@@ -289,6 +289,32 @@ input.warn {
   box-shadow: 0 0 0 2px rgba(230,179,90,.12);
 }
 
+
+/* ============================================================
+   PATCH 16 — розширена валідація textarea
+   ============================================================ */
+.ta-error-list {
+  margin-top: 4px;
+  padding: 6px 10px;
+  background: rgba(224,102,90,.10);
+  border-left: 2px solid #e0665a;
+  border-radius: 4px;
+  font-size: 11.5px;
+  color: #e0665a;
+  line-height: 1.7;
+  display: none;
+}
+.ta-error-list.visible { display: block; }
+.ta-ok-msg {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #5fd0a5;
+  display: none;
+}
+.ta-ok-msg.visible { display: block; }
+textarea.ta-invalid { border-color: #e0665a !important; box-shadow: 0 0 0 2px rgba(224,102,90,.15); }
+textarea.ta-valid   { border-color: #5fd0a5 !important; }
+
 </style>
 </head>
 
@@ -4849,6 +4875,276 @@ function highlightRos(rawText) {
     document.addEventListener('DOMContentLoaded', attachValidators);
   } else {
     attachValidators();
+  }
+
+})();
+
+/* ============================================================
+   PATCH 16 — DNS / Port Forwarding / WireGuard peers
+   ============================================================ */
+(function() {
+  'use strict';
+
+  /* --- Утиліти (локальні копії щоб не залежати від порядку) --- */
+  function _isIPv4(v) {
+    var o = String(v || '').trim().split('.');
+    return o.length === 4 && o.every(function(x) {
+      return /^\d+$/.test(x) && +x >= 0 && +x <= 255;
+    });
+  }
+  function _isPort(v) {
+    return /^\d+$/.test(String(v).trim()) && +v >= 1 && +v <= 65535;
+  }
+  function _isBase64Key(v) {
+    /* WireGuard public key: base64, 44 символи з '=' на кінці */
+    return /^[A-Za-z0-9+\/]{43}=$/.test(String(v || '').trim());
+  }
+  function _isCIDR(v) {
+    var p = String(v || '').trim().split('/');
+    return p.length === 2 && _isIPv4(p[0]) &&
+      /^\d+$/.test(p[1]) && +p[1] >= 0 && +p[1] <= 32;
+  }
+
+  /* --- Допоміжні UI функції --- */
+  function getOrCreate(parentEl, cls, tag) {
+    var el = parentEl.parentNode.querySelector('.' + cls);
+    if (!el) {
+      el = document.createElement(tag || 'div');
+      el.className = cls;
+      parentEl.parentNode.appendChild(el);
+    }
+    return el;
+  }
+
+  function showErrors(textarea, errors) {
+    textarea.classList.remove('ta-valid');
+    textarea.classList.add('ta-invalid');
+
+    var errEl = getOrCreate(textarea, 'ta-error-list');
+    errEl.innerHTML = errors.map(function(e) {
+      return '✗ ' + e;
+    }).join('<br>');
+    errEl.classList.add('visible');
+
+    var okEl = getOrCreate(textarea, 'ta-ok-msg');
+    okEl.classList.remove('visible');
+  }
+
+  function showOk(textarea, msg) {
+    textarea.classList.remove('ta-invalid');
+    textarea.classList.add('ta-valid');
+
+    var errEl = getOrCreate(textarea, 'ta-error-list');
+    errEl.classList.remove('visible');
+
+    var okEl = getOrCreate(textarea, 'ta-ok-msg');
+    okEl.textContent = '✓ ' + (msg || 'Все вірно');
+    okEl.classList.add('visible');
+  }
+
+  function clearState(textarea) {
+    textarea.classList.remove('ta-invalid', 'ta-valid');
+    ['ta-error-list', 'ta-ok-msg'].forEach(function(cls) {
+      var el = textarea.parentNode.querySelector('.' + cls);
+      if (el) {
+        el.classList.remove('visible');
+        el.textContent = '';
+      }
+    });
+  }
+
+  /* ============================================================
+     [1] DNS для клієнтів — landns
+         Зовнішні DNS   — upstreamdns
+     Формат: одна або кілька IPv4 через кому або пробіл
+     ============================================================ */
+  function validateDnsField(input) {
+    var val = input.value.trim();
+    if (!val) { clearState(input); return; }
+
+    var entries = val.split(/[,\s]+/).filter(Boolean);
+    var errors  = [];
+    var valid   = 0;
+
+    entries.forEach(function(entry) {
+      if (!_isIPv4(entry)) {
+        errors.push('"' + entry + '" — некоректна IPv4-адреса');
+      } else {
+        valid++;
+      }
+    });
+
+    if (errors.length) {
+      showErrors(input, errors);
+    } else {
+      showOk(input, 'DNS адреси (' + valid + ' шт.) — коректні');
+    }
+  }
+
+  /* ============================================================
+     [2] Port Forwarding — pfwrules
+     Формат кожного рядка: proto:зовн_порт:внутр_IP:внутр_порт:коментар
+     Приклад: tcp:8080:192.168.88.50:80:Camera
+     ============================================================ */
+  function validatePortForwarding(textarea) {
+    var raw = textarea.value.trim();
+    if (!raw) { clearState(textarea); return; }
+
+    var lines  = raw.split('\n');
+    var errors = [];
+    var valid  = 0;
+
+    lines.forEach(function(line, i) {
+      var val = line.trim();
+      if (!val || val.startsWith('#')) return;
+
+      var num = i + 1;
+      var parts = val.split(':');
+
+      if (parts.length < 4) {
+        errors.push('Рядок ' + num + ': замало частин — потрібно proto:зовн:IP:внутр[:коментар]');
+        return;
+      }
+
+      var proto    = parts[0].trim().toLowerCase();
+      var extPort  = parts[1].trim();
+      var intIp    = parts[2].trim();
+      var intPort  = parts[3].trim();
+
+      if (!['tcp', 'udp'].includes(proto)) {
+        errors.push('Рядок ' + num + ': протокол "' + proto + '" — має бути tcp або udp');
+      }
+      if (!_isPort(extPort)) {
+        errors.push('Рядок ' + num + ': зовнішній порт "' + extPort + '" — має бути 1-65535');
+      }
+      if (!_isIPv4(intIp)) {
+        errors.push('Рядок ' + num + ': IP "' + intIp + '" — некоректна IPv4-адреса');
+      }
+      if (!_isPort(intPort)) {
+        errors.push('Рядок ' + num + ': внутрішній порт "' + intPort + '" — має бути 1-65535');
+      }
+
+      if (
+        ['tcp','udp'].includes(proto) &&
+        _isPort(extPort) && _isIPv4(intIp) && _isPort(intPort)
+      ) {
+        valid++;
+      }
+    });
+
+    if (errors.length) {
+      showErrors(textarea, errors);
+    } else {
+      showOk(textarea, 'Port Forwarding (' + valid + ' правил) — коректні');
+    }
+  }
+
+  /* ============================================================
+     [3] WireGuard peers — wgpeers
+     Формат кожного рядка: ім'я:public_key:IP/32
+     Приклад: phone:abc...xyz=:10.20.30.2/32
+     ============================================================ */
+  function validateWgPeers(textarea) {
+    var raw = textarea.value.trim();
+    if (!raw) { clearState(textarea); return; }
+
+    var lines  = raw.split('\n');
+    var errors = [];
+    var valid  = 0;
+
+    lines.forEach(function(line, i) {
+      var val = line.trim();
+      if (!val || val.startsWith('#')) return;
+
+      var num   = i + 1;
+      var parts = val.split(':');
+
+      if (parts.length < 3) {
+        errors.push('Рядок ' + num + ': формат — ім\'я:public_key:IP/32');
+        return;
+      }
+
+      var name      = parts[0].trim();
+      var publicKey = parts[1].trim();
+      var allowedIp = parts[2].trim();
+
+      if (!name) {
+        errors.push('Рядок ' + num + ': ім\'я пустe');
+      }
+      if (!_isBase64Key(publicKey)) {
+        errors.push(
+          'Рядок ' + num + ': public key "' +
+          publicKey.substring(0, 12) + '..." — ' +
+          'має бути base64, 44 символи (напр. з wg genkey | wg pubkey)'
+        );
+      }
+      if (!_isCIDR(allowedIp)) {
+        errors.push('Рядок ' + num + ': "' + allowedIp + '" — має бути CIDR, напр. 10.20.30.2/32');
+      } else if (!allowedIp.endsWith('/32') && !allowedIp.endsWith('/24')) {
+        /* Попередження — не помилка */
+        errors.push(
+          '⚠ Рядок ' + num + ': маска /' +
+          allowedIp.split('/')[1] + ' — для клієнта зазвичай /32'
+        );
+      }
+
+      if (
+        name && _isBase64Key(publicKey) && _isCIDR(allowedIp)
+      ) {
+        valid++;
+      }
+    });
+
+    /* Розділяємо справжні помилки і попередження */
+    var realErrors = errors.filter(function(e) { return !e.startsWith('⚠'); });
+    var warns      = errors.filter(function(e) { return e.startsWith('⚠'); });
+
+    if (realErrors.length) {
+      showErrors(textarea, errors);
+    } else if (warns.length) {
+      /* Є тільки попередження — поле помаранчеве */
+      textarea.classList.remove('ta-invalid', 'ta-valid');
+      textarea.classList.add('ta-invalid');
+      var errEl = getOrCreate(textarea, 'ta-error-list');
+      errEl.style.borderColor = '#e6b35a';
+      errEl.style.background  = 'rgba(230,179,90,.10)';
+      errEl.style.color       = '#e6b35a';
+      errEl.innerHTML = warns.map(function(e){ return e; }).join('<br>');
+      errEl.classList.add('visible');
+    } else {
+      showOk(textarea, 'WireGuard peers (' + valid + ' шт.) — коректні');
+    }
+  }
+
+  /* ============================================================
+     Підключення до полів
+     ============================================================ */
+  function attach(id, validator) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input',  function() { validator(el); });
+    el.addEventListener('blur',   function() { validator(el); });
+    el.addEventListener('change', function() { validator(el); });
+    /* Перевірити одразу якщо вже заповнено */
+    if (el.value.trim()) validator(el);
+  }
+
+  function init() {
+    /* [1] DNS */
+    attach('landns',      validateDnsField);
+    attach('upstreamdns', validateDnsField);
+
+    /* [2] Port Forwarding */
+    attach('pfwrules', validatePortForwarding);
+
+    /* [3] WireGuard peers */
+    attach('wgpeers', validateWgPeers);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
   }
 
 })();

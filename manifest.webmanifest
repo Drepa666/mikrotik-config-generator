@@ -1,0 +1,18 @@
+{
+  "name": "MikroTik Config Generator",
+  "short_name": "MT Config",
+  "description": "Генератор конфігурації MikroTik RouterOS",
+  "lang": "uk",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#5fd0a5",
+  "background_color": "#0f1720",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%235fd0a5'/><text y='.9em' font-size='80' x='10'>📡</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

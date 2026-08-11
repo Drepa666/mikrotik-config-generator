@@ -15,6 +15,9 @@ const PRECACHE_ASSETS = [
 ];
 
 /* Домени AI-провайдерів — НЕ кешуємо */
+/* ⚠️ SYNC: При додаванні нового AI-провайдера в index.html
+   → додай його hostname сюди теж!
+   Поточні провайдери: anthropic, openai, grok, groq, deepseek, gemini */
 const API_HOSTS = [
   'api.openai.com',
   'api.anthropic.com',

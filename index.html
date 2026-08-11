@@ -1982,11 +1982,7 @@ function genRoutes() {
     const distance = params[1] ? params[1].trim() : '1';
     const comment = params.slice(2).join(':').trim();
 
-    if (
-      (isCIDR(destination) || destination === '0.0.0.0/0') &&
-      gateway &&
-      /^\d+$/.test(distance)
-    ) {
+   if (!/^\d+$/.test(distance) || +distance < 1 || +distance > 255) {
       lines.push(
         '/ip route add dst-address=' + destination +
         ' gateway=' + gateway +

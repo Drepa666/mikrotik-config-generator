@@ -1,0 +1,4877 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%235fd0a5'/><text y='.9em' font-size='75' x='12'>📡</text></svg>">
+
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MikroTik Config Generator</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MT Config">
+<meta name="theme-color" content="#5fd0a5">
+
+<style>
+:root{
+  --bg:#0f1720;
+  --panel:#16212c;
+  --panel2:#1c2a37;
+  --border:#2a3b48;
+  --text:#e6edf3;
+  --muted:#8ea3b0;
+  --accent:#5fd0a5;
+  --accent-dark:#2f7a5c;
+  --danger:#e0665a;
+  --warn:#e6b35a;
+  --mono:'SF Mono','Consolas','Menlo',monospace;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  padding:24px;
+}
+h1{font-size:20px;font-weight:600;margin:0 0 4px;}
+.sub{color:var(--muted);font-size:13px;margin:0 0 24px;}
+.layout{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:20px;
+  align-items:start;
+}
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr;}
+  #out-wrap{position:static!important;}
+}
+.card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:18px 20px;
+  margin-bottom:16px;
+}
+.card h2{
+  font-size:13px;
+  margin:0 0 14px;
+  color:var(--accent);
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+.row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-bottom:12px;
+}
+.row.single{grid-template-columns:1fr;}
+label{
+  display:block;
+  font-size:12.5px;
+  color:var(--muted);
+  margin-bottom:5px;
+}
+input[type=text],
+input[type=password],
+input[type=number],
+select{
+  width:100%;
+  background:var(--panel2);
+  border:1px solid var(--border);
+  color:var(--text);
+  padding:8px 10px;
+  border-radius:6px;
+  font-size:13.5px;
+  outline:none;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+textarea{
+  width:100%;
+  background:var(--panel2);
+  border:1px solid var(--border);
+  color:var(--text);
+  padding:8px 10px;
+  border-radius:6px;
+  font-size:13px;
+  outline:none;
+  resize:vertical;
+  font-family:inherit;
+}
+textarea.mono{
+  font-family:var(--mono);
+  font-size:12.3px;
+}
+button{
+  background:var(--accent);
+  color:#082018;
+  border:none;
+  padding:9px 16px;
+  border-radius:6px;
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+}
+button.sec{
+  background:transparent;
+  border:1px solid var(--border);
+  color:var(--text);
+}
+button:disabled{
+  opacity:.5;
+  cursor:default;
+}
+button:active{transform:scale(.98);}
+.btnbar{
+  display:flex;
+  gap:10px;
+  margin-bottom:12px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.chk{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+  font-size:13px;
+}
+.chk input[type=checkbox]{width:auto;}
+.hint{
+  font-size:11.5px;
+  color:var(--muted);
+  margin-top:4px;
+}
+.badge{
+  display:inline-block;
+  font-size:11px;
+  background:var(--accent-dark);
+  color:#d5f5e8;
+  padding:2px 7px;
+  border-radius:4px;
+  margin-left:6px;
+}
+.tog{
+  opacity:1;
+  transition:opacity .15s;
+}
+.tog.off{
+  opacity:.35;
+  pointer-events:none;
+}
+#out-wrap{
+  position:sticky;
+  top:24px;
+}
+#output{
+  background:#0a1017;
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:16px;
+  font-family:var(--mono);
+  font-size:12.3px;
+  line-height:1.6;
+  white-space:pre-wrap;
+  word-break:break-word;
+  max-height:680px;
+  overflow-y:auto;
+  color:#c9e8d8;
+  min-height:120px;
+}
+.wbox{
+  display:none;
+  background:#2a1a1a;
+  border:1px solid var(--danger);
+  border-radius:8px;
+  padding:10px 14px;
+  margin-bottom:12px;
+  font-size:12px;
+  color:#ffb3ab;
+}
+.sbox{
+  display:none;
+  background:#0d2a1a;
+  border:1px solid var(--accent);
+  border-radius:8px;
+  padding:10px 14px;
+  margin-bottom:12px;
+  font-size:12px;
+  color:#a8f0db;
+}
+.ibox{
+  display:none;
+  background:#2a2614;
+  border:1px solid var(--warn);
+  border-radius:8px;
+  padding:10px 14px;
+  margin-bottom:12px;
+  font-size:12px;
+  color:#ffe3a3;
+}
+.ks{
+  font-size:11.5px;
+  margin-top:6px;
+  min-height:18px;
+}
+.ks.ok{color:var(--accent);}
+.ks.err{color:var(--danger);}
+.ks.warn{color:var(--warn);}
+
+.diff-wrap { margin-top: 20px; }
+.diff-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.diff-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.diff-output {
+  background: #0a1017;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 520px;
+  overflow-y: auto;
+  color: #c9e8d8;
+  min-height: 60px;
+}
+.diff-add  { background: rgba(95,208,165,.18); color: #a8f0db; display: block; }
+.diff-rem  { background: rgba(224,102,90,.18);  color: #ffb3ab; display: block; }
+.diff-same { color: #4a6070; display: block; }
+.diff-hdr  { color: var(--accent); font-weight: 600; display: block; margin-top: 8px; }
+.diff-stat { font-size: 11.5px; margin-top: 8px; color: var(--muted); }
+.diff-stat b { color: var(--text); }
+@media(max-width:900px){ .diff-controls{grid-template-columns:1fr;} }
+
+
+/* ============================================================
+   INLINE VALIDATION
+   ============================================================ */
+.field-wrap { position: relative; }
+.field-error {
+  display: none;
+  font-size: 11px;
+  color: #e0665a;
+  margin-top: 3px;
+  padding: 3px 8px;
+  background: rgba(224,102,90,.10);
+  border-radius: 4px;
+  border-left: 2px solid #e0665a;
+}
+.field-warn {
+  display: none;
+  font-size: 11px;
+  color: #e6b35a;
+  margin-top: 3px;
+  padding: 3px 8px;
+  background: rgba(230,179,90,.10);
+  border-radius: 4px;
+  border-left: 2px solid #e6b35a;
+}
+input.invalid, textarea.invalid {
+  border-color: #e0665a !important;
+  box-shadow: 0 0 0 2px rgba(224,102,90,.15);
+}
+input.valid {
+  border-color: #5fd0a5 !important;
+}
+input.warn {
+  border-color: #e6b35a !important;
+  box-shadow: 0 0 0 2px rgba(230,179,90,.12);
+}
+
+</style>
+</head>
+
+<body>
+<h1>Генератор конфігурації MikroTik RouterOS</h1>
+<p class="sub">Заповни параметри зліва — скрипт формується справа в реальному часі.</p>
+
+<div class="card">
+  <h2>Профілі та налаштування</h2>
+
+  <div class="btnbar">
+    <button id="btn-save">💾 Зберегти налаштування</button>
+
+    <label for="f-load" class="sec" style="display:inline-flex;align-items:center;padding:9px 16px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
+      📂 Завантажити
+    </label>
+    <input type="file" id="f-load" accept=".json" style="display:none">
+
+    <button class="sec" id="btn-reset">🔄 Скинути</button>
+
+    <span style="color:var(--muted);padding:0 4px">│</span>
+
+    <button class="sec" id="pre-home">🏠 Дім</button>
+    <button class="sec" id="pre-office">🏢 Офіс</button>
+    <button class="sec" id="pre-lte">📶 LTE</button>
+
+    <button id="pwa-install-btn" class="sec" style="display:none;align-items:center;gap:6px;">
+      📲 Встановити
+    </button>
+
+    <span id="prof-status" class="hint" style="margin:0"></span>
+  </div>
+
+  <div class="hint">
+    ⚠️ Файл налаштувань і згенерований <code>.rsc</code> можуть містити паролі у відкритому вигляді — зберігай їх безпечно.
+  </div>
+</div>
+
+<div class="layout">
+<div id="form">
+
+  <div class="card">
+    <h2>AI-генерація команд <span class="badge">провайдер</span></h2>
+
+    <div class="row">
+      <div>
+        <label>AI-провайдер</label>
+        <select id="ai-prov">
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="openai">OpenAI (GPT)</option>
+          <option value="grok">Grok (xAI)</option>
+          <option value="groq">Groq</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="gemini">Gemini</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Модель (необов'язково)</label>
+        <input type="text" id="ai-model" placeholder="напр. gpt-4o-mini">
+      </div>
+    </div>
+
+    <label>API ключ</label>
+    <div style="display:flex;gap:8px;margin-bottom:6px;">
+      <input type="password" id="ai-key" placeholder="вставте ключ..." style="flex:1">
+      <button id="btn-key-save" style="white-space:nowrap;padding:8px 12px;font-size:12px;">Зберегти</button>
+      <button class="sec" id="btn-key-show" style="padding:8px 12px;font-size:12px;">Показати</button>
+      <button class="sec" id="btn-key-test" style="padding:8px 12px;font-size:12px;">Тест</button>
+    </div>
+
+    <div id="ks" class="ks"></div>
+
+    <div class="hint">
+      ⚠️ API-ключ не експортується разом із профілем і не зберігається у localStorage.
+      У браузері ключ все одно доступний через DevTools — використовуй лише довірений пристрій.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Модель роутера</h2>
+
+    <div class="row">
+      <div>
+        <label>Модель</label>
+        <select id="model">
+          <option value="hap-ac-lite">hAP ac lite</option>
+          <option value="hap-ac2">hAP ac2</option>
+          <option value="hap-ac3">hAP ac3</option>
+          <option value="hap-ax2">hAP ax2 (Wi-Fi 6)</option>
+          <option value="hap-ax3">hAP ax3 (Wi-Fi 6)</option>
+          <option value="hap-ax-s">hAP ax S (Wi-Fi 6)</option>
+          <option value="hex">hEX (без Wi-Fi)</option>
+          <option value="wap-ac">wAP ac (1 порт)</option>
+          <option value="cap-ac">cAP ac (1 порт)</option>
+          <option value="chateau-lte7">Chateau LTE7 ax</option>
+          <option value="chateau-lte12">Chateau LTE12</option>
+          <option value="chateau-5g">Chateau 5G ax</option>
+          <option value="chateau-pro-ax">Chateau PRO ax</option>
+          <option value="other">Інша (вручну)</option>
+        </select>
+      </div>
+
+      <div>
+        <label>RouterOS</label>
+        <select id="firmware">
+          <option value="7.13+">7.13 і новіше</option>
+          <option value="7.1-7.12">7.1 – 7.12</option>
+          <option value="6.x">6.x</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="custom-model-row" class="row single" style="display:none">
+      <div>
+        <label>Назва моделі</label>
+        <input type="text" id="custommodel" placeholder="напр. RB5009">
+      </div>
+    </div>
+
+    <div class="hint" id="model-hint"></div>
+  </div>
+
+  <div class="card">
+    <h2>Загальне</h2>
+
+    <div class="chk">
+      <input type="checkbox" id="backupenable" checked>
+      <label for="backupenable" style="margin:0">Резервна копія перед змінами</label>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="safetynet">
+      <label for="safetynet" style="margin:0">Запобіжник від блокування (авто-відкат)</label>
+    </div>
+
+    <div id="safety-row" class="row single tog off">
+      <div>
+        <label>Хвилин до відкату</label>
+        <input type="number" id="safetyminutes" value="10" min="1" max="120">
+      </div>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="ddnsenable">
+      <label for="ddnsenable" style="margin:0">Cloud DDNS</label>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="resetconfig">
+      <label for="resetconfig" style="margin:0">Скинути конфіг перед застосуванням</label>
+    </div>
+
+    <div class="hint" style="margin-bottom:10px">
+      ⚠️ Reset перезавантажує роутер. Команда генерується окремо на початку файлу — запускай її лише вручну та окремо від основного сценарію.
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Ім'я роутера</label>
+        <input type="text" id="hostname" value="MikroTik-Router">
+      </div>
+
+      <div>
+        <label>Часовий пояс</label>
+        <select id="timezone">
+          <option value="Europe/Kyiv">Europe/Kyiv</option>
+          <option value="Europe/Warsaw">Europe/Warsaw</option>
+          <option value="UTC">UTC</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="changepass" checked>
+      <label for="changepass" style="margin:0">Змінити пароль admin</label>
+    </div>
+
+    <div id="pass-row" class="row single">
+      <div>
+        <label>Новий пароль admin</label>
+        <input type="password" id="adminpass" autocomplete="new-password" placeholder="уникай $ у паролі">
+      </div>
+    </div>
+
+    <div class="chk" style="margin-top:8px">
+      <input type="checkbox" id="disableipv6">
+      <label for="disableipv6" style="margin:0">Вимкнути IPv6</label>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="ipneighbor">
+      <label for="ipneighbor" style="margin:0">Вимкнути IP Neighbor Discovery</label>
+    </div>
+
+    <div class="row single" style="margin-top:6px">
+      <div>
+        <label>max-neighbor-entries (0 = не змінювати)</label>
+        <input type="number" id="maxneighbor" value="0" min="0" max="65536">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>WAN</h2>
+
+    <div class="row">
+      <div>
+        <label>WAN-інтерфейс</label>
+        <input type="text" id="wanif" value="ether1">
+      </div>
+
+      <div>
+        <label>Тип підключення</label>
+        <select id="wantype">
+          <option value="dhcp">DHCP</option>
+          <option value="static">Статична IP</option>
+          <option value="pppoe">PPPoE</option>
+          <option value="lte">LTE (APN)</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="wan-static" style="display:none" class="row">
+      <div>
+        <label>IP/маска</label>
+        <input type="text" id="wanip" placeholder="203.0.113.10/24">
+      </div>
+      <div>
+        <label>Шлюз</label>
+        <input type="text" id="wangw" placeholder="203.0.113.1">
+      </div>
+    </div>
+
+    <div id="wan-pppoe" style="display:none" class="row">
+      <div>
+        <label>Логін PPPoE</label>
+        <input type="text" id="pppoeuser" placeholder="login@isp">
+      </div>
+      <div>
+        <label>Пароль PPPoE</label>
+        <input type="password" id="pppoepass">
+      </div>
+    </div>
+
+    <div id="wan-lte" style="display:none" class="row">
+      <div>
+        <label>APN</label>
+        <input type="text" id="lteapn" placeholder="internet">
+      </div>
+      <div>
+        <label>PIN SIM</label>
+        <input type="text" id="ltepin" placeholder="необов'язково">
+      </div>
+    </div>
+
+    <div id="wan-lte2" style="display:none" class="row">
+      <div>
+        <label>Логін APN</label>
+        <input type="text" id="lteuser" placeholder="необов'язково">
+      </div>
+      <div>
+        <label>Пароль APN</label>
+        <input type="password" id="ltepass">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Резервний WAN (Failover)</h2>
+
+    <div class="chk">
+      <input type="checkbox" id="foenable">
+      <label for="foenable" style="margin:0">Увімкнути резервний канал</label>
+    </div>
+
+    <div id="fo-block" class="tog off">
+      <div class="row">
+        <div>
+          <label>Інтерфейс</label>
+          <input type="text" id="foif" value="lte1">
+        </div>
+
+        <div>
+          <label>Тип</label>
+          <select id="fotype">
+            <option value="lte">LTE (APN)</option>
+            <option value="dhcp">DHCP</option>
+            <option value="static">Статична IP</option>
+            <option value="pppoe">PPPoE</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="fo-static" style="display:none" class="row">
+        <div>
+          <label>IP/маска</label>
+          <input type="text" id="foip" placeholder="203.0.113.20/24">
+        </div>
+        <div>
+          <label>Шлюз</label>
+          <input type="text" id="fogw" placeholder="203.0.113.1">
+        </div>
+      </div>
+
+      <div id="fo-pppoe" style="display:none" class="row">
+        <div>
+          <label>Логін</label>
+          <input type="text" id="fouser" placeholder="login@isp">
+        </div>
+        <div>
+          <label>Пароль</label>
+          <input type="password" id="fopass">
+        </div>
+      </div>
+
+      <div id="fo-lte" class="row">
+        <div>
+          <label>APN</label>
+          <input type="text" id="foapn" placeholder="internet">
+        </div>
+        <div>
+          <label>PIN SIM</label>
+          <input type="text" id="fopin" placeholder="необов'язково">
+        </div>
+      </div>
+
+      <div id="fo-lte2" class="row">
+        <div>
+          <label>Логін APN</label>
+          <input type="text" id="foapnuser" placeholder="необов'язково">
+        </div>
+        <div>
+          <label>Пароль APN</label>
+          <input type="password" id="foapnpass">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Health-check хост</label>
+          <input type="text" id="fohealthhost" value="8.8.8.8">
+        </div>
+        <div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>LAN</h2>
+
+    <div class="row">
+      <div>
+        <label>LAN-порти (через кому)</label>
+        <input type="text" id="lanports" value="ether2,ether3,ether4,ether5">
+      </div>
+
+      <div>
+        <label>IP роутера</label>
+        <input type="text" id="lanip" value="192.168.88.1/24">
+      </div>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="dhcpenable" checked>
+      <label for="dhcpenable" style="margin:0">DHCP-сервер у LAN</label>
+    </div>
+
+    <div id="dhcp-block" class="tog">
+      <div class="row">
+        <div>
+          <label>Діапазон DHCP</label>
+          <input type="text" id="dhcprange" value="192.168.88.10-192.168.88.254">
+        </div>
+        <div>
+          <label>DNS для клієнтів</label>
+          <input type="text" id="landns" value="192.168.88.1">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>DNS та NAT</h2>
+
+    <div class="row">
+      <div>
+        <label>Зовнішні DNS</label>
+        <input type="text" id="upstreamdns" value="8.8.8.8,8.8.4.4,1.1.1.1">
+      </div>
+
+      <div>
+        <label>&nbsp;</label>
+        <div class="chk" style="margin-top:5px">
+          <input type="checkbox" id="allowremote" checked>
+          <label for="allowremote" style="margin:0">allow-remote-requests</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="natenable" checked>
+      <label for="natenable" style="margin:0">NAT (masquerade)</label>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="dnsprotect" checked>
+      <label for="dnsprotect" style="margin:0">Захист DNS від WAN (блок порту 53)</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Static DNS</h2>
+
+    <div class="chk">
+      <input type="checkbox" id="dnsstaticenable">
+      <label for="dnsstaticenable" style="margin:0">Статичні DNS-записи</label>
+    </div>
+
+    <div id="dnsstatic-block" class="tog off">
+      <label>Записи (ім'я=IP, по рядку)</label>
+      <textarea id="dnsstaticentries" rows="4" class="mono" placeholder="router.lan=192.168.88.1&#10;nas.lan=192.168.88.10"></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Port Forwarding</h2>
+
+    <div class="chk">
+      <input type="checkbox" id="pfwenable">
+      <label for="pfwenable" style="margin:0">Port Forwarding (DST-NAT)</label>
+    </div>
+
+    <div id="pfw-block" class="tog off">
+      <label>Правила (proto:зовн:внутр_IP:внутр:коментар)</label>
+      <textarea id="pfwrules" rows="4" class="mono" placeholder="tcp:8080:192.168.88.50:80:Camera&#10;tcp:3389:192.168.88.100:3389:RDP"></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Wi-Fi <span class="badge" id="wifi-badge">wlan1/wlan2</span></h2>
+
+    <div class="chk">
+      <input type="checkbox" id="wifienable">
+      <label for="wifienable" style="margin:0">Налаштувати Wi-Fi</label>
+    </div>
+
+    <div id="wifi-block" class="tog off">
+      <div class="row">
+        <div>
+          <label>SSID</label>
+          <input type="text" id="ssid" value="MyNetwork">
+        </div>
+        <div>
+          <label>Пароль</label>
+          <input type="password" id="wifipass" autocomplete="new-password" placeholder="мін. 8 символів">
+        </div>
+      </div>
+
+      <div class="chk">
+        <input type="checkbox" id="band24" checked>
+        <label for="band24" style="margin:0">2.4 ГГц</label>
+      </div>
+
+      <div class="chk">
+        <input type="checkbox" id="band5" checked>
+        <label for="band5" style="margin:0">5 ГГц</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>CAPsMAN</h2>
+
+    <div class="chk">
+      <input type="checkbox" id="capsmanenable">
+      <label for="capsmanenable" style="margin:0">CAPsMAN сервер</label>
+    </div>
+
+    <div id="capsman-block" class="tog off">
+      <div class="row">
+        <div>
+          <label>SSID</label>
+          <input type="text" id="capsmanssid" value="Office-WiFi">
+        </div>
+        <div>
+          <label>Пароль</label>
+          <input type="password" id="capsmanpass" autocomplete="new-password" placeholder="мін. 8 символів">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Канал 2.4 ГГц</label>
+          <input type="text" id="capsman24ch" value="2417/20/gn">
+        </div>
+        <div>
+          <label>Канал 5 ГГц</label>
+          <input type="text" id="capsman5ch" value="5180/80/ac">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Гостьова мережа (VLAN)</h2>
+
+    <div class="chk">
+      <input type="checkbox" id="guestenable">
+      <label for="guestenable" style="margin:0">Ізольована гостьова мережа</label>
+    </div>
+
+    <div id="guest-block" class="tog off">
+      <div class="row">
+        <div>
+          <label>VLAN ID</label>
+          <input type="text" id="guestvlan" value="20">
+        </div>
+        <div>
+          <label>IP гостьової мережі</label>
+          <input type="text" id="guestip" value="192.168.20.1/24">
+        </div>
+      </div>
+
+      <div class="row single">
+        <div>
+          <label>Діапазон DHCP</label>
+          <input type="text" id="guestrange" value="192.168.20.10-192.168.20.254">
+        </div>
+      </div>
+
+      <div class="chk">
+        <input type="checkbox" id="guestwifi">
+        <label for="guestwifi" style="margin:0">Окремий гостьовий Wi-Fi</label>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>SSID гостьовий</label>
+          <input type="text" id="guestssid" value="Guest-WiFi">
+        </div>
+        <div>
+          <label>Пароль</label>
+          <input type="password" id="guestwifipass" autocomplete="new-password" placeholder="мін. 8 символів">
+        </div>
+      </div>
+    </div>
+  </div>  <div class="card">
+    <h2>WireGuard VPN <span class="badge">RouterOS 7+</span></h2>
+
+    <div class="chk">
+      <input type="checkbox" id="wgenable">
+      <label for="wgenable" style="margin:0">WireGuard сервер</label>
+    </div>
+
+    <div id="wg-block" class="tog off">
+      <div class="row">
+        <div>
+          <label>Порт</label>
+          <input type="number" id="wgport" value="51820" min="1" max="65535">
+        </div>
+        <div>
+          <label>IP сервера (CIDR)</label>
+          <input type="text" id="wgserverip" value="10.20.30.1/24">
+        </div>
+      </div>
+
+      <label>Клієнти (ім'я:pub_key:IP/32)</label>
+      <textarea id="wgpeers" rows="3" class="mono" placeholder="phone:AbCdEf...==:10.20.30.2/32"></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>OpenVPN сервер</h2>
+
+    <div class="chk">
+      <input type="checkbox" id="ovpnenable">
+      <label for="ovpnenable" style="margin:0">OpenVPN сервер</label>
+    </div>
+
+    <div id="ovpn-block" class="tog off">
+      <div class="row">
+        <div>
+          <label>Порт</label>
+          <input type="number" id="ovpnport" value="1194" min="1" max="65535">
+        </div>
+
+        <div>
+          <label>Шифрування</label>
+          <select id="ovpncipher">
+            <option value="aes256-cbc">aes256-cbc (рекомендовано)</option>
+            <option value="aes256-gcm">aes256-gcm (лише 7.13+)</option>
+            <option value="blowfish128">blowfish128 (лише 6.x)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>IP сервера у VPN</label>
+          <input type="text" id="ovpnlocal" value="10.10.10.1">
+        </div>
+        <div>
+          <label>Діапазон клієнтів</label>
+          <input type="text" id="ovpnrange" value="10.10.10.2-10.10.10.254">
+        </div>
+      </div>
+
+      <div class="chk">
+        <input type="checkbox" id="ovpnreqcert">
+        <label for="ovpnreqcert" style="margin:0">Вимагати клієнтський сертифікат</label>
+      </div>
+
+      <label>Користувачі (логін:пароль)</label>
+      <textarea id="ovpnusers" rows="3" class="mono" placeholder="vpnuser:СкладнийПароль"></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>OpenVPN клієнт</h2>
+
+    <div class="chk">
+      <input type="checkbox" id="ovpnclenable">
+      <label for="ovpnclenable" style="margin:0">OpenVPN клієнт</label>
+    </div>
+
+    <div id="ovpncl-block" class="tog off">
+      <div class="row">
+        <div>
+          <label>Адреса сервера</label>
+          <input type="text" id="ovpnclserver" placeholder="vpn.example.com">
+        </div>
+        <div>
+          <label>Порт</label>
+          <input type="number" id="ovpnclport" value="1194" min="1" max="65535">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Назва інтерфейсу</label>
+          <input type="text" id="ovpnclname" value="ovpn-client1">
+        </div>
+        <div>
+          <label>Шифрування</label>
+          <select id="ovpnclcipher">
+            <option value="aes256-cbc">aes256-cbc</option>
+            <option value="aes256-gcm">aes256-gcm</option>
+            <option value="blowfish128">blowfish128</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Логін</label>
+          <input type="text" id="ovpncluser">
+        </div>
+        <div>
+          <label>Пароль</label>
+          <input type="password" id="ovpnclpass">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Сертифікат клієнта</label>
+          <input type="text" id="ovpnclcert" placeholder="client.crt_0 або порожньо">
+        </div>
+        <div>
+          <label>MAC (необов'язково)</label>
+          <input type="text" id="ovpnclmac" placeholder="02:XX:XX:XX:XX:XX">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>IPsec</h2>
+
+    <div class="chk">
+      <input type="checkbox" id="ipsecenable">
+      <label for="ipsecenable" style="margin:0">IPsec тунелі</label>
+    </div>
+
+    <div id="ipsec-block" class="tog off">
+      <label>Peers (ім'я:IP:PSK:режим)</label>
+      <textarea id="ipsecpeers" rows="3" class="mono" placeholder="peer1:195.123.10.1:MyStrongPSK:ike2"
+        style="-webkit-text-security:disc"
+        onfocus="this.style.webkitTextSecurity='none'"
+        onblur="this.style.webkitTextSecurity='disc'"></textarea>
+
+      <label style="margin-top:8px">Policies (peer:src_net:dst_net)</label>
+      <textarea id="ipsecpolicies" rows="3" class="mono" placeholder="peer1:10.1.0.0/24:10.2.0.0/24"></textarea>
+
+      <div class="row" style="margin-top:10px">
+        <div>
+          <label>Шифрування</label>
+          <select id="ipsecenc">
+            <option value="aes-256">aes-256</option>
+            <option value="aes-128">aes-128</option>
+            <option value="3des">3des</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Hash</label>
+          <select id="ipsechash">
+            <option value="sha256">sha256</option>
+            <option value="sha512">sha512</option>
+            <option value="sha1">sha1</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Address-List</h2>
+
+    <div class="chk">
+      <input type="checkbox" id="addrlistenable">
+      <label for="addrlistenable" style="margin:0">Firewall Address-List</label>
+    </div>
+
+    <div id="addrlist-block" class="tog off">
+      <label>Записи (список=IP або CIDR, по рядку)</label>
+      <textarea id="addrlistentries" rows="5" class="mono" placeholder="TRUSTED=192.168.1.100&#10;BLOCKED=10.0.0.0/24"></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Статичні маршрути</h2>
+
+    <div class="chk">
+      <input type="checkbox" id="routesenable">
+      <label for="routesenable" style="margin:0">Статичні маршрути</label>
+    </div>
+
+    <div id="routes-block" class="tog off">
+      <label>Маршрути (мережа=шлюз:distance:коментар)</label>
+      <textarea id="routesentries" rows="4" class="mono" placeholder="10.0.0.0/8=192.168.88.254:1:corporate"></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Фаєрвол та сервіси</h2>
+
+    <div class="chk">
+      <input type="checkbox" id="basicfw" checked>
+      <label for="basicfw" style="margin:0">Базовий фаєрвол (defconf)</label>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="fasttrack">
+      <label for="fasttrack" style="margin:0">Додати правило FastTrack</label>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="fasttrackhw">
+      <label for="fasttrackhw" style="margin:0">hw-offload для FastTrack (лише CRS/switch-chip)</label>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="macprotect" checked>
+      <label for="macprotect" style="margin:0">Захист MAC (Winbox/Telnet тільки з LAN)</label>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="disableservices">
+      <label for="disableservices" style="margin:0">Вимкнути telnet, ftp, www, api</label>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="disablesvcports">
+      <label for="disablesvcports" style="margin:0">Вимкнути небезпечні service-ports</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>NTP та моніторинг</h2>
+
+    <div class="chk">
+      <input type="checkbox" id="ntpenable" checked>
+      <label for="ntpenable" style="margin:0">NTP-клієнт (pool.ntp.org)</label>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="logwandrops">
+      <label for="logwandrops" style="margin:0">Логувати блокування з WAN</label>
+    </div>
+
+    <div class="chk">
+      <input type="checkbox" id="netwatchenable">
+      <label for="netwatchenable" style="margin:0">Netwatch</label>
+    </div>
+
+    <div id="netwatch-block" class="row tog off">
+      <div>
+        <label>Хост перевірки</label>
+        <input type="text" id="netwatchhost" value="8.8.8.8">
+      </div>
+      <div>
+        <label>Інтервал</label>
+        <input type="text" id="netwatchinterval" value="30s">
+      </div>
+    </div>
+
+    <div class="hint">
+      ⚠️ Якщо Failover та Netwatch перевіряють один хост — будуть створені два записи Netwatch. Краще використовувати різні хости.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Власні команди (AI або вручну)</h2>
+
+    <label>Опис задачі</label>
+    <textarea id="customdesc" rows="3" placeholder="Напр.: відкрити порт 8080 для камери 192.168.88.50"></textarea>
+
+    <div class="btnbar" style="margin-top:10px;">
+      <button id="btn-ai-gen">Генерувати (AI)</button>
+      <span id="gen-status" class="hint" style="margin:0"></span>
+    </div>
+
+    <label>Команди RouterOS</label>
+    <textarea id="customcmds" rows="5" class="mono" placeholder="Тут з'являться згенеровані або введені вручну команди..."></textarea>
+
+    <div class="hint">
+      ⚠️ AI-команди не проходять автоматичну перевірку безпеки. Переглянь їх перед імпортом.
+    </div>
+  </div>
+
+</div><!-- /form -->
+
+<div id="out-wrap">
+  <div class="btnbar">
+    <button id="btn-copy">Копіювати скрипт</button>
+    <button class="sec" id="btn-dl">Завантажити .rsc</button>
+    <button class="sec" id="btn-validate">🔍 Перевірити</button>
+    <button class="sec" id="btn-strip">✂️ Мінімізувати</button>
+  </div>
+
+  <div id="vbox"></div>
+  <pre id="output"></pre>
+</div>
+
+</div><!-- /layout -->
+
+<div class="card" style="margin-top:20px">
+  <h2>Аналіз .rsc файлу</h2>
+
+  <input type="file" id="rsc-file" accept=".rsc,.txt"
+    style="width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px;margin-bottom:10px;">
+
+  <textarea id="rsc-input" rows="7" class="mono" placeholder="...або вставте вміст .rsc тут"></textarea>
+
+  <div class="btnbar" style="margin-top:10px;">
+    <button id="btn-parse">Розібрати офлайн</button>
+    <button class="sec" id="btn-fill">Заповнити форму</button>
+    <button class="sec" id="btn-explain">Пояснити (AI)</button>
+  </div>
+
+  <div id="rsc-status" class="hint"></div>
+
+  <pre id="rsc-output" style="display:none;background:#0a1017;border:1px solid var(--border);border-radius:10px;padding:16px;font-family:var(--mono);font-size:12.3px;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-height:500px;overflow-y:auto;color:#c9e8d8;margin-top:10px;"></pre>
+</div>
+
+<script>
+'use strict';
+
+/* ============================================================
+   УТИЛІТИ
+   ============================================================ */
+
+function el(id) {
+  return document.getElementById(id);
+}
+
+function debounce(fn, delay) {
+  let timer;
+  return function debounced() {
+    clearTimeout(timer);
+    timer = setTimeout(fn, delay);
+  };
+}
+
+/*
+  Екранування для значень RouterOS у подвійних лапках.
+  $ екранується, щоб RouterOS не інтерпретував його як змінну.
+*/
+function q(value) {
+  return String(value == null ? '' : value)
+    .replace(/\\/g, '\\\\')
+    .replace(/\$/g, '\\$')
+    .replace(/"/g, '\\"')
+    .replace(/%/g, '\\%')
+    .replace(/\r/g, '')
+    .replace(/\n/g, '');
+}
+
+function esc(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function sip(value) {
+  return String(value == null ? '' : value)
+    .trim()
+    .split(/\s+/)[0];
+}
+
+function lineValue(value, fallback) {
+  const result = String(value == null ? '' : value).trim();
+  return result || fallback;
+}
+
+function isIPv4(value) {
+  const octets = String(value || '').trim().split('.');
+  return octets.length === 4 && octets.every(function(octet) {
+    return /^\d+$/.test(octet) && Number(octet) >= 0 && Number(octet) <= 255;
+  });
+}
+
+function isCIDR(value) {
+  const parts = String(value || '').trim().split('/');
+  return parts.length === 2 &&
+    isIPv4(parts[0]) &&
+    /^\d+$/.test(parts[1]) &&
+    Number(parts[1]) >= 0 &&
+    Number(parts[1]) <= 32;
+}
+
+function isPort(value) {
+  return /^\d+$/.test(String(value).trim()) &&
+    Number(value) >= 1 &&
+    Number(value) <= 65535;
+}
+
+function calcNet(cidr) {
+  const parts = String(cidr || '').trim().split('/');
+  const ip = sip(parts[0]);
+  let prefix = parseInt(parts[1] || '24', 10);
+
+  if (!Number.isInteger(prefix) || prefix < 0 || prefix > 32 || !isIPv4(ip)) {
+    return ip + '/' + (Number.isInteger(prefix) ? prefix : 24);
+  }
+
+  const octets = ip.split('.').map(Number);
+  const mask = prefix === 0 ? 0 : ((~0 << (32 - prefix)) >>> 0);
+  const ipInt = (
+    (octets[0] << 24) |
+    (octets[1] << 16) |
+    (octets[2] << 8) |
+    octets[3]
+  ) >>> 0;
+
+  const netInt = (ipInt & mask) >>> 0;
+
+  return [
+    (netInt >>> 24) & 255,
+    (netInt >>> 16) & 255,
+    (netInt >>> 8) & 255,
+    netInt & 255
+  ].join('.') + '/' + prefix;
+}
+
+function rosSafeName(value, fallback) {
+  const name = String(value || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9_.-]/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 50);
+
+  return name || fallback;
+}
+
+/*
+  Ідемпотентне створення сутності: якщо вона існує,
+  RouterOS не припиняє виконувати подальших команд.
+*/
+function rosEnsure(command, label) {
+  const safeLabel = q(label || 'already exists');
+  return ':do { ' + command + ' } on-error={ :log info "' + safeLabel + '" }';
+}
+
+/*
+  Для блоків, які можуть дублюватися при повторному імпорті.
+*/
+function rosRemoveByComment(menu, comment) {
+  return ':do { ' + menu + ' remove [find where comment="' + q(comment) + '"] } on-error={}';
+}
+
+function uniqueNonEmpty(items) {
+  return Array.from(new Set(items.map(function(item) {
+    return String(item || '').trim();
+  }).filter(Boolean)));
+}
+
+/* ============================================================
+   МОДЕЛІ РОУТЕРІВ
+   ============================================================ */
+
+const MODELS = {
+  'hap-ac-lite': {
+    label: 'hAP ac lite',
+    wifi: 'legacy',
+    wanif: 'ether1',
+    lanports: 'ether2,ether3,ether4,ether5',
+    single: false,
+    hint: 'ether1 = WAN, ether2–5 = LAN, wlan1 (2.4 ГГц), wlan2 (5 ГГц)'
+  },
+  'hap-ac2': {
+    label: 'hAP ac2',
+    wifi: 'legacy',
+    wanif: 'ether1',
+    lanports: 'ether2,ether3,ether4,ether5',
+    single: false,
+    hint: 'ether1 = WAN, ether2–5 = LAN, wlan1 (2.4 ГГц), wlan2 (5 ГГц)'
+  },
+  'hap-ac3': {
+    label: 'hAP ac3',
+    wifi: 'legacy',
+    wanif: 'ether1',
+    lanports: 'ether2,ether3,ether4,ether5',
+    single: false,
+    hint: 'ether1 = WAN, ether2–5 = LAN'
+  },
+  'hap-ax2': {
+    label: 'hAP ax2',
+    wifi: 'wifi6',
+    wanif: 'ether1',
+    lanports: 'ether2,ether3,ether4,ether5',
+    single: false,
+    hint: 'Wi‑Fi 6: wifi1 (5 ГГц), wifi2 (2.4 ГГц)'
+  },
+  'hap-ax3': {
+    label: 'hAP ax3',
+    wifi: 'wifi6',
+    wanif: 'ether1',
+    lanports: 'ether2,ether3,ether4,ether5',
+    single: false,
+    hint: 'Wi‑Fi 6: wifi1 (5 ГГц), wifi2 (2.4 ГГц)'
+  },
+  'hap-ax-s': {
+    label: 'hAP ax S',
+    wifi: 'wifi6',
+    wanif: 'ether1',
+    lanports: 'ether2,ether3,ether4,ether5',
+    single: false,
+    hint: 'Wi‑Fi 6: wifi1 (5 ГГц), wifi2 (2.4 ГГц)'
+  },
+  'hex': {
+    label: 'hEX',
+    wifi: 'none',
+    wanif: 'ether1',
+    lanports: 'ether2,ether3,ether4,ether5',
+    single: false,
+    hint: 'Без Wi‑Fi'
+  },
+  'wap-ac': {
+    label: 'wAP ac',
+    wifi: 'legacy',
+    wanif: 'ether1',
+    lanports: '',
+    single: true,
+    hint: '⚠️ Один порт: використовуй пристрій як AP або налаштуй VLAN вручну.'
+  },
+  'cap-ac': {
+    label: 'cAP ac',
+    wifi: 'legacy',
+    wanif: 'ether1',
+    lanports: '',
+    single: true,
+    hint: '⚠️ Один порт: зазвичай використовується як CAP/AP, а не як маршрутизатор.'
+  },
+  'chateau-lte7': {
+    label: 'Chateau LTE7 ax',
+    wifi: 'wifi6',
+    wanif: 'lte1',
+    wantype: 'lte',
+    lanports: 'ether1,ether2,ether3,ether4',
+    single: false,
+    hint: 'LTE = WAN, Wi‑Fi 6'
+  },
+  'chateau-lte12': {
+    label: 'Chateau LTE12',
+    wifi: 'legacy',
+    wanif: 'lte1',
+    wantype: 'lte',
+    lanports: 'ether1,ether2,ether3,ether4',
+    single: false,
+    hint: 'LTE = WAN'
+  },
+  'chateau-5g': {
+    label: 'Chateau 5G ax',
+    wifi: 'wifi6',
+    wanif: 'lte1',
+    wantype: 'lte',
+    lanports: 'ether1,ether2,ether3,ether4',
+    single: false,
+    hint: '5G/LTE = WAN, Wi‑Fi 6'
+  },
+  'chateau-pro-ax': {
+    label: 'Chateau PRO ax',
+    wifi: 'wifi6',
+    wanif: 'ether1',
+    lanports: 'ether2,ether3,ether4,ether5',
+    single: false,
+    hint: 'Wi‑Fi 6, без LTE'
+  },
+  'other': {
+    label: 'Інша',
+    wifi: 'legacy',
+    wanif: 'ether1',
+    lanports: 'ether2,ether3,ether4,ether5',
+    single: false,
+    hint: 'Перевір назви інтерфейсів, доступні пакети Wi‑Fi й сумісність із RouterOS.'
+  }
+};
+
+/* ============================================================
+   AI ПРОВАЙДЕРИ
+   ============================================================ */
+
+const AI_COMPAT = {
+  openai: {
+    url: 'https://api.openai.com/v1/chat/completions',
+    model: 'gpt-4o-mini'
+  },
+  grok: {
+    url: 'https://api.x.ai/v1/chat/completions',
+    model: 'grok-2-latest'
+  },
+  groq: {
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    model: 'llama-3.3-70b-versatile'
+  },
+  deepseek: {
+    url: 'https://api.deepseek.com/chat/completions',
+    model: 'deepseek-chat'
+  }
+};
+
+function aiErrorMessage(error) {
+  const message = String(error && error.message ? error.message : error || '');
+
+  if (error instanceof TypeError || /fetch|network|load failed/i.test(message)) {
+    return 'Мережева помилка або CORS. Відкрий застосунок через HTTPS чи локальний HTTP-сервер.';
+  }
+
+  return message || 'Невідома помилка AI-запиту.';
+}
+
+function callAI(prompt, maxTokens) {
+  const provider = el('ai-prov').value;
+  const key = el('ai-key').value.trim();
+  const modelInput = el('ai-model').value.trim();
+
+  if (!key) {
+    return Promise.reject(new Error('Потрібен API ключ для ' + provider + '.'));
+  }
+
+  if (provider === 'anthropic') {
+    const model = modelInput || 'claude-3-5-sonnet-latest';
+
+    return fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: maxTokens,
+        messages: [{
+          role: 'user',
+          content: prompt
+        }]
+      })
+    }).then(function(response) {
+      return response.json().then(function(data) {
+        if (!response.ok) {
+          throw new Error((data.error && data.error.message) || ('HTTP ' + response.status));
+        }
+
+        return (data.content || []).map(function(block) {
+          return block.text || '';
+        }).join('').trim();
+      });
+    });
+  }
+
+  if (provider === 'gemini') {
+    const model = modelInput || 'gemini-2.0-flash';
+
+    return fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/' +
+      encodeURIComponent(model) +
+      ':generateContent',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': key
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: prompt }]
+          }]
+        })
+      }
+    ).then(function(response) {
+      return response.json().then(function(data) {
+        if (!response.ok) {
+          throw new Error((data.error && data.error.message) || ('HTTP ' + response.status));
+        }
+
+        const candidate = (data.candidates || [])[0];
+        return ((candidate && candidate.content && candidate.content.parts) || [])
+          .map(function(part) {
+            return part.text || '';
+          })
+          .join('')
+          .trim();
+      });
+    });
+  }
+
+  const config = AI_COMPAT[provider];
+  if (!config) {
+    return Promise.reject(new Error('Невідомий AI-провайдер.'));
+  }
+
+  return fetch(config.url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + key
+    },
+    body: JSON.stringify({
+      model: modelInput || config.model,
+      max_tokens: maxTokens,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    })
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      if (!response.ok) {
+        throw new Error((data.error && data.error.message) || ('HTTP ' + response.status));
+      }
+
+      const choice = (data.choices || [])[0];
+      return choice && choice.message ? String(choice.message.content || '').trim() : '';
+    });
+  });
+}
+
+/* ============================================================
+   UI: МОДЕЛІ, ПОЛЯ, TOGGLE
+   ============================================================ */
+
+function updateWanFields() {
+  const type = el('wantype').value;
+  el('wan-static').style.display = type === 'static' ? 'grid' : 'none';
+  el('wan-pppoe').style.display = type === 'pppoe' ? 'grid' : 'none';
+  el('wan-lte').style.display = type === 'lte' ? 'grid' : 'none';
+  el('wan-lte2').style.display = type === 'lte' ? 'grid' : 'none';
+}
+
+function updateFoFields() {
+  const type = el('fotype').value;
+  el('fo-static').style.display = type === 'static' ? 'grid' : 'none';
+  el('fo-pppoe').style.display = type === 'pppoe' ? 'grid' : 'none';
+  el('fo-lte').style.display = type === 'lte' ? 'grid' : 'none';
+  el('fo-lte2').style.display = type === 'lte' ? 'grid' : 'none';
+}
+
+function applyModel() {
+  const modelKey = el('model').value;
+  const model = MODELS[modelKey];
+
+  el('custom-model-row').style.display = modelKey === 'other' ? 'grid' : 'none';
+  el('model-hint').textContent = model.hint;
+
+  el('wanif').value = model.wanif;
+  el('lanports').value = model.lanports;
+  el('wantype').value = model.wantype || 'dhcp';
+
+  updateWanFields();
+
+  if (model.wifi === 'none') {
+    el('wifienable').checked = false;
+    el('wifienable').disabled = true;
+    el('wifi-block').classList.add('off');
+    el('wifi-badge').textContent = 'недоступно';
+    return;
+  }
+
+  el('wifienable').disabled = false;
+  el('wifi-block').classList.toggle('off', !el('wifienable').checked);
+
+  el('wifi-badge').textContent = model.wifi === 'wifi6'
+    ? 'wifi1 (5 ГГц) + wifi2 (2.4 ГГц)'
+    : 'wlan1 (2.4 ГГц) + wlan2 (5 ГГц)';
+}
+
+function setToggleState(checkboxId, blockId) {
+  el(blockId).classList.toggle('off', !el(checkboxId).checked);
+}
+
+function bindToggle(checkboxId, blockId) {
+  el(checkboxId).addEventListener('change', function() {
+    setToggleState(checkboxId, blockId);
+    render();
+  });
+}
+
+function syncToggleStates() {
+  setToggleState('dhcpenable', 'dhcp-block');
+  setToggleState('wifienable', 'wifi-block');
+  setToggleState('guestenable', 'guest-block');
+  setToggleState('foenable', 'fo-block');
+  setToggleState('wgenable', 'wg-block');
+  setToggleState('ovpnenable', 'ovpn-block');
+  setToggleState('ovpnclenable', 'ovpncl-block');
+  setToggleState('ipsecenable', 'ipsec-block');
+  setToggleState('addrlistenable', 'addrlist-block');
+  setToggleState('routesenable', 'routes-block');
+  setToggleState('dnsstaticenable', 'dnsstatic-block');
+  setToggleState('pfwenable', 'pfw-block');
+  setToggleState('capsmanenable', 'capsman-block');
+  setToggleState('safetynet', 'safety-row');
+  setToggleState('netwatchenable', 'netwatch-block');
+
+  el('pass-row').style.display = el('changepass').checked ? 'grid' : 'none';
+
+  if (el('wifienable').disabled) {
+    el('wifi-block').classList.add('off');
+  }
+}
+
+/* ============================================================
+   ВАЛІДАЦІЯ ФОРМИ
+   ============================================================ */
+
+function validateForm() {
+  const warnings = [];
+  const firmware = el('firmware').value;
+  const wanType = el('wantype').value;
+  const model = MODELS[el('model').value];
+
+  if (!isCIDR(sip(el('lanip').value))) {
+    warnings.push('LAN IP має бути у форматі IPv4/CIDR, наприклад 192.168.88.1/24.');
+  }
+
+  if (!model.single && !el('lanports').value.trim()) {
+    warnings.push('LAN-порти не вказані: bridge-lan не матиме фізичних портів.');
+  }
+
+  if (wanType === 'static') {
+    if (!isCIDR(sip(el('wanip').value))) {
+      warnings.push('WAN IP має бути у форматі IPv4/CIDR.');
+    }
+    if (!isIPv4(sip(el('wangw').value))) {
+      warnings.push('WAN gateway має бути коректною IPv4-адресою.');
+    }
+  }
+
+  if (wanType === 'pppoe' && !el('pppoeuser').value.trim()) {
+    warnings.push('PPPoE логін порожній.');
+  }
+
+  if (wanType === 'lte' && !el('lteapn').value.trim()) {
+    warnings.push('Для LTE потрібно вказати APN.');
+  }
+
+  if (el('foenable').checked) {
+    const failoverType = el('fotype').value;
+    const failoverInterface = el('foif').value.trim();
+
+    if (!failoverInterface) {
+      warnings.push('Для резервного WAN не вказано інтерфейс.');
+    }
+
+    if (failoverInterface === el('wanif').value.trim()) {
+      warnings.push('Інтерфейс резервного WAN збігається з основним WAN.');
+    }
+
+    if (failoverType === 'static') {
+      if (!isCIDR(sip(el('foip').value))) {
+        warnings.push('Резервний WAN IP має бути у форматі IPv4/CIDR.');
+      }
+      if (!isIPv4(sip(el('fogw').value))) {
+        warnings.push('Резервний WAN gateway має бути IPv4-адресою.');
+      }
+    }
+
+    if (failoverType === 'pppoe' && !el('fouser').value.trim()) {
+      warnings.push('Для резервного PPPoE не вказано логін.');
+    }
+
+    if (failoverType === 'lte' && !el('foapn').value.trim()) {
+      warnings.push('Для резервного LTE не вказано APN.');
+    }
+
+    if (
+      el('netwatchenable').checked &&
+      el('fohealthhost').value.trim() === el('netwatchhost').value.trim()
+    ) {
+      warnings.push('Failover і Netwatch використовують один хост. Краще вказати різні.');
+    }
+  }
+
+  if (el('dhcpenable').checked) {
+    const range = el('dhcprange').value.trim();
+    if (!/^\d{1,3}(?:\.\d{1,3}){3}-\d{1,3}(?:\.\d{1,3}){3}$/.test(range)) {
+      warnings.push('Діапазон DHCP має формат 192.168.88.10-192.168.88.254.');
+    }
+  }
+
+  if (el('changepass').checked && !el('adminpass').value.trim()) {
+    warnings.push('Пароль admin порожній — команда зміни пароля не буде згенерована.');
+  }
+
+  const passwords = [
+    { name: 'Пароль admin', value: el('adminpass').value },
+    { name: 'Пароль Wi‑Fi', value: el('wifipass').value },
+    { name: 'Пароль гостьового Wi‑Fi', value: el('guestwifipass').value },
+    { name: 'Пароль CAPsMAN', value: el('capsmanpass').value }
+  ];
+
+  passwords.forEach(function(item) {
+    if (item.value.includes('$')) {
+      warnings.push(item.name + ' містить символ "$". Для RouterOS це потенційно небезпечно.');
+    }
+  });
+
+  if (el('wifienable').checked) {
+    if (!el('ssid').value.trim()) {
+      warnings.push('SSID основного Wi‑Fi порожній.');
+    }
+
+    if (el('wifipass').value && el('wifipass').value.length < 8) {
+      warnings.push('Пароль Wi‑Fi має містити щонайменше 8 символів.');
+    }
+
+    if (!el('band24').checked && !el('band5').checked) {
+      warnings.push('Для Wi‑Fi не вибрано жоден діапазон.');
+    }
+
+    if (model.wifi === 'wifi6' && firmware === '6.x') {
+      warnings.push('Wi‑Fi 6 потребує RouterOS 7+; RouterOS 6.x не підтримує /interface wifi.');
+    }
+  }
+
+  if (el('capsmanenable').checked) {
+    if (!el('capsmanpass').value.trim()) {
+      warnings.push('Пароль CAPsMAN порожній. Генератор не підставляє дефолтний пароль.');
+    } else if (el('capsmanpass').value.length < 8) {
+      warnings.push('Пароль CAPsMAN має містити щонайменше 8 символів.');
+    }
+  }
+
+  if (el('guestenable').checked) {
+    const vlanId = Number(el('guestvlan').value);
+
+    if (!Number.isInteger(vlanId) || vlanId < 1 || vlanId > 4094) {
+      warnings.push('VLAN ID для гостьової мережі має бути у межах 1–4094.');
+    }
+
+    if (!isCIDR(sip(el('guestip').value))) {
+      warnings.push('IP гостьової мережі має бути у форматі IPv4/CIDR.');
+    }
+
+    if (model.single) {
+      warnings.push('Гостьова VLAN на однопортовій моделі потребує ручного налаштування trunk/access портів.');
+    }
+
+    if (el('guestwifi').checked && !el('wifienable').checked) {
+      warnings.push('Гостьовий Wi‑Fi увімкнено, але основне налаштування Wi‑Fi вимкнено.');
+    }
+
+    if (el('guestwifi').checked && el('guestwifipass').value && el('guestwifipass').value.length < 8) {
+      warnings.push('Пароль гостьового Wi‑Fi має містити щонайменше 8 символів.');
+    }
+  }
+
+  if (el('wgenable').checked) {
+    if (firmware === '6.x') {
+      warnings.push('WireGuard підтримується лише в RouterOS 7+.');
+    }
+
+    if (!isPort(el('wgport').value)) {
+      warnings.push('Порт WireGuard має бути числом від 1 до 65535.');
+    }
+
+    if (!isCIDR(sip(el('wgserverip').value))) {
+      warnings.push('IP WireGuard-сервера має бути у форматі IPv4/CIDR.');
+    }
+  }
+
+  if (el('ovpnenable').checked) {
+    const cipher = el('ovpncipher').value;
+
+    if (!isPort(el('ovpnport').value)) {
+      warnings.push('Порт OpenVPN має бути числом від 1 до 65535.');
+    }
+
+    if (cipher === 'aes256-gcm' && firmware !== '7.13+') {
+      warnings.push('aes256-gcm для OpenVPN підтримується лише RouterOS 7.13+.');
+    }
+
+    if (cipher === 'blowfish128' && firmware !== '6.x') {
+      warnings.push('blowfish128 призначений лише для RouterOS 6.x та небезпечний для нових конфігурацій.');
+    }
+  }
+
+  if (el('ovpnclenable').checked) {
+    const cipher = el('ovpnclcipher').value;
+
+    if (!el('ovpnclserver').value.trim()) {
+      warnings.push('Для OpenVPN-клієнта не вказано адресу сервера.');
+    }
+
+    if (!isPort(el('ovpnclport').value)) {
+      warnings.push('Порт OpenVPN-клієнта має бути числом від 1 до 65535.');
+    }
+
+    if (cipher === 'aes256-gcm' && firmware !== '7.13+') {
+      warnings.push('OpenVPN-клієнт з aes256-gcm потребує RouterOS 7.13+.');
+    }
+
+    if (cipher === 'blowfish128' && firmware !== '6.x') {
+      warnings.push('blowfish128 для OpenVPN-клієнта дозволений лише для RouterOS 6.x.');
+    }
+  }
+
+  if (el('safetynet').checked && !el('backupenable').checked) {
+    warnings.push('Авто-відкат потребує резервної копії перед змінами.');
+  }
+
+  if (el('safetynet').checked) {
+    const minutes = Number(el('safetyminutes').value);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 120) {
+      warnings.push('Час авто-відкату має бути від 1 до 120 хвилин.');
+    }
+  }
+
+  if (el('fasttrackhw').checked && !el('fasttrack').checked) {
+    warnings.push('hw-offload увімкнено без FastTrack.');
+  }
+
+  if (el('fasttrack').checked && (el('wgenable').checked || el('ipsecenable').checked)) {
+    warnings.push('FastTrack може обходити облік або політики VPN. Перевір винятки для IPsec/WireGuard у production-конфігурації.');
+  }
+
+  if (!el('basicfw').checked) {
+    warnings.push('Базовий firewall вимкнено. Роутер може бути доступний із WAN.');
+  }
+
+  return warnings;
+}
+
+/* ============================================================
+   ГЕНЕРАТОРИ ДОДАТКОВИХ БЛОКІВ
+   ============================================================ */
+
+function genStaticDns() {
+  if (!el('dnsstaticenable').checked) return [];
+
+  const raw = el('dnsstaticentries').value.trim();
+  if (!raw) return [];
+
+  const lines = ['', '# --- Static DNS ---'];
+
+  raw.split('\n').forEach(function(line) {
+    const value = line.trim();
+    if (!value || value.startsWith('#')) return;
+
+    const separator = value.indexOf('=');
+    if (separator < 1) return;
+
+    const name = value.slice(0, separator).trim();
+    const address = sip(value.slice(separator + 1));
+
+    if (name && isIPv4(address)) {
+      lines.push('/ip dns static add name="' + q(name) + '" address=' + address);
+    }
+  });
+
+  return lines;
+}
+
+function genAddressList() {
+  if (!el('addrlistenable').checked) return [];
+
+  const raw = el('addrlistentries').value.trim();
+  if (!raw) return [];
+
+  const lines = ['', '# --- Address-List ---'];
+
+  raw.split('\n').forEach(function(line) {
+    const value = line.trim();
+    if (!value || value.startsWith('#')) return;
+
+    const separator = value.indexOf('=');
+    if (separator < 1) return;
+
+    const list = value.slice(0, separator).trim();
+    const address = sip(value.slice(separator + 1));
+
+    if (list && (isIPv4(address) || isCIDR(address))) {
+      lines.push('/ip firewall address-list add list="' + q(list) + '" address=' + address);
+    }
+  });
+
+  return lines;
+}
+
+function genPortForwarding() {
+  if (!el('pfwenable').checked) return [];
+
+  const raw = el('pfwrules').value.trim();
+  if (!raw) return [];
+
+  const lines = ['', '# --- Port Forwarding (DST-NAT) ---'];
+
+  raw.split('\n').forEach(function(line) {
+    const value = line.trim();
+    if (!value || value.startsWith('#')) return;
+
+    const parts = value.split(':');
+    if (parts.length < 4) return;
+
+    const protocol = parts[0].trim().toLowerCase();
+    const externalPort = parts[1].trim();
+    const internalIp = sip(parts[2]);
+    const internalPort = parts[3].trim();
+    const comment = parts.slice(4).join(':').trim();
+
+    if (
+      ['tcp', 'udp'].includes(protocol) &&
+      isPort(externalPort) &&
+      isIPv4(internalIp) &&
+      isPort(internalPort)
+    ) {
+      lines.push(
+        '/ip firewall nat add chain=dstnat protocol=' + protocol +
+        ' dst-port=' + externalPort +
+        ' action=dst-nat to-addresses=' + internalIp +
+        ' to-ports=' + internalPort +
+        (comment ? ' comment="' + q(comment) + '"' : '')
+      );
+    }
+  });
+
+  return lines;
+}
+
+function genRoutes() {
+  if (!el('routesenable').checked) return [];
+
+  const raw = el('routesentries').value.trim();
+  if (!raw) return [];
+
+  const lines = ['', '# --- Статичні маршрути ---'];
+
+  raw.split('\n').forEach(function(line) {
+    const value = line.trim();
+    if (!value || value.startsWith('#')) return;
+
+    const equalIndex = value.indexOf('=');
+    if (equalIndex < 1) return;
+
+    const destination = sip(value.slice(0, equalIndex));
+    const params = value.slice(equalIndex + 1).trim().split(':');
+    const gateway = sip(params[0]);
+    const distance = params[1] ? params[1].trim() : '1';
+    const comment = params.slice(2).join(':').trim();
+
+    if (
+      (isCIDR(destination) || destination === '0.0.0.0/0') &&
+      gateway &&
+      /^\d+$/.test(distance)
+    ) {
+      lines.push(
+        '/ip route add dst-address=' + destination +
+        ' gateway=' + gateway +
+        ' distance=' + distance +
+        (comment ? ' comment="' + q(comment) + '"' : '')
+      );
+    }
+  });
+
+  return lines;
+}
+
+function genOpenVpnClient() {
+  if (!el('ovpnclenable').checked) return [];
+
+  const server = el('ovpnclserver').value.trim();
+  if (!server) return [];
+
+  const firmware = el('firmware').value;
+  const cipher = el('ovpnclcipher').value;
+  const name = rosSafeName(el('ovpnclname').value, 'ovpn-client1');
+  const port = lineValue(el('ovpnclport').value, '1194');
+
+  const lines = ['', '# --- OpenVPN клієнт ---'];
+
+  if (cipher === 'aes256-gcm' && firmware !== '7.13+') {
+    lines.push('# ⚠ aes256-gcm потребує RouterOS 7.13+');
+    return lines;
+  }
+
+  if (cipher === 'blowfish128' && firmware !== '6.x') {
+    lines.push('# ⚠ blowfish128 підтримується лише RouterOS 6.x');
+    return lines;
+  }
+
+  let command =
+    '/interface ovpn-client add name="' + q(name) + '"' +
+    ' connect-to="' + q(server) + '"' +
+    ' port=' + port +
+    ' cipher=' + cipher;
+
+  const user = el('ovpncluser').value.trim();
+  const password = el('ovpnclpass').value;
+  const certificate = el('ovpnclcert').value.trim();
+  const mac = el('ovpnclmac').value.trim();
+
+  if (user) command += ' user="' + q(user) + '"';
+  if (password) command += ' password="' + q(password) + '"';
+  if (certificate) command += ' certificate="' + q(certificate) + '"';
+  if (mac) command += ' mac-address=' + mac;
+
+  command += ' disabled=no';
+
+  lines.push(command);
+  lines.push('# Перевір: /interface ovpn-client print');
+
+  return lines;
+}
+
+function genIpsec() {
+  if (!el('ipsecenable').checked) return [];
+
+  const rawPeers = el('ipsecpeers').value.trim();
+  if (!rawPeers) return [];
+
+  const encryption = el('ipsecenc').value;
+  const hash = el('ipsechash').value;
+
+  /*
+    Для RouterOS:
+    aes-256 -> aes-256-cbc
+    aes-128 -> aes-128-cbc
+    3des    -> 3des
+  */
+  const proposalEncryption = encryption === '3des'
+    ? '3des'
+    : encryption + '-cbc';
+
+  const lines = ['', '# --- IPsec ---'];
+
+  rawPeers.split('\n').forEach(function(line) {
+    const value = line.trim();
+    if (!value || value.startsWith('#')) return;
+
+    const parts = value.split(':');
+
+    const peerName = rosSafeName(parts[0], 'peer');
+    const peerAddress = sip(parts[1] || '');
+    const psk = parts[2] ? parts[2].trim() : '';
+    const mode = (parts[3] || 'ike2').trim();
+
+    if (!peerAddress) return;
+
+    lines.push(
+      rosEnsure(
+        '/ip ipsec profile add name="profile-' + q(peerName) + '"' +
+        ' enc-algorithm=' + encryption +
+        ' hash-algorithm=' + hash +
+        ' dh-group=modp2048',
+        'IPsec profile exists: ' + peerName
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/ip ipsec proposal add name="proposal-' + q(peerName) + '"' +
+        ' enc-algorithms=' + proposalEncryption +
+        ' auth-algorithms=' + hash +
+        ' pfs-group=none',
+        'IPsec proposal exists: ' + peerName
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/ip ipsec peer add name="' + q(peerName) + '"' +
+        ' address=' + peerAddress + '/32' +
+        ' exchange-mode=' + q(mode) +
+        ' profile="profile-' + q(peerName) + '"',
+        'IPsec peer exists: ' + peerName
+      )
+    );
+
+    if (psk) {
+      lines.push(
+        '/ip ipsec identity add peer="' + q(peerName) + '"' +
+        ' auth-method=pre-shared-key secret="' + q(psk) + '"'
+      );
+    } else {
+      lines.push('# ⚠ PSK для IPsec peer "' + peerName + '" не вказано.');
+    }
+  });
+
+  const policies = el('ipsecpolicies').value.trim();
+
+  if (policies) {
+    lines.push('');
+
+    policies.split('\n').forEach(function(line) {
+      const value = line.trim();
+      if (!value || value.startsWith('#')) return;
+
+      const parts = value.split(':');
+      const peer = rosSafeName(parts[0], 'peer');
+      const source = sip(parts[1] || '');
+      const destination = sip(parts[2] || '');
+
+      if (isCIDR(source) && isCIDR(destination)) {
+        lines.push(
+          '/ip ipsec policy add peer="' + q(peer) + '"' +
+          ' src-address=' + source +
+          ' dst-address=' + destination +
+          ' proposal="proposal-' + q(peer) + '"' +
+          ' tunnel=yes'
+        );
+      }
+    });
+  }
+
+  lines.push('# Перевір: /ip ipsec active-peers print');
+
+  return lines;
+}
+
+function genCapsman() {
+  if (!el('capsmanenable').checked) return [];
+
+  const firmware = el('firmware').value;
+  const ssid = el('capsmanssid').value.trim() || 'CAPsMAN';
+  const password = el('capsmanpass').value.trim();
+
+  if (!password) {
+    return [
+      '',
+      '# --- CAPsMAN ---',
+      '# ⚠ Пароль CAPsMAN не задано. Блок не згенеровано.'
+    ];
+  }
+
+  const channel24 = el('capsman24ch').value.trim() || '2417/20/gn';
+  const channel5 = el('capsman5ch').value.trim() || '5180/80/ac';
+
+  const parts24 = channel24.split('/');
+  const parts5 = channel5.split('/');
+
+  const freq24 = parts24[0] || '2417';
+  const width24 = parts24[1] || '20';
+  const freq5 = parts5[0] || '5180';
+  const width5 = parts5[1] || '80';
+
+  const lines = [''];
+
+  if (firmware === '6.x') {
+    lines.push('# --- CAPsMAN v1 (RouterOS 6) ---');
+    lines.push('/caps-man manager set enabled=yes');
+
+    lines.push(
+      rosEnsure(
+        '/caps-man channel add name="ch-2ghz" frequency=' + freq24 +
+        ' width=' + width24 +
+        ' band=2ghz-g/n',
+        'CAPsMAN channel exists: ch-2ghz'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/caps-man channel add name="ch-5ghz" frequency=' + freq5 +
+        ' width=' + width5 +
+        ' band=5ghz-a/n/ac',
+        'CAPsMAN channel exists: ch-5ghz'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/caps-man security add name="sec-wpa2"' +
+        ' authentication-types=wpa2-psk' +
+        ' passphrase="' + q(password) + '"',
+        'CAPsMAN security profile exists'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/caps-man configuration add name="cfg-2ghz"' +
+        ' ssid="' + q(ssid) + '"' +
+        ' channel=ch-2ghz security=sec-wpa2 mode=ap',
+        'CAPsMAN configuration exists: cfg-2ghz'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/caps-man configuration add name="cfg-5ghz"' +
+        ' ssid="' + q(ssid) + '_5G"' +
+        ' channel=ch-5ghz security=sec-wpa2 mode=ap',
+        'CAPsMAN configuration exists: cfg-5ghz'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/caps-man provisioning add action=create-dynamic-enabled' +
+        ' master-configuration=cfg-2ghz hw-supported-modes=gn',
+        'CAPsMAN provisioning exists: 2ghz'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/caps-man provisioning add action=create-dynamic-enabled' +
+        ' master-configuration=cfg-5ghz hw-supported-modes=an,ac',
+        'CAPsMAN provisioning exists: 5ghz'
+      )
+    );
+
+    return lines;
+  }
+
+  lines.push('# --- CAPsMAN / WiFi CAPsMAN (RouterOS 7) ---');
+  lines.push('# ⚠ Підтримка залежить від установленого WiFi-пакета та конкретної моделі.');
+  lines.push('/interface wifi capsman set enabled=yes');
+
+  lines.push(
+    rosEnsure(
+      '/interface wifi configuration add name="cfg-2ghz"' +
+      ' ssid="' + q(ssid) + '"' +
+      ' mode=ap' +
+      ' security.authentication-types=wpa2-psk,wpa3-psk' +
+      ' security.passphrase="' + q(password) + '"' +
+      ' channel.frequency=' + freq24 +
+      ' channel.width=' + width24,
+      'WiFi CAPsMAN config exists: cfg-2ghz'
+    )
+  );
+
+  lines.push(
+    rosEnsure(
+      '/interface wifi configuration add name="cfg-5ghz"' +
+      ' ssid="' + q(ssid) + '_5G"' +
+      ' mode=ap' +
+      ' security.authentication-types=wpa2-psk,wpa3-psk' +
+      ' security.passphrase="' + q(password) + '"' +
+      ' channel.frequency=' + freq5 +
+      ' channel.width=' + width5,
+      'WiFi CAPsMAN config exists: cfg-5ghz'
+    )
+  );
+
+  lines.push(
+    rosEnsure(
+      '/interface wifi provisioning add action=create-dynamic-enabled' +
+      ' master-configuration=cfg-2ghz supported-bands=2ghz-g/n',
+      'WiFi CAPsMAN provisioning exists: 2ghz'
+    )
+  );
+
+  lines.push(
+    rosEnsure(
+      '/interface wifi provisioning add action=create-dynamic-enabled' +
+      ' master-configuration=cfg-5ghz supported-bands=5ghz-a/n/ac',
+      'WiFi CAPsMAN provisioning exists: 5ghz'
+    )
+  );
+
+  return lines;
+}
+
+function genNtp() {
+  if (!el('ntpenable').checked) return [];
+
+  const firmware = el('firmware').value;
+  const lines = ['', '# --- NTP ---'];
+
+  if (firmware === '6.x') {
+    lines.push(
+      '# RouterOS 6.x використовує IP-адреси primary-ntp та secondary-ntp.'
+    );
+    lines.push(
+      '/system ntp client set enabled=yes primary-ntp=162.159.200.1 secondary-ntp=162.159.200.123'
+    );
+  } else {
+    lines.push('/system ntp client set enabled=yes');
+    lines.push(
+      rosEnsure(
+        '/system ntp client servers add address=pool.ntp.org',
+        'NTP server already exists'
+      )
+    );
+  }
+
+  return lines;
+}
+
+/* ============================================================
+   ГОЛОВНИЙ ГЕНЕРАТОР
+   ============================================================ */
+
+function render() {
+  const model = MODELS[el('model').value];
+  const firmware = el('firmware').value;
+  const hostname = el('hostname').value.trim() || 'MikroTik';
+  const timezone = el('timezone').value;
+
+  const wanInterface = el('wanif').value.trim() || 'ether1';
+  const wanType = el('wantype').value;
+
+  const failoverEnabled = el('foenable').checked;
+  const lanPorts = uniqueNonEmpty(el('lanports').value.split(','));
+
+  const lanIpCidr = sip(el('lanip').value) || '192.168.88.1/24';
+  const lanIp = sip(lanIpCidr.split('/')[0]);
+  const lanNetwork = calcNet(lanIpCidr);
+
+  const modelLabel = el('model').value === 'other'
+    ? (el('custommodel').value.trim() || 'Інша модель')
+    : model.label;
+
+  const warnings = validateForm();
+  const vbox = el('vbox');
+
+  if (warnings.length) {
+    vbox.className = 'wbox';
+    vbox.style.display = 'block';
+    vbox.innerHTML =
+      '<b>⚠ Перевір перед заливкою:</b><br>' +
+      warnings.map(function(warning) {
+        return '• ' + esc(warning);
+      }).join('<br>');
+  } else {
+    vbox.style.display = 'none';
+    vbox.innerHTML = '';
+  }
+
+  const lines = [];
+
+  lines.push('# ============================================================');
+  lines.push('# Скрипт згенеровано MikroTik Config Generator');
+  lines.push('# Модель: ' + modelLabel + ' | RouterOS: ' + firmware);
+  lines.push('# Перевір команди та зроби export перед імпортом у production.');
+  lines.push('# ============================================================');
+  lines.push('');
+
+  lines.push('# --- Чек-лист безпеки ---');
+  lines.push('# [' + (el('changepass').checked && el('adminpass').value.trim() ? 'x' : ' ') + '] Пароль admin змінено');
+  lines.push('# [' + (el('basicfw').checked ? 'x' : ' ') + '] Базовий firewall');
+  lines.push('# [' + (el('macprotect').checked ? 'x' : ' ') + '] MAC-захист');
+  lines.push('# [' + (el('dnsprotect').checked ? 'x' : ' ') + '] Захист DNS із WAN');
+  lines.push('# [' + (el('disableservices').checked ? 'x' : ' ') + '] Небезпечні сервіси вимкнено');
+
+  if (el('wgenable').checked) {
+    lines.push('# [x] WireGuard: UDP/' + lineValue(el('wgport').value, '51820'));
+  }
+
+  if (el('ipsecenable').checked) {
+    lines.push('# [x] IPsec');
+  }
+
+  if (failoverEnabled) {
+    lines.push('# [x] Failover: ' + lineValue(el('foif').value, 'lte1'));
+  }
+
+  if (el('guestenable').checked) {
+    lines.push('# [x] Ізольована гостьова мережа');
+  }
+
+  lines.push('');
+
+  /*
+    Reset навмисно лише коментується: reset розриває виконання
+    поточного .rsc та перезавантажує пристрій.
+  */
+  if (el('resetconfig').checked) {
+    lines.push('# --- УВАГА: RESET ---');
+    lines.push('# Виконай НАСТУПНУ команду окремо, дочекайся перезавантаження,');
+    lines.push('# а потім імпортуй цей конфіг повторно без цього блоку.');
+    lines.push('# /system reset-configuration no-defaults=yes skip-backup=yes');
+    lines.push('');
+  }
+
+  if (el('backupenable').checked) {
+    lines.push('# --- Резервна копія ---');
+    lines.push('/system backup save name=backup-before-config dont-encrypt=yes');
+    lines.push('');
+  }
+
+  lines.push('# --- Загальне ---');
+  lines.push('/system identity set name="' + q(hostname) + '"');
+  lines.push('/system clock set time-zone-name=' + timezone);
+
+  if (el('changepass').checked && el('adminpass').value.trim()) {
+    lines.push('/user set admin password="' + q(el('adminpass').value) + '"');
+  }
+
+  if (el('ddnsenable').checked) {
+    lines.push('/ip cloud set ddns-enabled=yes');
+    lines.push('# Після імпорту: /ip cloud print');
+  }
+
+  if (el('disableipv6').checked) {
+    lines.push('/ipv6 settings set disable-ipv6=yes');
+  }
+
+  if (el('ipneighbor').checked) {
+    lines.push('/ip neighbor discovery-settings set discover-interface-list=none');
+  }
+
+  const maxNeighbors = Number(el('maxneighbor').value);
+  if (Number.isInteger(maxNeighbors) && maxNeighbors > 0) {
+    lines.push('/ip settings set max-neighbor-entries=' + maxNeighbors);
+    lines.push('/ipv6 settings set max-neighbor-entries=' + maxNeighbors);
+  }
+
+  lines.push('');
+
+  lines.push('# --- Interface Lists ---');
+  lines.push(rosEnsure('/interface list add name=WAN', 'Interface list WAN already exists'));
+  lines.push(rosEnsure('/interface list add name=LAN', 'Interface list LAN already exists'));
+  lines.push(
+    rosEnsure(
+      '/interface list member add list=WAN interface=' + wanInterface,
+      'WAN interface member already exists: ' + wanInterface
+    )
+  );
+
+  let lanInterface = 'bridge-lan';
+
+  lines.push('');
+  lines.push('# --- LAN ---');
+
+  if (model.single) {
+    lanInterface = wanInterface;
+    lines.push('# Однопортова модель: LAN використовує інтерфейс ' + wanInterface + '.');
+    lines.push(
+      rosEnsure(
+        '/ip address add address=' + lanIpCidr + ' interface=' + wanInterface,
+        'LAN IP address already exists'
+      )
+    );
+  } else {
+    lines.push(
+      rosEnsure(
+        '/interface bridge add name=bridge-lan protocol-mode=rstp',
+        'Bridge bridge-lan already exists'
+      )
+    );
+
+    lanPorts.forEach(function(port) {
+      lines.push(
+        rosEnsure(
+          '/interface bridge port add bridge=bridge-lan interface=' + port,
+          'Bridge port already exists: ' + port
+        )
+      );
+    });
+
+    lines.push(
+      rosEnsure(
+        '/ip address add address=' + lanIpCidr + ' interface=bridge-lan',
+        'LAN IP address already exists'
+      )
+    );
+  }
+
+  lines.push(
+    rosEnsure(
+      '/interface list member add list=LAN interface=' + lanInterface,
+      'LAN interface member already exists: ' + lanInterface
+    )
+  );
+
+  lines.push('');
+  lines.push('# --- WAN: ' + wanInterface + ' ---');
+
+  if (wanType === 'dhcp') {
+    lines.push(
+      '/ip dhcp-client add interface=' + wanInterface +
+      ' disabled=no add-default-route=yes' +
+      ' default-route-distance=1' +
+      (failoverEnabled ? ' check-gateway=ping' : '')
+    );
+  }
+
+  if (wanType === 'static') {
+    const wanIp = sip(el('wanip').value) || '203.0.113.10/24';
+    const wanGateway = sip(el('wangw').value) || '203.0.113.1';
+
+    lines.push('/ip address add address=' + wanIp + ' interface=' + wanInterface);
+    lines.push(
+      '/ip route add dst-address=0.0.0.0/0 gateway=' + wanGateway +
+      ' distance=1' +
+      (failoverEnabled ? ' check-gateway=ping' : '') +
+      ' comment="main default route"'
+    );
+  }
+
+  if (wanType === 'pppoe') {
+    lines.push(
+      '/interface pppoe-client add interface=' + wanInterface +
+      ' name=pppoe-out1' +
+      ' user="' + q(lineValue(el('pppoeuser').value, 'login@isp')) + '"' +
+      ' password="' + q(el('pppoepass').value) + '"' +
+      ' disabled=no add-default-route=yes default-route-distance=1'
+    );
+  }
+
+  if (wanType === 'lte') {
+    const apn = lineValue(el('lteapn').value, 'internet');
+    const apnUser = el('lteuser').value.trim();
+    const apnPassword = el('ltepass').value;
+    const pin = el('ltepin').value.trim();
+
+    if (pin) {
+      lines.push('/interface lte settings set pin1="' + q(pin) + '"');
+    }
+
+    lines.push(
+      rosEnsure(
+        '/interface lte apn add name=apn-main apn="' + q(apn) + '"' +
+        (apnUser ? ' user="' + q(apnUser) + '"' : '') +
+        (apnPassword ? ' password="' + q(apnPassword) + '"' : ''),
+        'LTE APN profile apn-main already exists'
+      )
+    );
+
+    lines.push('/interface lte set ' + wanInterface + ' apn-profiles=apn-main');
+    lines.push('# LTE створює default route автоматично після підключення.');
+  }
+
+  if (failoverEnabled) {
+    const failoverInterface = lineValue(el('foif').value, 'lte1');
+    const failoverType = el('fotype').value;
+    const healthHost = lineValue(el('fohealthhost').value, '1.1.1.1');
+
+    lines.push('');
+    lines.push('# --- Failover: ' + failoverInterface + ' ---');
+
+    if (failoverType === 'dhcp') {
+      lines.push(
+        '/ip dhcp-client add interface=' + failoverInterface +
+        ' disabled=no add-default-route=yes default-route-distance=2'
+      );
+    }
+
+    if (failoverType === 'static') {
+      const ip = sip(el('foip').value) || '203.0.113.20/24';
+      const gateway = sip(el('fogw').value) || '203.0.113.1';
+
+      lines.push('/ip address add address=' + ip + ' interface=' + failoverInterface);
+      lines.push(
+        '/ip route add dst-address=0.0.0.0/0 gateway=' + gateway +
+        ' distance=2 check-gateway=ping comment="failover default route"'
+      );
+    }
+
+    if (failoverType === 'pppoe') {
+      lines.push(
+        '/interface pppoe-client add interface=' + failoverInterface +
+        ' name=pppoe-failover' +
+        ' user="' + q(lineValue(el('fouser').value, 'login@isp')) + '"' +
+        ' password="' + q(el('fopass').value) + '"' +
+        ' disabled=no add-default-route=yes default-route-distance=2'
+      );
+    }
+
+    if (failoverType === 'lte') {
+      const apn = lineValue(el('foapn').value, 'internet');
+      const apnUser = el('foapnuser').value.trim();
+      const apnPassword = el('foapnpass').value;
+      const pin = el('fopin').value.trim();
+
+      if (pin) {
+        lines.push('/interface lte settings set pin1="' + q(pin) + '"');
+      }
+
+      lines.push(
+        rosEnsure(
+          '/interface lte apn add name=apn-failover apn="' + q(apn) + '"' +
+          (apnUser ? ' user="' + q(apnUser) + '"' : '') +
+          (apnPassword ? ' password="' + q(apnPassword) + '"' : ''),
+          'LTE APN profile apn-failover already exists'
+        )
+      );
+
+      lines.push('/interface lte set ' + failoverInterface + ' apn-profiles=apn-failover');
+      lines.push(
+        rosEnsure(
+          '/ip route add dst-address=0.0.0.0/0 gateway=' + failoverInterface +
+          ' distance=2 comment="failover LTE route"',
+          'Failover LTE route already exists'
+        )
+      );
+    }
+
+    lines.push(
+      rosEnsure(
+        '/interface list member add list=WAN interface=' + failoverInterface,
+        'WAN failover interface already exists: ' + failoverInterface
+      )
+    );
+
+    lines.push(
+      rosRemoveByComment('/tool netwatch', 'Failover health-check')
+    );
+
+    lines.push(
+      '/tool netwatch add host=' + healthHost +
+      ' interval=30s' +
+      ' down-script=":log warning failover-down"' +
+      ' up-script=":log info failover-up"' +
+      ' comment="Failover health-check"'
+    );
+  }
+
+  if (el('dhcpenable').checked) {
+    const dhcpRange = lineValue(el('dhcprange').value, '192.168.88.10-192.168.88.254');
+    const clientDns = sip(el('landns').value) || lanIp;
+
+    lines.push('');
+    lines.push('# --- DHCP LAN ---');
+    lines.push(
+      rosEnsure(
+        '/ip pool add name=dhcp-pool ranges=' + dhcpRange,
+        'DHCP pool already exists'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/ip dhcp-server add name=dhcp-lan interface=' + lanInterface +
+        ' address-pool=dhcp-pool lease-time=1d disabled=no',
+        'DHCP server dhcp-lan already exists'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/ip dhcp-server network add address=' + lanNetwork +
+        ' gateway=' + lanIp +
+        ' dns-server=' + clientDns,
+        'DHCP network already exists'
+      )
+    );
+  }
+
+  lines.push('');
+  lines.push('# --- DNS ---');
+  lines.push(
+    '/ip dns set servers=' + lineValue(el('upstreamdns').value, '1.1.1.1,8.8.8.8') +
+    ' allow-remote-requests=' + (el('allowremote').checked ? 'yes' : 'no')
+  );
+
+  lines.push.apply(lines, genStaticDns());
+  lines.push.apply(lines, genAddressList());
+
+  if (el('natenable').checked) {
+    lines.push('');
+    lines.push('# --- NAT ---');
+    lines.push(
+      '/ip firewall nat add chain=srcnat action=masquerade' +
+      ' out-interface-list=WAN ipsec-policy=out,none' +
+      ' comment="defconf: masquerade"'
+    );
+  }
+
+  lines.push.apply(lines, genPortForwarding());
+  lines.push.apply(lines, genRoutes());
+
+  if (el('wifienable').checked && model.wifi !== 'none') {
+    const ssid = el('ssid').value.trim() || 'MyNetwork';
+    const password = el('wifipass').value;
+
+    lines.push('');
+
+    if (!password) {
+      lines.push('# --- Wi-Fi ---');
+      lines.push('# ⚠ Пароль Wi‑Fi не задано. Wi‑Fi-блок не згенеровано.');
+    } else if (model.wifi === 'legacy') {
+      lines.push('# --- Wi-Fi legacy (wireless) ---');
+
+      lines.push(
+        rosEnsure(
+          '/interface wireless security-profiles add name=wifi-sec' +
+          ' mode=dynamic-keys authentication-types=wpa2-psk' +
+          ' wpa2-pre-shared-key="' + q(password) + '"',
+          'Wi-Fi security profile wifi-sec already exists'
+        )
+      );
+
+      if (el('band24').checked) {
+        lines.push(
+          '/interface wireless set wlan1 mode=ap-bridge' +
+          ' band=2ghz-b/g/n ssid="' + q(ssid) + '"' +
+          ' security-profile=wifi-sec disabled=no'
+        );
+
+        if (!model.single) {
+          lines.push(
+            rosEnsure(
+              '/interface bridge port add bridge=bridge-lan interface=wlan1',
+              'Bridge port already exists: wlan1'
+            )
+          );
+        }
+      }
+
+      if (el('band5').checked) {
+        lines.push(
+          '/interface wireless set wlan2 mode=ap-bridge' +
+          ' band=5ghz-a/n/ac ssid="' + q(ssid) + '"' +
+          ' security-profile=wifi-sec disabled=no'
+        );
+
+        if (!model.single) {
+          lines.push(
+            rosEnsure(
+              '/interface bridge port add bridge=bridge-lan interface=wlan2',
+              'Bridge port already exists: wlan2'
+            )
+          );
+        }
+      }
+    } else if (firmware !== '6.x') {
+      const wifiMenu = firmware === '7.13+' ? '/interface wifi' : '/interface wifiwave2';
+
+      lines.push('# --- Wi-Fi 6 ---');
+
+      if (el('band5').checked) {
+        lines.push(
+          wifiMenu + ' set wifi1 disabled=no' +
+          ' configuration.ssid="' + q(ssid) + '"' +
+          ' configuration.mode=ap' +
+          ' security.authentication-types=wpa2-psk,wpa3-psk' +
+          ' security.passphrase="' + q(password) + '"'
+        );
+
+        if (!model.single) {
+          lines.push(
+            rosEnsure(
+              '/interface bridge port add bridge=bridge-lan interface=wifi1',
+              'Bridge port already exists: wifi1'
+            )
+          );
+        }
+      }
+
+      if (el('band24').checked) {
+        lines.push(
+          wifiMenu + ' set wifi2 disabled=no' +
+          ' configuration.ssid="' + q(ssid) + '"' +
+          ' configuration.mode=ap' +
+          ' security.authentication-types=wpa2-psk,wpa3-psk' +
+          ' security.passphrase="' + q(password) + '"'
+        );
+
+        if (!model.single) {
+          lines.push(
+            rosEnsure(
+              '/interface bridge port add bridge=bridge-lan interface=wifi2',
+              'Bridge port already exists: wifi2'
+            )
+          );
+        }
+      }
+    } else {
+      lines.push('# ⚠ Wi‑Fi 6 не підтримується у RouterOS 6.x.');
+    }
+  }
+
+  lines.push.apply(lines, genCapsman());
+
+  if (el('guestenable').checked && !model.single) {
+    const vlan = lineValue(el('guestvlan').value, '20');
+    const guestIpCidr = sip(el('guestip').value) || '192.168.20.1/24';
+    const guestIp = sip(guestIpCidr.split('/')[0]);
+    const guestNetwork = calcNet(guestIpCidr);
+    const guestRange = lineValue(el('guestrange').value, '192.168.20.10-192.168.20.254');
+
+    lines.push('');
+    lines.push('# --- Гостьова мережа (VLAN ' + vlan + ') ---');
+    lines.push('# ⚠ Для фізичних trunk/access-портів налаштуй bridge VLAN filtering окремо.');
+    lines.push(
+      rosEnsure(
+        '/interface bridge add name=bridge-guest protocol-mode=rstp',
+        'Bridge bridge-guest already exists'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/interface vlan add name=vlan-guest vlan-id=' + vlan + ' interface=bridge-lan',
+        'VLAN vlan-guest already exists'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/interface bridge port add bridge=bridge-guest interface=vlan-guest',
+        'Guest bridge VLAN port already exists'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/ip address add address=' + guestIpCidr + ' interface=bridge-guest',
+        'Guest IP address already exists'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/ip pool add name=guest-pool ranges=' + guestRange,
+        'Guest DHCP pool already exists'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/ip dhcp-server add name=dhcp-guest interface=bridge-guest' +
+        ' address-pool=guest-pool lease-time=1d disabled=no',
+        'Guest DHCP server already exists'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/ip dhcp-server network add address=' + guestNetwork +
+        ' gateway=' + guestIp +
+        ' dns-server=' + guestIp,
+        'Guest DHCP network already exists'
+      )
+    );
+
+    lines.push(
+      '/ip firewall filter add chain=forward in-interface=bridge-guest' +
+      ' out-interface=bridge-lan action=drop' +
+      ' comment="isolate guest from LAN"'
+    );
+
+    lines.push(
+      '/ip firewall filter add chain=forward in-interface=bridge-lan' +
+      ' out-interface=bridge-guest action=drop' +
+      ' comment="isolate LAN from guest"'
+    );
+
+    lines.push(
+      '/ip firewall filter add chain=input in-interface=bridge-guest' +
+      ' protocol=udp dst-port=53 action=accept comment="allow guest DNS UDP"'
+    );
+
+    lines.push(
+      '/ip firewall filter add chain=input in-interface=bridge-guest' +
+      ' protocol=tcp dst-port=53 action=accept comment="allow guest DNS TCP"'
+    );
+
+    lines.push(
+      '/ip firewall filter add chain=input in-interface=bridge-guest' +
+      ' protocol=udp dst-port=67-68 action=accept comment="allow guest DHCP"'
+    );
+
+    lines.push(
+      '/ip firewall filter add chain=input in-interface=bridge-guest' +
+      ' action=drop comment="block guest router access"'
+    );
+
+    if (el('guestwifi').checked && el('wifienable').checked && model.wifi === 'legacy') {
+      const guestSsid = el('guestssid').value.trim() || 'Guest-WiFi';
+      const guestPassword = el('guestwifipass').value;
+
+      if (guestPassword) {
+        lines.push(
+          rosEnsure(
+            '/interface wireless security-profiles add name=guest-sec' +
+            ' mode=dynamic-keys authentication-types=wpa2-psk' +
+            ' wpa2-pre-shared-key="' + q(guestPassword) + '"',
+            'Guest Wi-Fi security profile already exists'
+          )
+        );
+
+        if (el('band24').checked) {
+          lines.push(
+            rosEnsure(
+              '/interface wireless add master-interface=wlan1 name=wlan1-guest' +
+              ' ssid="' + q(guestSsid) + '"' +
+              ' security-profile=guest-sec disabled=no',
+              'Guest Wi-Fi interface already exists: wlan1-guest'
+            )
+          );
+
+          lines.push(
+            rosEnsure(
+              '/interface bridge port add bridge=bridge-guest interface=wlan1-guest',
+              'Guest bridge port already exists: wlan1-guest'
+            )
+          );
+        }
+
+        if (el('band5').checked) {
+          lines.push(
+            rosEnsure(
+              '/interface wireless add master-interface=wlan2 name=wlan2-guest' +
+              ' ssid="' + q(guestSsid) + '"' +
+              ' security-profile=guest-sec disabled=no',
+              'Guest Wi-Fi interface already exists: wlan2-guest'
+            )
+          );
+
+          lines.push(
+            rosEnsure(
+              '/interface bridge port add bridge=bridge-guest interface=wlan2-guest',
+              'Guest bridge port already exists: wlan2-guest'
+            )
+          );
+        }
+      } else {
+        lines.push('# ⚠ Пароль гостьового Wi‑Fi не задано.');
+      }
+    }
+
+    if (el('guestwifi').checked && model.wifi === 'wifi6') {
+      lines.push('# ⚠ Гостьовий Wi‑Fi 6 потребує окремого slave/configuration профілю; налаштуй вручну.');
+    }
+  }
+
+  if (el('wgenable').checked && firmware !== '6.x') {
+    const wgPort = lineValue(el('wgport').value, '51820');
+    const wgIp = sip(el('wgserverip').value) || '10.20.30.1/24';
+
+    lines.push('');
+    lines.push('# --- WireGuard VPN ---');
+
+    lines.push(
+      rosEnsure(
+        '/interface wireguard add name=wg1 listen-port=' + wgPort,
+        'WireGuard interface wg1 already exists'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/ip address add address=' + wgIp + ' interface=wg1',
+        'WireGuard IP address already exists'
+      )
+    );
+
+    lines.push(
+      rosEnsure(
+        '/interface list member add list=LAN interface=wg1',
+        'WireGuard LAN member already exists'
+      )
+    );
+
+    const peers = el('wgpeers').value.trim();
+
+    if (peers) {
+      peers.split('\n').forEach(function(line) {
+        const value = line.trim();
+        if (!value || value.startsWith('#')) return;
+
+        const parts = value.split(':');
+        const peerName = parts[0] ? parts[0].trim() : '';
+        const publicKey = parts[1] ? parts[1].trim() : '';
+        const allowedAddress = parts[2] ? parts[2].trim() : '';
+
+        if (publicKey && isCIDR(allowedAddress)) {
+          lines.push(
+            '/interface wireguard peers add interface=wg1' +
+            ' public-key="' + q(publicKey) + '"' +
+            ' allowed-address=' + allowedAddress +
+            (peerName ? ' comment="' + q(peerName) + '"' : '')
+          );
+        }
+      });
+    }
+
+    lines.push('# Публічний ключ сервера: /interface wireguard print');
+  }
+
+  if (el('ovpnenable').checked) {
+    const port = lineValue(el('ovpnport').value, '1194');
+    const localAddress = sip(el('ovpnlocal').value) || '10.10.10.1';
+    const range = lineValue(el('ovpnrange').value, '10.10.10.2-10.10.10.254');
+    const cipher = el('ovpncipher').value;
+    const requireCert = el('ovpnreqcert').checked ? 'yes' : 'no';
+
+    lines.push('');
+    lines.push('# --- OpenVPN сервер ---');
+
+    if (
+      (cipher === 'aes256-gcm' && firmware !== '7.13+') ||
+      (cipher === 'blowfish128' && firmware !== '6.x')
+    ) {
+      lines.push('# ⚠ Вибране шифрування не сумісне з RouterOS ' + firmware + '.');
+    } else {
+      lines.push('# Створення CA та серверного сертифіката.');
+      lines.push('# Перед повторним запуском перевір: /certificate print');
+
+      lines.push(
+        rosEnsure(
+          '/certificate add name=ovpn-ca-template common-name=ovpn-ca' +
+          ' key-usage=key-cert-sign,crl-sign days-valid=3650',
+          'OpenVPN CA template already exists'
+        )
+      );
+
+      lines.push(
+        ':do { /certificate sign ovpn-ca-template name=ovpn-ca ca-crl-host=127.0.0.1 } on-error={ :log info "OpenVPN CA already signed" }'
+      );
+
+      lines.push(':delay 5s');
+
+      lines.push(
+        rosEnsure(
+          '/certificate add name=ovpn-server-template common-name=ovpn-server' +
+          ' key-usage=digital-signature,key-encipherment,tls-server days-valid=1825',
+          'OpenVPN server certificate template already exists'
+        )
+      );
+
+      lines.push(
+        ':do { /certificate sign ovpn-server-template name=ovpn-server ca=ovpn-ca } on-error={ :log info "OpenVPN server certificate already signed" }'
+      );
+
+      lines.push(':delay 5s');
+
+      lines.push(
+        rosEnsure(
+          '/ip pool add name=ovpn-pool ranges=' + range,
+          'OpenVPN pool already exists'
+        )
+      );
+
+      lines.push(
+        rosEnsure(
+          '/ppp profile add name=ovpn-profile local-address=' + localAddress +
+          ' remote-address=ovpn-pool dns-server=' + (sip(el('landns').value) || '8.8.8.8'),
+          'OpenVPN PPP profile already exists'
+        )
+      );
+
+      const users = el('ovpnusers').value.trim();
+
+      if (users) {
+        users.split('\n').forEach(function(line) {
+          const value = line.trim();
+          if (!value || value.startsWith('#')) return;
+
+          const separator = value.indexOf(':');
+          const username = separator >= 0 ? value.slice(0, separator).trim() : value;
+          const password = separator >= 0 ? value.slice(separator + 1).trim() : '';
+
+          if (username && password) {
+            lines.push(
+              '/ppp secret add name="' + q(username) + '"' +
+              ' password="' + q(password) + '"' +
+              ' service=ovpn profile=ovpn-profile'
+            );
+          }
+        });
+      }
+
+      lines.push(
+        '/interface ovpn-server server set enabled=yes' +
+        ' port=' + port +
+        ' certificate=ovpn-server' +
+        ' cipher=' + cipher +
+        ' auth=sha256 default-profile=ovpn-profile' +
+        ' require-client-certificate=' + requireCert
+      );
+    }
+  }
+
+  lines.push.apply(lines, genOpenVpnClient());
+  lines.push.apply(lines, genIpsec());
+
+  if (el('macprotect').checked) {
+    lines.push('');
+    lines.push('# --- Захист MAC ---');
+    lines.push('/tool mac-server set allowed-interface-list=LAN');
+    lines.push('/tool mac-server mac-winbox set allowed-interface-list=LAN');
+    lines.push('/tool mac-server ping set enabled=no');
+  }
+
+  if (el('basicfw').checked) {
+    lines.push('');
+    lines.push('# --- Firewall (defconf-подібний) ---');
+
+    lines.push(
+      '/ip firewall filter add chain=input action=accept' +
+      ' connection-state=established,related,untracked' +
+      ' comment="defconf: accept established,related,untracked"'
+    );
+
+    lines.push(
+      '/ip firewall filter add chain=input action=drop connection-state=invalid' +
+      ' comment="defconf: drop invalid"'
+    );
+
+    lines.push(
+      '/ip firewall filter add chain=input action=accept protocol=icmp' +
+      ' comment="defconf: accept ICMP"'
+    );
+
+    lines.push(
+      '/ip firewall filter add chain=input action=accept in-interface=lo' +
+      ' src-address=127.0.0.1 dst-address=127.0.0.1' +
+      ' comment="defconf: accept loopback"'
+    );
+
+    if (el('dnsprotect').checked) {
+      lines.push(
+        '/ip firewall filter add chain=input protocol=udp dst-port=53' +
+        ' in-interface-list=WAN action=drop comment="block DNS UDP from WAN"'
+      );
+
+      lines.push(
+        '/ip firewall filter add chain=input protocol=tcp dst-port=53' +
+        ' in-interface-list=WAN action=drop comment="block DNS TCP from WAN"'
+      );
+    }
+
+    if (el('ovpnenable').checked) {
+      lines.push(
+        '/ip firewall filter add chain=input protocol=tcp' +
+        ' dst-port=' + lineValue(el('ovpnport').value, '1194') +
+        ' in-interface-list=WAN action=accept comment="allow OpenVPN"'
+      );
+    }
+
+    if (el('wgenable').checked && firmware !== '6.x') {
+      lines.push(
+        '/ip firewall filter add chain=input protocol=udp' +
+        ' dst-port=' + lineValue(el('wgport').value, '51820') +
+        ' in-interface-list=WAN action=accept comment="allow WireGuard"'
+      );
+    }
+
+    if (el('ipsecenable').checked) {
+      lines.push(
+        '/ip firewall filter add chain=input protocol=udp dst-port=500,4500' +
+        ' in-interface-list=WAN action=accept comment="allow IPsec IKE"'
+      );
+
+      lines.push(
+        '/ip firewall filter add chain=input protocol=ipsec-esp' +
+        ' in-interface-list=WAN action=accept comment="allow IPsec ESP"'
+      );
+    }
+
+    lines.push(
+      '/ip firewall filter add chain=input action=drop in-interface-list=!LAN' +
+      (el('logwandrops').checked ? ' log=yes log-prefix="WAN-DROP: "' : '') +
+      ' comment="defconf: drop all not from LAN"'
+    );
+
+    lines.push(
+      '/ip firewall filter add chain=forward action=accept ipsec-policy=in,ipsec' +
+      ' comment="defconf: accept in ipsec"'
+    );
+
+    lines.push(
+      '/ip firewall filter add chain=forward action=accept ipsec-policy=out,ipsec' +
+      ' comment="defconf: accept out ipsec"'
+    );
+
+    if (el('fasttrack').checked) {
+      lines.push(
+        '/ip firewall filter add chain=forward action=fasttrack-connection' +
+        ' connection-state=established,related' +
+        (el('fasttrackhw').checked ? ' hw-offload=yes' : '') +
+        ' comment="defconf: fasttrack"'
+      );
+    }
+
+    lines.push(
+      '/ip firewall filter add chain=forward action=accept' +
+      ' connection-state=established,related,untracked' +
+      ' comment="defconf: accept established,related,untracked"'
+    );
+
+    lines.push(
+      '/ip firewall filter add chain=forward action=drop connection-state=invalid' +
+      ' comment="defconf: drop invalid"'
+    );
+
+    lines.push(
+      '/ip firewall filter add chain=forward action=drop' +
+      ' in-interface-list=WAN connection-nat-state=!dstnat' +
+      ' comment="defconf: drop WAN not DSTNATed"'
+    );
+  } else if (el('dnsprotect').checked) {
+    lines.push('');
+    lines.push('# --- Захист DNS із WAN ---');
+    lines.push('/ip firewall filter add chain=input protocol=udp dst-port=53 in-interface-list=WAN action=drop');
+    lines.push('/ip firewall filter add chain=input protocol=tcp dst-port=53 in-interface-list=WAN action=drop');
+  }
+
+  if (el('disableservices').checked) {
+    lines.push('');
+    lines.push('# --- Вимкнення сервісів ---');
+    lines.push('/ip service disable telnet,ftp,www,api,api-ssl');
+  }
+
+  if (el('disablesvcports').checked) {
+    lines.push('');
+    lines.push('# --- Вимкнення service-ports ---');
+    lines.push('/ip firewall service-port set ftp disabled=yes');
+    lines.push('/ip firewall service-port set tftp disabled=yes');
+    lines.push('/ip firewall service-port set h323 disabled=yes');
+    lines.push('/ip firewall service-port set sip disabled=yes');
+    lines.push('/ip firewall service-port set pptp disabled=yes');
+  }
+
+  lines.push.apply(lines, genNtp());
+
+  if (el('netwatchenable').checked) {
+    lines.push('');
+    lines.push('# --- Netwatch ---');
+
+    lines.push(rosRemoveByComment('/tool netwatch', 'WAN availability check'));
+
+    lines.push(
+      '/tool netwatch add host=' + lineValue(el('netwatchhost').value, '8.8.8.8') +
+      ' interval=' + lineValue(el('netwatchinterval').value, '30s') +
+      ' down-script=":log warning netwatch-down"' +
+      ' up-script=":log info netwatch-up"' +
+      ' comment="WAN availability check"'
+    );
+  }
+
+  if (el('safetynet').checked && el('backupenable').checked) {
+    const minutes = Math.max(1, Math.min(120, Number(el('safetyminutes').value) || 10));
+
+    lines.push('');
+    lines.push('# --- Запобіжник від блокування ---');
+    lines.push('# Якщо все працює — видали scheduler після перевірки.');
+    lines.push(rosRemoveByComment('/system scheduler', 'Safety net auto revert'));
+
+    lines.push(
+      '/system scheduler add name=safety-net-revert' +
+      ' interval=' + minutes + 'm' +
+      ' start-time=startup' +
+      ' comment="Safety net auto revert"' +
+      ' on-event="/system backup load name=backup-before-config dont-encrypt=yes"'
+    );
+
+    lines.push('# Після успішної перевірки: /system scheduler remove [find name=safety-net-revert]');
+  }
+
+  const customCommands = el('customcmds').value.trim();
+
+  if (customCommands) {
+    lines.push('');
+    lines.push('# --- Власні команди ---');
+
+    customCommands.split('\n').forEach(function(line) {
+      if (line.trim()) lines.push(line);
+    });
+  }
+
+  var _rosRaw = lines.join('\n');
+  var _outEl = el('output');
+  if (typeof highlightRos === 'function') {
+    _outEl.innerHTML = highlightRos(_rosRaw);
+  } else {
+    _outEl.textContent = _rosRaw;
+  }
+}
+
+/* ============================================================
+   ПРОФІЛІ: ЗБЕРЕЖЕННЯ / ЗАВАНТАЖЕННЯ
+   ============================================================ */
+
+function serializeForm() {
+  const data = {};
+
+  document.querySelectorAll('#form input[id],#form select[id],#form textarea[id]')
+    .forEach(function(field) {
+      if (field.id === 'ai-key') return;
+      data[field.id] = field.type === 'checkbox' ? field.checked : field.value;
+    });
+
+  return data;
+}
+
+function containsPasswords(data) {
+  const fields = [
+    'adminpass',
+    'pppoepass',
+    'ltepass',
+    'fopass',
+    'foapnpass',
+    'wifipass',
+    'guestwifipass',
+    'capsmanpass',
+    'ovpnclpass'
+  ];
+
+  return fields.some(function(key) {
+    return data[key] && String(data[key]).length > 0;
+  });
+}
+
+function applyData(data) {
+  if (!data || typeof data !== 'object') return;
+
+  if (data.model && MODELS[data.model]) {
+    el('model').value = data.model;
+  }
+
+  if (data.firmware) {
+    el('firmware').value = data.firmware;
+  }
+
+  applyModel();
+
+  Object.keys(data).forEach(function(id) {
+    const field = el(id);
+    if (!field || id === 'ai-key') return;
+
+    if (field.type === 'checkbox') {
+      field.checked = Boolean(data[id]);
+    } else {
+      field.value = data[id];
+    }
+  });
+
+  updateWanFields();
+  updateFoFields();
+  syncToggleStates();
+  render();
+}
+
+const PRESETS = {
+  home: {
+    model: 'hap-ac2',
+    firmware: '7.13+',
+    hostname: 'Home-Router',
+    timezone: 'Europe/Kyiv',
+    backupenable: true,
+    safetynet: false,
+    ddnsenable: false,
+    resetconfig: false,
+    changepass: true,
+    adminpass: '',
+    wanif: 'ether1',
+    wantype: 'dhcp',
+    lanports: 'ether2,ether3,ether4,ether5',
+    lanip: '192.168.88.1/24',
+    dhcpenable: true,
+    dhcprange: '192.168.88.10-192.168.88.254',
+    landns: '192.168.88.1',
+    upstreamdns: '1.1.1.1,8.8.8.8',
+    allowremote: true,
+    natenable: true,
+    dnsprotect: true,
+    wifienable: true,
+    ssid: 'Home-WiFi',
+    wifipass: '',
+    band24: true,
+    band5: true,
+    guestenable: false,
+    foenable: false,
+    wgenable: false,
+    ovpnenable: false,
+    ovpnclenable: false,
+    ipsecenable: false,
+    capsmanenable: false,
+    addrlistenable: false,
+    routesenable: false,
+    dnsstaticenable: false,
+    pfwenable: false,
+    disableipv6: true,
+    ipneighbor: false,
+    maxneighbor: 0,
+    basicfw: true,
+    fasttrack: false,
+    fasttrackhw: false,
+    macprotect: true,
+    disableservices: false,
+    disablesvcports: false,
+    ntpenable: true,
+    logwandrops: false,
+    netwatchenable: false,
+    _name: 'Домашній роутер'
+  },
+
+  office: {
+    model: 'hap-ac3',
+    firmware: '7.13+',
+    hostname: 'Office-Router',
+    timezone: 'Europe/Kyiv',
+    backupenable: true,
+    safetynet: true,
+    safetyminutes: '10',
+    ddnsenable: true,
+    resetconfig: false,
+    changepass: true,
+    adminpass: '',
+    wanif: 'ether1',
+    wantype: 'pppoe',
+    pppoeuser: 'office@isp',
+    pppoepass: '',
+    lanports: 'ether2,ether3,ether4,ether5',
+    lanip: '10.0.0.1/24',
+    dhcpenable: true,
+    dhcprange: '10.0.0.50-10.0.0.200',
+    landns: '10.0.0.1',
+    upstreamdns: '1.1.1.1,8.8.8.8',
+    allowremote: true,
+    natenable: true,
+    dnsprotect: true,
+    wifienable: true,
+    ssid: 'Office-WiFi',
+    wifipass: '',
+    band24: true,
+    band5: true,
+    guestenable: true,
+    guestvlan: '20',
+    guestip: '192.168.20.1/24',
+    guestrange: '192.168.20.10-192.168.20.254',
+    guestwifi: true,
+    guestssid: 'Office-Guest',
+    guestwifipass: '',
+    foenable: true,
+    foif: 'lte1',
+    fotype: 'lte',
+    foapn: 'internet',
+    fohealthhost: '1.1.1.1',
+    wgenable: true,
+    wgport: '51820',
+    wgserverip: '10.20.30.1/24',
+    ovpnenable: false,
+    ovpnclenable: false,
+    ipsecenable: false,
+    capsmanenable: false,
+    addrlistenable: false,
+    routesenable: false,
+    dnsstaticenable: true,
+    dnsstaticentries: 'router.lan=10.0.0.1',
+    pfwenable: false,
+    disableipv6: true,
+    ipneighbor: true,
+    maxneighbor: 8192,
+    basicfw: true,
+    fasttrack: false,
+    fasttrackhw: false,
+    macprotect: true,
+    disableservices: true,
+    disablesvcports: true,
+    ntpenable: true,
+    logwandrops: true,
+    netwatchenable: true,
+    netwatchhost: '8.8.8.8',
+    netwatchinterval: '30s',
+    _name: 'Офісна мережа'
+  },
+
+  lte: {
+    model: 'chateau-lte7',
+    firmware: '7.13+',
+    hostname: 'LTE-Router',
+    timezone: 'Europe/Kyiv',
+    backupenable: true,
+    safetynet: false,
+    ddnsenable: true,
+    resetconfig: false,
+    changepass: true,
+    adminpass: '',
+    wanif: 'lte1',
+    wantype: 'lte',
+    lteapn: 'internet',
+    ltepin: '',
+    lteuser: '',
+    ltepass: '',
+    lanports: 'ether1,ether2,ether3,ether4',
+    lanip: '192.168.88.1/24',
+    dhcpenable: true,
+    dhcprange: '192.168.88.10-192.168.88.254',
+    landns: '192.168.88.1',
+    upstreamdns: '1.1.1.1,8.8.8.8',
+    allowremote: true,
+    natenable: true,
+    dnsprotect: true,
+    wifienable: true,
+    ssid: 'LTE-WiFi',
+    wifipass: '',
+    band24: true,
+    band5: true,
+    guestenable: false,
+    foenable: true,
+    foif: 'ether1',
+    fotype: 'dhcp',
+    fohealthhost: '8.8.8.8',
+    wgenable: false,
+    ovpnenable: false,
+    ovpnclenable: false,
+    ipsecenable: false,
+    capsmanenable: false,
+    addrlistenable: false,
+    routesenable: false,
+    dnsstaticenable: false,
+    pfwenable: false,
+    disableipv6: true,
+    ipneighbor: false,
+    maxneighbor: 0,
+    basicfw: true,
+    fasttrack: false,
+    fasttrackhw: false,
+    macprotect: true,
+    disableservices: false,
+    disablesvcports: false,
+    ntpenable: true,
+    logwandrops: false,
+    netwatchenable: true,
+    netwatchhost: '1.1.1.1',
+    netwatchinterval: '30s',
+    _name: 'LTE + резервний WAN'
+  }
+};
+
+/* ============================================================
+   RSC ОФЛАЙН-АНАЛІЗАТОР
+   ============================================================ */
+
+function parseRscOffline(text) {
+  const verbs = ['add', 'set', 'remove', 'enable', 'disable', 'print', 'export', 'unset', 'move'];
+  const commands = [];
+  let context = '';
+
+  text.split('\n').forEach(function(raw) {
+    const line = raw.replace(/\r$/, '').trim();
+
+    if (!line || line.startsWith('#')) return;
+
+    if (line.startsWith('/')) {
+      const tokens = line.split(/\s+/);
+      let verbIndex = -1;
+
+      for (let index = 1; index < tokens.length; index += 1) {
+        if (verbs.includes(tokens[index].toLowerCase())) {
+          verbIndex = index;
+          break;
+        }
+      }
+
+      if (verbIndex > 0) {
+        context = tokens.slice(0, verbIndex).join(' ');
+        commands.push({ path: context, full: line });
+      } else {
+        context = line;
+      }
+
+      return;
+    }
+
+    if (context) {
+      commands.push({
+        path: context,
+        full: context + ' ' + line
+      });
+    }
+  });
+
+  return commands;
+}
+
+function fillFromRsc(text) {
+  let filled = 0;
+
+  function setValue(id, value) {
+    const field = el(id);
+
+    if (field && value !== undefined && value !== null && String(value) !== '') {
+      field.value = value;
+      filled += 1;
+    }
+  }
+
+  function setChecked(id, value) {
+    const field = el(id);
+
+    if (field) {
+      field.checked = Boolean(value);
+      filled += 1;
+    }
+  }
+
+  function matchOne(regex) {
+    const match = text.match(regex);
+    return match ? match[1] : null;
+  }
+
+  const hostname = matchOne(/\/system identity set name=["']?([^"'\r\n]+?)["']?\s*(?:#.*)?$/im);
+  if (hostname) setValue('hostname', hostname.trim());
+
+  const timezone = matchOne(/\/system clock set time-zone-name=([^\s#\r\n]+)/i);
+  if (timezone) setValue('timezone', timezone.trim());
+
+  const dhcpWan = matchOne(/\/ip dhcp-client add[^\n]*\binterface=([^\s]+)/i);
+  const pppoeWan = matchOne(/\/interface pppoe-client add[^\n]*\binterface=([^\s]+)/i);
+  const lteWan = matchOne(/\/interface lte set\s+([^\s]+)\s+apn-profiles=/i);
+  const lteApn = matchOne(/\/interface lte apn add[^\n]*\bapn=["']?([^"'\s]+)["']?/i);
+
+  if (lteWan && lteApn) {
+    el('wantype').value = 'lte';
+    setValue('wanif', lteWan);
+    setValue('lteapn', lteApn);
+  } else if (pppoeWan) {
+    el('wantype').value = 'pppoe';
+    setValue('wanif', pppoeWan);
+
+    const pppoeUser = matchOne(/\/interface pppoe-client add[^\n]*\buser=["']?([^"'\s]+)["']?/i);
+    if (pppoeUser) setValue('pppoeuser', pppoeUser);
+  } else if (dhcpWan) {
+    el('wantype').value = 'dhcp';
+    setValue('wanif', dhcpWan);
+  }
+
+  const lanIp = matchOne(/\/ip address add address=([\d.\/]+)\s+interface=bridge-lan/i);
+  if (lanIp) setValue('lanip', lanIp);
+
+  const bridgePorts = [];
+  const bridgePortRegex = /\/interface bridge port add[^\n]*\bbridge=bridge-lan\b[^\n]*\binterface=([^\s]+)/gi;
+  let bridgeMatch;
+
+  while ((bridgeMatch = bridgePortRegex.exec(text))) {
+    if (!/^(wlan|wifi)/i.test(bridgeMatch[1])) {
+      bridgePorts.push(bridgeMatch[1]);
+    }
+  }
+
+  if (bridgePorts.length) {
+    setValue('lanports', uniqueNonEmpty(bridgePorts).join(','));
+  }
+
+  const dhcpRange = matchOne(/\/ip pool add name=dhcp-pool\s+ranges=([^\s#\r\n]+)/i);
+  if (dhcpRange) {
+    setChecked('dhcpenable', true);
+    setValue('dhcprange', dhcpRange);
+  }
+
+  const clientDns = matchOne(/\/ip dhcp-server network add[^\n]*\bdns-server=([^\s#\r\n]+)/i);
+  if (clientDns) setValue('landns', clientDns);
+
+  const upstreamDns = matchOne(/\/ip dns set\s+(?:[^\n]*\s)?servers=([^\s#\r\n]+)/i);
+  if (upstreamDns) setValue('upstreamdns', upstreamDns);
+
+  setChecked('allowremote', /allow-remote-requests=yes/i.test(text));
+  setChecked('natenable', /action=masquerade/i.test(text));
+  setChecked('basicfw', /\/ip firewall filter add/i.test(text));
+  setChecked('fasttrack', /action=fasttrack-connection/i.test(text));
+  setChecked('fasttrackhw', /hw-offload=yes/i.test(text));
+  setChecked('dnsprotect', /dst-port=53[^\n]*action=drop/i.test(text));
+  setChecked('logwandrops', /log-prefix="?WAN-DROP/i.test(text));
+  setChecked('disableservices', /\/ip service disable/i.test(text));
+  setChecked('disablesvcports', /\/ip firewall service-port set[^\n]+disabled=yes/i.test(text));
+  setChecked('ntpenable', /\/system ntp client set enabled=yes/i.test(text));
+  setChecked('macprotect', /mac-server set allowed-interface-list/i.test(text));
+  setChecked('disableipv6', /disable-ipv6=yes/i.test(text));
+  setChecked('ipneighbor', /discover-interface-list=none/i.test(text));
+
+  const maxNeighbors = matchOne(/\/ip settings set max-neighbor-entries=(\d+)/i);
+  if (maxNeighbors) setValue('maxneighbor', maxNeighbors);
+
+  const wgPort = matchOne(/\/interface wireguard add[^\n]*\blisten-port=(\d+)/i);
+  if (wgPort) {
+    setChecked('wgenable', true);
+    setValue('wgport', wgPort);
+  }
+
+  const wgIp = matchOne(/\/ip address add address=([\d.\/]+)\s+interface=wg\d/i);
+  if (wgIp) setValue('wgserverip', wgIp);
+
+  const ovpnServerPort = matchOne(/\/interface ovpn-server server set[^\n]*\bport=(\d+)/i);
+  if (ovpnServerPort) {
+    setChecked('ovpnenable', true);
+    setValue('ovpnport', ovpnServerPort);
+  }
+
+  const ovpnClientServer = matchOne(/\/interface ovpn-client add[^\n]*\bconnect-to=["']?([^"'\s]+)["']?/i);
+  if (ovpnClientServer) {
+    setChecked('ovpnclenable', true);
+    setValue('ovpnclserver', ovpnClientServer);
+  }
+
+  const guestVlan = matchOne(/\/interface vlan add name=vlan-guest\s+vlan-id=(\d+)/i);
+  if (guestVlan) {
+    setChecked('guestenable', true);
+    setValue('guestvlan', guestVlan);
+  }
+
+  const guestIp = matchOne(/\/ip address add address=([\d.\/]+)\s+interface=bridge-guest/i);
+  if (guestIp) setValue('guestip', guestIp);
+
+  const netwatchHost = matchOne(/\/tool netwatch add host=([^\s]+)[^\n]*comment="WAN availability check/i);
+  if (netwatchHost) {
+    setChecked('netwatchenable', true);
+    setValue('netwatchhost', netwatchHost);
+  }
+
+  return filled;
+}
+
+/* ============================================================
+   ОБРОБНИКИ ПОДІЙ
+   ============================================================ */
+
+el('model').addEventListener('change', function() {
+  applyModel();
+  render();
+});
+
+el('firmware').addEventListener('change', render);
+
+el('wantype').addEventListener('change', function() {
+  updateWanFields();
+  render();
+});
+
+el('fotype').addEventListener('change', function() {
+  updateFoFields();
+  render();
+});
+
+bindToggle('dhcpenable', 'dhcp-block');
+bindToggle('wifienable', 'wifi-block');
+bindToggle('guestenable', 'guest-block');
+bindToggle('foenable', 'fo-block');
+bindToggle('wgenable', 'wg-block');
+bindToggle('ovpnenable', 'ovpn-block');
+bindToggle('ovpnclenable', 'ovpncl-block');
+bindToggle('ipsecenable', 'ipsec-block');
+bindToggle('addrlistenable', 'addrlist-block');
+bindToggle('routesenable', 'routes-block');
+bindToggle('dnsstaticenable', 'dnsstatic-block');
+bindToggle('pfwenable', 'pfw-block');
+bindToggle('capsmanenable', 'capsman-block');
+bindToggle('safetynet', 'safety-row');
+bindToggle('netwatchenable', 'netwatch-block');
+
+el('changepass').addEventListener('change', function() {
+  syncToggleStates();
+  render();
+});
+
+const debouncedRender = debounce(render, 300);
+
+document.querySelectorAll('#form input, #form select, #form textarea').forEach(function(field) {
+  if (field.type === 'checkbox' || field.tagName === 'SELECT') {
+    field.addEventListener('input', render);
+    field.addEventListener('change', render);
+  } else {
+    field.addEventListener('input', debouncedRender);
+  }
+});
+
+el('btn-save').addEventListener('click', function() {
+  const data = serializeForm();
+
+  if (
+    containsPasswords(data) &&
+    !confirm('⚠️ Файл міститиме паролі у відкритому вигляді.\nПродовжити?')
+  ) {
+    return;
+  }
+
+  const blob = new Blob(
+    [JSON.stringify(data, null, 2)],
+    { type: 'application/json' }
+  );
+
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'mikrotik-settings.json';
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  setTimeout(function() {
+    URL.revokeObjectURL(link.href);
+  }, 1000);
+
+  el('prof-status').textContent = '✓ Налаштування збережено';
+});
+
+el('f-load').addEventListener('change', function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = function(loadEvent) {
+    try {
+      applyData(JSON.parse(loadEvent.target.result));
+      el('prof-status').textContent = '✓ Завантажено: ' + file.name;
+    } catch (error) {
+      el('prof-status').textContent = '✗ Помилка JSON: ' + error.message;
+    }
+  };
+
+  reader.readAsText(file);
+});
+
+el('btn-reset').addEventListener('click', function() {
+  if (confirm('Скинути всю форму до початкових значень?')) {
+    location.reload();
+  }
+});
+
+['home', 'office', 'lte'].forEach(function(key) {
+  el('pre-' + key).addEventListener('click', function() {
+    const preset = PRESETS[key];
+
+    if (!confirm('Завантажити пресет "' + preset._name + '"?\nПоточні дані будуть перезаписані.')) {
+      return;
+    }
+
+    applyData(preset);
+    el('prof-status').textContent = '✓ Завантажено: ' + preset._name;
+  });
+});
+
+el('btn-copy').addEventListener('click', function() {
+  const text = el('output').innerText || el('output').textContent;
+  const button = this;
+  const originalText = button.textContent;
+
+  function done() {
+    button.textContent = '✓ Скопійовано';
+    setTimeout(function() {
+      button.textContent = originalText;
+    }, 1500);
+  }
+
+  function fallbackCopy() {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    done();
+  }
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(done).catch(fallbackCopy);
+  } else {
+    fallbackCopy();
+  }
+});
+
+el('btn-dl').addEventListener('click', function() {
+  const blob = new Blob(
+    [el('output').innerText || el('output').textContent],
+    { type: 'text/plain;charset=utf-8' }
+  );
+
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'mikrotik-config.rsc';
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  setTimeout(function() {
+    URL.revokeObjectURL(link.href);
+  }, 1000);
+});
+
+el('btn-strip').addEventListener('click', function() {
+  const source = el('output').innerText || el('output').textContent;
+  if (!source.trim()) return;
+
+  const stripped = source
+    .split('\n')
+    .filter(function(line) {
+      const trimmed = line.trim();
+      return trimmed && !trimmed.startsWith('#');
+    })
+    .join('\n');
+
+  /* Показуємо stripped з підсвічуванням */
+  el('output').innerHTML = (typeof highlightRos === 'function')
+    ? highlightRos(stripped)
+    : stripped.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  const vbox = el('vbox');
+  vbox.className = 'sbox';
+  vbox.style.display = 'block';
+  vbox.innerHTML = '<b>✂️ Скрипт мінімізовано.</b> Зміна будь-якого поля відновить повну генерацію.';
+});
+
+el('btn-validate').addEventListener('click', function() {
+  const script = el('output').innerText || el('output').textContent;
+  const firmware = el('firmware').value;
+
+  const errors = [];
+  const warnings = [];
+
+  if (!script.trim()) {
+    alert('Скрипт порожній.');
+    return;
+  }
+
+  if (firmware === '6.x') {
+    if (/\/interface wireguard/i.test(script)) {
+      errors.push('WireGuard підтримується лише RouterOS 7+.');
+    }
+
+    if (/\/interface wifi\b/i.test(script)) {
+      errors.push('/interface wifi не підтримується у RouterOS 6.x.');
+    }
+
+    if (/aes256-gcm/i.test(script)) {
+      errors.push('aes256-gcm не підтримується у RouterOS 6.x.');
+    }
+
+    if (/\/system ntp client servers add/i.test(script)) {
+      errors.push('NTP servers add — синтаксис RouterOS 7.x, не 6.x.');
+    }
+  }
+
+  if (firmware === '7.1-7.12') {
+    if (/cipher=aes256-gcm/i.test(script)) {
+      errors.push('aes256-gcm для OpenVPN потребує RouterOS 7.13+.');
+    }
+
+    if (/blowfish128/i.test(script)) {
+      errors.push('blowfish128 не підтримується в RouterOS 7.x.');
+    }
+  }
+
+  if (firmware === '7.13+') {
+    if (/blowfish128/i.test(script)) {
+      errors.push('blowfish128 не підтримується в RouterOS 7.x.');
+    }
+  }
+
+  if (/(?:password|passphrase|wpa2-pre-shared-key)=["']?changeme123["']?/i.test(script)) {
+    errors.push('Знайдено небезпечний дефолтний пароль "changeme123".');
+  }
+
+  if (!/\/ip firewall filter add/i.test(script)) {
+    warnings.push('Firewall rules не знайдені: роутер може бути відкритим із WAN.');
+  }
+
+  if (/\/system reset-configuration/i.test(script) && !/^\/system reset-configuration/m.test(script)) {
+    warnings.push('Reset присутній лише як коментар. Це очікувана безпечна поведінка генератора.');
+  }
+
+  const commandCount = script.split('\n').filter(function(line) {
+    const value = line.trim();
+    return value && !value.startsWith('#');
+  }).length;
+
+  const vbox = el('vbox');
+
+  if (!errors.length && !warnings.length) {
+    vbox.className = 'sbox';
+    vbox.style.display = 'block';
+    vbox.innerHTML =
+      '<b>✅ Перевірка RouterOS ' + esc(firmware) +
+      ' завершена. Команд: ' + commandCount + '.</b>';
+  } else {
+    vbox.className = 'wbox';
+    vbox.style.display = 'block';
+
+    let html =
+      '<b>🔍 RouterOS ' + esc(firmware) +
+      ' | Команд: ' + commandCount + '</b><br><br>';
+
+    if (errors.length) {
+      html += errors.map(function(error) {
+        return '❌ ' + esc(error);
+      }).join('<br>');
+    }
+
+    if (errors.length && warnings.length) {
+      html += '<br>';
+    }
+
+    if (warnings.length) {
+      html += warnings.map(function(warning) {
+        return '⚠️ ' + esc(warning);
+      }).join('<br>');
+    }
+
+    vbox.innerHTML = html;
+  }
+
+  vbox.scrollIntoView({
+    behavior: 'smooth',
+    block: 'nearest'
+  });
+});
+
+/* ============================================================
+   AI КНОПКИ
+   ============================================================ */
+
+el('btn-key-save').addEventListener('click', function() {
+  const key = el('ai-key').value.trim();
+  const status = el('ks');
+
+  if (!key) {
+    status.textContent = 'Введи API-ключ.';
+    status.className = 'ks err';
+    return;
+  }
+
+  status.textContent = '✓ Ключ є лише в поточній вкладці та не експортується.';
+  status.className = 'ks ok';
+});
+
+el('btn-key-show').addEventListener('click', function() {
+  const input = el('ai-key');
+
+  input.type = input.type === 'password' ? 'text' : 'password';
+  this.textContent = input.type === 'password' ? 'Показати' : 'Сховати';
+});
+
+el('btn-key-test').addEventListener('click', function() {
+  const status = el('ks');
+  const button = this;
+
+  if (!el('ai-key').value.trim()) {
+    status.textContent = '✗ Введи API-ключ.';
+    status.className = 'ks err';
+    return;
+  }
+
+  button.disabled = true;
+  status.textContent = '⏳ Перевіряю доступ...';
+  status.className = 'ks warn';
+
+  callAI('Відповідай рівно одним словом: OK', 30)
+    .then(function(result) {
+      status.textContent = '✓ Відповідь: ' + result.slice(0, 40);
+      status.className = 'ks ok';
+    })
+    .catch(function(error) {
+      status.textContent = '✗ ' + aiErrorMessage(error);
+      status.className = 'ks err';
+    })
+    .finally(function() {
+      button.disabled = false;
+    });
+});
+
+el('btn-ai-gen').addEventListener('click', function() {
+  const task = el('customdesc').value.trim();
+  const button = this;
+
+  if (!task) {
+    el('gen-status').textContent = 'Опиши задачу.';
+    return;
+  }
+
+  if (!el('ai-key').value.trim()) {
+    el('gen-status').textContent = '✗ Потрібен API-ключ.';
+    return;
+  }
+
+  button.disabled = true;
+  el('gen-status').textContent = '⏳ Генерую команди...';
+
+  const model = MODELS[el('model').value];
+  const prompt =
+    'Ти — експерт MikroTik RouterOS ' + el('firmware').value + '.\n' +
+    'Модель: ' + model.label + '.\n' +
+    'WAN: ' + el('wanif').value + '.\n' +
+    'LAN: bridge-lan, адреса ' + sip(el('lanip').value) + '.\n\n' +
+    'Завдання: ' + task + '\n\n' +
+    'Виведи ЛИШЕ команди RouterOS CLI без Markdown, пояснень або ```.\n' +
+    'Не видаляй конфіг, не вимикай firewall, не відкривай Winbox/SSH із WAN без прямої вказівки.';
+
+  callAI(prompt, 800)
+    .then(function(result) {
+      const commands = result
+        .replace(/```(?:routeros|bash|shell|text)?/gi, '')
+        .replace(/```/g, '')
+        .trim();
+
+      const existing = el('customcmds').value.trim();
+      el('customcmds').value = existing
+        ? existing + '\n' + commands
+        : commands;
+
+      el('gen-status').textContent = '✓ Команди додано. Перевір перед імпортом.';
+      render();
+    })
+    .catch(function(error) {
+      el('gen-status').textContent = '✗ ' + aiErrorMessage(error);
+    })
+    .finally(function() {
+      button.disabled = false;
+    });
+});
+
+/* ============================================================
+   RSC-ФАЙЛ: ЗАВАНТАЖЕННЯ, ПАРСИНГ, AI
+   ============================================================ */
+
+el('rsc-file').addEventListener('change', function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = function(loadEvent) {
+    el('rsc-input').value = loadEvent.target.result;
+    el('rsc-status').textContent = 'Завантажено: ' + file.name;
+  };
+
+  reader.readAsText(file);
+});
+
+el('btn-parse').addEventListener('click', function() {
+  const text = el('rsc-input').value;
+
+  if (!text.trim()) {
+    el('rsc-status').textContent = 'Вставте або завантажте .rsc-файл.';
+    return;
+  }
+
+  const commands = parseRscOffline(text);
+
+  if (!commands.length) {
+    el('rsc-output').style.display = 'none';
+    el('rsc-status').textContent = 'Команди RouterOS не знайдені.';
+    return;
+  }
+
+  const groups = {};
+  const order = [];
+
+  commands.forEach(function(command) {
+    if (!groups[command.path]) {
+      groups[command.path] = [];
+      order.push(command.path);
+    }
+
+    groups[command.path].push(command.full);
+  });
+
+  order.sort();
+
+  el('rsc-output').style.display = 'block';
+  el('rsc-output').textContent = order.map(function(path) {
+    return '### ' + path + ' (' + groups[path].length + ')\n' +
+      groups[path].map(function(command) {
+        return '  ' + command;
+      }).join('\n');
+  }).join('\n\n');
+
+  el('rsc-status').textContent = '✓ Розібрано команд: ' + commands.length;
+});
+
+el('btn-fill').addEventListener('click', function() {
+  const text = el('rsc-input').value;
+
+  if (!text.trim()) {
+    el('rsc-status').textContent = 'Вставте або завантажте .rsc-файл.';
+    return;
+  }
+
+  const fields = fillFromRsc(text);
+
+  updateWanFields();
+  updateFoFields();
+  syncToggleStates();
+  render();
+
+  el('rsc-status').textContent =
+    '✓ Розпізнано полів: ' + fields + '. Перевір форму перед генерацією.';
+});
+
+el('btn-explain').addEventListener('click', function() {
+  const text = el('rsc-input').value.trim();
+  const button = this;
+
+  if (!text) {
+    el('rsc-status').textContent = 'Вставте або завантажте .rsc-файл.';
+    return;
+  }
+
+  if (!el('ai-key').value.trim()) {
+    el('rsc-status').textContent = '✗ Потрібен API-ключ.';
+    return;
+  }
+
+  button.disabled = true;
+  el('rsc-status').textContent = '⏳ Аналізую конфігурацію...';
+
+  const prompt =
+    'Проаналізуй цей MikroTik RouterOS .rsc українською.\n' +
+    'Структура відповіді:\n' +
+    '1. WAN та маршрути;\n' +
+    '2. LAN і DHCP;\n' +
+    '3. DNS/NAT;\n' +
+    '4. Wi-Fi/VLAN;\n' +
+    '5. VPN;\n' +
+    '6. Firewall;\n' +
+    '7. Ризики та конкретні рекомендації.\n' +
+    'Не повторюй секрети (паролі, ключі, PSK) у відповіді.\n\n' +
+    '--- CONFIG ---\n' + text + '\n--- END CONFIG ---';
+
+  callAI(prompt, 2200)
+    .then(function(result) {
+      el('rsc-output').style.display = 'block';
+      el('rsc-output').textContent = result;
+      el('rsc-status').textContent = '✓ Аналіз готовий.';
+    })
+    .catch(function(error) {
+      el('rsc-status').textContent = '✗ ' + aiErrorMessage(error);
+    })
+    .finally(function() {
+      button.disabled = false;
+    });
+});
+
+/* ============================================================
+   PWA
+   Service Worker має бути ОКРЕМИМ файлом sw.js на тому ж origin.
+   ============================================================ */
+
+(function initPwa() {
+  if (!('serviceWorker' in navigator)) return;
+
+  navigator.serviceWorker.register('./sw.js', { scope: './' })
+    .then(function(registration) {
+      window.addEventListener('beforeinstallprompt', function(event) {
+        event.preventDefault();
+
+        const button = el('pwa-install-btn');
+        button.style.display = 'inline-flex';
+
+        button.onclick = function() {
+          event.prompt();
+
+          event.userChoice.then(function(choice) {
+            if (choice.outcome === 'accepted') {
+              button.style.display = 'none';
+            }
+          });
+        };
+      });
+
+      registration.addEventListener('updatefound', function() {
+        const worker = registration.installing;
+        if (!worker) return;
+
+        worker.addEventListener('statechange', function() {
+          if (
+            worker.state === 'installed' &&
+            navigator.serviceWorker.controller
+          ) {
+            const banner = document.createElement('div');
+
+            banner.style.cssText =
+              'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);' +
+              'background:#5fd0a5;color:#082018;padding:12px 20px;border-radius:8px;' +
+              'font-size:13px;font-weight:600;z-index:9999;display:flex;gap:12px;' +
+              'align-items:center;box-shadow:0 4px 20px rgba(0,0,0,.4);';
+
+            const text = document.createElement('span');
+            text.textContent = '🔄 Доступна нова версія!';
+
+            const update = document.createElement('button');
+            update.textContent = 'Оновити';
+            update.style.cssText =
+              'background:#082018;color:#5fd0a5;border:none;padding:6px 12px;' +
+              'border-radius:4px;cursor:pointer;font-weight:600;';
+
+            update.addEventListener('click', function() {
+              if (registration.waiting) {
+                registration.waiting.postMessage('SKIP_WAITING');
+              }
+
+              window.location.reload();
+            });
+
+            const close = document.createElement('button');
+            close.textContent = '✕';
+            close.style.cssText =
+              'background:transparent;border:none;cursor:pointer;font-size:16px;color:#082018;';
+
+            close.addEventListener('click', function() {
+              banner.remove();
+            });
+
+            banner.appendChild(text);
+            banner.appendChild(update);
+            banner.appendChild(close);
+
+            document.body.appendChild(banner);
+          }
+        });
+      });
+    })
+    .catch(function(error) {
+      console.warn('[PWA] Service Worker не зареєстровано:', error);
+    });
+})();
+
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+
+applyModel();
+updateWanFields();
+updateFoFields();
+syncToggleStates();
+render();
+
+/* DIFF VIEWER */
+(function() {
+  'use strict';
+
+  function bindFileInput(inputId, textareaId) {
+    var inp = document.getElementById(inputId);
+    if (!inp) return;
+    inp.addEventListener('change', function(e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        var ta = document.getElementById(textareaId);
+        if (ta) ta.value = ev.target.result;
+      };
+      reader.readAsText(file, 'utf-8');
+    });
+  }
+
+  bindFileInput('diff-file-a', 'diff-text-a');
+  bindFileInput('diff-file-b', 'diff-text-b');
+
+  function diffLines(aLines, bLines) {
+    var m = aLines.length, n = bLines.length;
+    var dp = [];
+    for (var i = 0; i <= m; i++) {
+      dp[i] = new Array(n + 1).fill(0);
+    }
+    for (var i = 1; i <= m; i++) {
+      for (var j = 1; j <= n; j++) {
+        if (aLines[i-1] === bLines[j-1]) {
+          dp[i][j] = dp[i-1][j-1] + 1;
+        } else {
+          dp[i][j] = Math.max(dp[i-1][j], dp[i][j-1]);
+        }
+      }
+    }
+    var ops = [];
+    var i = m, j = n;
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && aLines[i-1] === bLines[j-1]) {
+        ops.unshift({ type: 'same', line: aLines[i-1] });
+        i--; j--;
+      } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+        ops.unshift({ type: 'add', line: bLines[j-1] });
+        j--;
+      } else {
+        ops.unshift({ type: 'rem', line: aLines[i-1] });
+        i--;
+      }
+    }
+    return ops;
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;');
+  }
+
+  function renderDiff(ops, ctx) {
+    ctx = ctx || 3;
+    var html = '';
+    var adds = 0, rems = 0;
+    var sameRun = [];
+    var lineNum = { a: 1, b: 1 };
+
+    function flushSame() {
+      if (!sameRun.length) return;
+      if (sameRun.length <= ctx * 2 + 1) {
+        sameRun.forEach(function(item) {
+          html += '<span class="diff-same">  ' +
+            String(item.a).padStart(4) + '  ' +
+            String(item.b).padStart(4) + '  ' +
+            escHtml(item.line) + '</span>';
+        });
+      } else {
+        sameRun.slice(0, ctx).forEach(function(item) {
+          html += '<span class="diff-same">  ' +
+            String(item.a).padStart(4) + '  ' +
+            String(item.b).padStart(4) + '  ' +
+            escHtml(item.line) + '</span>';
+        });
+        html += '<span class="diff-hdr">@@ ... ' +
+          (sameRun.length - ctx * 2) + ' рядків без змін ... @@</span>';
+        sameRun.slice(-ctx).forEach(function(item) {
+          html += '<span class="diff-same">  ' +
+            String(item.a).padStart(4) + '  ' +
+            String(item.b).padStart(4) + '  ' +
+            escHtml(item.line) + '</span>';
+        });
+      }
+      sameRun = [];
+    }
+
+    ops.forEach(function(op) {
+      if (op.type === 'same') {
+        sameRun.push({ line: op.line, a: lineNum.a, b: lineNum.b });
+        lineNum.a++; lineNum.b++;
+      } else {
+        flushSame();
+        if (op.type === 'add') {
+          html += '<span class="diff-add">+ ' +
+            '    '.padStart(4) + '  ' +
+            String(lineNum.b).padStart(4) + '  ' +
+            escHtml(op.line) + '</span>';
+          lineNum.b++; adds++;
+        } else {
+          html += '<span class="diff-rem">- ' +
+            String(lineNum.a).padStart(4) + '  ' +
+            '    '.padStart(4) + '  ' +
+            escHtml(op.line) + '</span>';
+          lineNum.a++; rems++;
+        }
+      }
+    });
+    flushSame();
+    return { html: html, adds: adds, rems: rems };
+  }
+
+  var btnDiff  = document.getElementById('btn-diff');
+  var btnClear = document.getElementById('btn-diff-clear');
+  var outEl    = document.getElementById('diff-output');
+  var statEl   = document.getElementById('diff-stat');
+
+  if (btnDiff) {
+    btnDiff.addEventListener('click', function() {
+      var textA = (document.getElementById('diff-text-a') || {}).value || '';
+      var textB = (document.getElementById('diff-text-b') || {}).value || '';
+      if (!textA.trim() && !textB.trim()) {
+        if (statEl) statEl.innerHTML = 'Вставте або завантажте обидва файли.';
+        return;
+      }
+      var aLines = textA.split('\n');
+      var bLines = textB.split('\n');
+      if (aLines.length > 5000 || bLines.length > 5000) {
+        if (statEl) statEl.innerHTML = 'Файл занадто великий (макс. 5000 рядків).';
+        return;
+      }
+      if (statEl) statEl.innerHTML = 'Порівнюю...';
+      setTimeout(function() {
+        var ops    = diffLines(aLines, bLines);
+        var result = renderDiff(ops, 3);
+        if (outEl) {
+          outEl.style.display = 'block';
+          outEl.innerHTML = result.html ||
+            '<span class="diff-same">Файли ідентичні</span>';
+        }
+        if (statEl) {
+          statEl.innerHTML =
+            'Рядків A: <b>' + aLines.length + '</b> | ' +
+            'Рядків B: <b>' + bLines.length + '</b> | ' +
+            '<span style="color:#a8f0db">+' + result.adds + '</span> ' +
+            '<span style="color:#ffb3ab">-' + result.rems + '</span>';
+        }
+      }, 10);
+    });
+  }
+
+  if (btnClear) {
+    btnClear.addEventListener('click', function() {
+      ['diff-text-a','diff-text-b','diff-file-a','diff-file-b'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      if (outEl) { outEl.style.display = 'none'; outEl.innerHTML = ''; }
+      if (statEl) statEl.innerHTML = '';
+    });
+  }
+})();
+
+
+
+/* ============================================================
+   SYNTAX HIGHLIGHTING RouterOS
+   ============================================================ */
+
+
+/* ============================================================
+   SYNTAX HIGHLIGHTING RouterOS — token-based v4
+   ============================================================ */
+function highlightRos(rawText) {
+  if (!rawText) return '';
+  return rawText.split('\n').map(function(line) {
+
+    /* Крок 1: екрануємо СИРИЙ текст */
+    var s = line
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    /* Крок 2: коментарі — одразу повертаємо */
+    if (/^\s*#/.test(line)) {
+      if (/---/.test(line))
+        return '<span style="color:#2f7a5c;font-style:italic">' + s + '</span>';
+      if (/\[x\]/.test(line))
+        return '<span style="color:#5fd0a5">' + s + '</span>';
+      if (/\[ \]/.test(line))
+        return '<span style="color:#556b7a">' + s + '</span>';
+      return '<span style="color:#3d6b58">' + s + '</span>';
+    }
+
+    if (!line.trim()) return '';
+
+    /* Крок 3: замінюємо на ТОКЕНИ (не HTML!) — так регекси не чіпають власний вивід
+       \x01..\x08 — унікальні символи яких немає у RouterOS-скриптах */
+
+    /* 3a. key=value ПЕРШИМ — сирий текст не містить style= чи color= */
+    s = s.replace(
+      /\b([a-z][a-z0-9-]*)=("[^"]*"|[^\s&<>"]+)/g,
+      '\x01$1\x02=\x03$2\x04'
+    );
+
+    /* 3b. /menu команда на початку рядка */
+    s = s.replace(
+      /^(\/[a-z][a-z0-9-]*(?: [a-z][a-z0-9-]*)*)/,
+      '\x05$1\x06'
+    );
+
+    /* 3c. ключові слова дій */
+    s = s.replace(
+      /\b(set|add|remove|enable|disable|print|export)\b/g,
+      function(m, w) {
+        /* пропускаємо якщо вже всередині токена */
+        return '\x07' + w + '\x08';
+      }
+    );
+
+    /* 3d. :do { */
+    s = s.replace(/:do\s*\{/g, '\x09:do\x0b {');
+
+    /* 3e. } on-error={ */
+    s = s.replace(/\} on-error=\{/g, '} \x0con-error\x0d={');
+
+    /* Крок 4: токени → HTML (один прохід, без зворотного ефекту) */
+    s = s
+      .replace(/\x01([^\x02]*)\x02/g,
+        '<span style="color:#8ea3b0">$1</span>')
+      .replace(/\x03([^\x04]*)\x04/g,
+        '<span style="color:#c9e8d8">$1</span>')
+      .replace(/\x05([^\x06]*)\x06/g,
+        '<span style="color:#5fd0a5;font-weight:700">$1</span>')
+      .replace(/\x07([^\x08]*)\x08/g,
+        '<span style="color:#e6b35a;font-weight:600">$1</span>')
+      .replace(/\x09([^\x0b]*)\x0b/g,
+        '<span style="color:#e6b35a;font-weight:600">$1</span>')
+      .replace(/\x0c([^\x0d]*)\x0d/g,
+        '<span style="color:#556b7a">$1</span>');
+
+    /* Крок 5: disabled=yes/no — окремі кольори */
+    s = s.replace(
+      /disabled=<span style="color:#c9e8d8">(yes|no)<\/span>/g,
+      function(m, val) {
+        var c = val === 'yes' ? '#e0665a' : '#5fd0a5';
+        return 'disabled=<span style="color:' + c + ';font-weight:600">' + val + '</span>';
+      }
+    );
+
+    return s;
+  }).join('\n');
+}
+
+/* ============================================================
+   INLINE FIELD VALIDATION — реальний час
+   ============================================================ */
+(function() {
+  'use strict';
+
+  /* --- Утиліти --- */
+  function isIPv4(v) {
+    var o = String(v||'').trim().split('.');
+    return o.length === 4 && o.every(function(x){
+      return /^\d+$/.test(x) && +x >= 0 && +x <= 255;
+    });
+  }
+  function isCIDR(v) {
+    var p = String(v||'').trim().split('/');
+    return p.length === 2 && isIPv4(p[0]) &&
+      /^\d+$/.test(p[1]) && +p[1] >= 0 && +p[1] <= 32;
+  }
+  function isPort(v) {
+    return /^\d+$/.test(String(v).trim()) && +v >= 1 && +v <= 65535;
+  }
+  function isDhcpRange(v) {
+    /* формат: A.B.C.D-A.B.C.E */
+    var parts = String(v||'').trim().split('-');
+    return parts.length === 2 && isIPv4(parts[0]) && isIPv4(parts[1]);
+  }
+  function dhcpRangeNetwork(v) {
+    /* перевіряє що обидва кінці в одній мережі /24 */
+    var parts = String(v||'').trim().split('-');
+    if (parts.length !== 2) return false;
+    var a = parts[0].split('.'), b = parts[1].split('.');
+    return a[0]===b[0] && a[1]===b[1] && a[2]===b[2];
+  }
+
+  /* --- Показати/сховати повідомлення --- */
+  function setError(input, msg) {
+    input.classList.remove('valid','warn');
+    input.classList.add('invalid');
+    var err = input.parentNode.querySelector('.field-error');
+    if (!err) {
+      err = document.createElement('div');
+      err.className = 'field-error';
+      input.parentNode.appendChild(err);
+    }
+    err.textContent = '✗ ' + msg;
+    err.style.display = 'block';
+    var w = input.parentNode.querySelector('.field-warn');
+    if (w) w.style.display = 'none';
+  }
+
+  function setWarn(input, msg) {
+    input.classList.remove('invalid','valid');
+    input.classList.add('warn');
+    var w = input.parentNode.querySelector('.field-warn');
+    if (!w) {
+      w = document.createElement('div');
+      w.className = 'field-warn';
+      input.parentNode.appendChild(w);
+    }
+    w.textContent = '⚠ ' + msg;
+    w.style.display = 'block';
+    var e = input.parentNode.querySelector('.field-error');
+    if (e) e.style.display = 'none';
+  }
+
+  function setOk(input) {
+    input.classList.remove('invalid','warn');
+    input.classList.add('valid');
+    var e = input.parentNode.querySelector('.field-error');
+    if (e) e.style.display = 'none';
+    var w = input.parentNode.querySelector('.field-warn');
+    if (w) w.style.display = 'none';
+  }
+
+  function clearState(input) {
+    input.classList.remove('invalid','valid','warn');
+    ['field-error','field-warn'].forEach(function(cls){
+      var el = input.parentNode.querySelector('.'+cls);
+      if (el) el.style.display = 'none';
+    });
+  }
+
+  /* --- Правила валідації для кожного поля --- */
+  function validateField(input) {
+    var id  = input.id;
+    var val = input.value.trim();
+
+    /* Пропускаємо порожні необов'язкові поля */
+    if (!val) { clearState(input); return; }
+
+    switch (id) {
+
+      /* IP роутера (LAN) */
+      case 'lanip':
+        if (!isCIDR(val))
+          setError(input, 'Має бути IP/маска — наприклад 192.168.88.1/24');
+        else setOk(input);
+        break;
+
+      /* Діапазон DHCP */
+      case 'dhcprange':
+        if (!isDhcpRange(val))
+          setError(input, 'Формат: 192.168.88.10-192.168.88.254');
+        else if (!dhcpRangeNetwork(val))
+          setError(input, 'Початок і кінець діапазону в різних мережах!');
+        else setOk(input);
+        break;
+
+      /* DNS для клієнтів */
+      case 'landns':
+        var firstDns = val.split(',')[0].trim().split(' ')[0];
+        if (!isIPv4(firstDns))
+          setError(input, 'Некоректна IPv4-адреса: ' + firstDns);
+        else setOk(input);
+        break;
+
+      /* Зовнішні DNS */
+      case 'upstreamdns':
+        var dnsOk = val.split(',').every(function(d){
+          return isIPv4(d.trim());
+        });
+        if (!dnsOk)
+          setError(input, 'Один або кілька DNS некоректні. Формат: 8.8.8.8,1.1.1.1');
+        else setOk(input);
+        break;
+
+      /* WAN IP/маска (статична) */
+      case 'wanip':
+        if (!isCIDR(val))
+          setError(input, 'Має бути IP/маска — наприклад 203.0.113.1/24');
+        else setOk(input);
+        break;
+
+      /* Шлюз WAN */
+      case 'wangw':
+        if (!isIPv4(val))
+          setError(input, 'Некоректна IPv4-адреса шлюзу');
+        else setOk(input);
+        break;
+
+      /* Порт OpenVPN */
+      case 'ovpnport':
+      case 'ovpnclport':
+        if (!isPort(val))
+          setError(input, 'Порт має бути від 1 до 65535');
+        else setOk(input);
+        break;
+
+      /* WireGuard порт */
+      case 'wgport':
+        if (!isPort(val))
+          setError(input, 'Порт має бути від 1 до 65535');
+        else setOk(input);
+        break;
+
+      /* WireGuard IP сервера */
+      case 'wgserverip':
+        if (!isCIDR(val))
+          setError(input, 'Має бути CIDR — наприклад 10.20.30.1/24');
+        else setOk(input);
+        break;
+
+      /* OpenVPN IP сервера */
+      case 'ovpnlocal':
+        if (!isIPv4(val))
+          setError(input, 'Некоректна IPv4-адреса');
+        else setOk(input);
+        break;
+
+      /* IP гостьової мережі */
+      case 'guestip':
+        if (!isCIDR(val))
+          setError(input, 'Має бути CIDR — наприклад 192.168.20.1/24');
+        else setOk(input);
+        break;
+
+      /* Діапазон гостьового DHCP */
+      case 'guestrange':
+        if (!isDhcpRange(val))
+          setError(input, 'Формат: 192.168.20.10-192.168.20.254');
+        else if (!dhcpRangeNetwork(val))
+          setError(input, 'Початок і кінець діапазону в різних мережах!');
+        else setOk(input);
+        break;
+
+      /* Пароль Wi-Fi */
+      case 'wifipass':
+      case 'capsmanpass':
+      case 'guestwifipass':
+        if (val.length < 8)
+          setError(input, 'Мінімум 8 символів для WPA2');
+        else if (val.length < 12)
+          setWarn(input, 'Рекомендовано 12+ символів для надійності');
+        else setOk(input);
+        break;
+
+      /* Netwatch хост */
+      case 'netwatchhost':
+        if (!isIPv4(val) && !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(val))
+          setWarn(input, 'Має бути IP або домен, наприклад 8.8.8.8');
+        else setOk(input);
+        break;
+
+      /* Health-check хост failover */
+      case 'fohealthhost':
+        if (!isIPv4(val) && !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(val))
+          setWarn(input, 'Має бути IP або домен, наприклад 1.1.1.1');
+        else setOk(input);
+        break;
+    }
+  }
+
+  /* --- Підключаємо до всіх полів --- */
+  var fieldIds = [
+    'lanip','dhcprange','landns','upstreamdns',
+    'wanip','wangw',
+    'ovpnport','ovpnclport','ovpnlocal',
+    'wgport','wgserverip',
+    'guestip','guestrange',
+    'wifipass','capsmanpass','guestwifipass',
+    'netwatchhost','fohealthhost'
+  ];
+
+  function attachValidators() {
+    fieldIds.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', function() { validateField(el); });
+      el.addEventListener('blur',  function() { validateField(el); });
+      /* Перевірити одразу якщо поле вже заповнене */
+      if (el.value.trim()) validateField(el);
+    });
+  }
+
+  /* Запускаємо після DOMContentLoaded */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attachValidators);
+  } else {
+    attachValidators();
+  }
+
+})();
+</script>
+
+<div class="card diff-wrap">
+  <h2>Diff .rsc файлів <span class="badge">порівняння</span></h2>
+  <div class="diff-controls">
+    <div>
+      <div class="diff-label">Файл A (оригінал)</div>
+      <input type="file" id="diff-file-a" accept=".rsc,.txt"
+        style="width:100%;background:var(--panel2);border:1px solid var(--border);
+               color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px;margin-bottom:6px;">
+      <textarea id="diff-text-a" rows="5" class="mono"
+        placeholder="...або вставте вміст файлу A тут"></textarea>
+    </div>
+    <div>
+      <div class="diff-label">Файл B (новий)</div>
+      <input type="file" id="diff-file-b" accept=".rsc,.txt"
+        style="width:100%;background:var(--panel2);border:1px solid var(--border);
+               color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px;margin-bottom:6px;">
+      <textarea id="diff-text-b" rows="5" class="mono"
+        placeholder="...або вставте вміст файлу B тут"></textarea>
+    </div>
+  </div>
+  <div class="btnbar">
+    <button id="btn-diff">&#128269; Порівняти</button>
+    <button class="sec" id="btn-diff-clear">&#10006; Очистити</button>
+    <span id="diff-stat" class="diff-stat"></span>
+  </div>
+  <div id="diff-output" class="diff-output" style="display:none"></div>
+</div>
+
+</body>
+</html>

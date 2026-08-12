@@ -1,164 +1,75 @@
-\# 🛰️ MikroTik Config Generator
+# MikroTik Config Generator
 
-
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live-5fd0a5?logo=github)](https://drepa666.github.io/mikrotik-config-generator/)
+[![RouterOS](https://img.shields.io/badge/RouterOS-6.x%20|%207.x%20|%207.13%2B-blue)](https://mikrotik.com)
+[![PWA](https://img.shields.io/badge/PWA-Offline%20Ready-orange)](https://drepa666.github.io/mikrotik-config-generator/)
+[![Tests](https://img.shields.io/badge/Unit%20Tests-53%2F53-5fd0a5)](https://drepa666.github.io/mikrotik-config-generator/test.html)
 
 > Генератор конфігурації RouterOS — один HTML-файл, нульові залежності, працює офлайн.
 
+## Demo
 
+**https://drepa666.github.io/mikrotik-config-generator/**
 
-!\[RouterOS](https://img.shields.io/badge/RouterOS-6.x%20%7C%207.x%20%7C%207.13%2B-blue)
-
-!\[PWA](https://img.shields.io/badge/PWA-offline%20ready-green)
-
-!\[License](https://img.shields.io/badge/license-MIT-orange)
-
-
-
-\## ✨ Можливості
-
-
+## Можливості
 
 | Функція | Опис |
-
 |---|---|
-
-| 🔧 Генератор | Realtime генерація `.rsc` скриптів для RouterOS |
-
-| 🤖 AI інтеграція | 6 провайдерів: Claude, GPT, Grok, Groq, DeepSeek, Gemini |
-
-| 🔍 Diff viewer | Порівняння `.rsc` файлів (LCS алгоритм) |
-
-| ✅ Валідація | Realtime перевірка 20+ полів форми |
-
-| 🎨 Highlighting | Syntax highlighting RouterOS команд |
-
-| 📱 PWA | Встановлюється як застосунок, працює офлайн |
-
-| 🔐 Безпека | API ключ не зберігається в localStorage |
-
-
-
-\## 📦 Структура
-
-📂 mikrotik-config-generator/
-
-├── index.html ← головний файл (весь UI + логіка)
-
-├── core.js ← спільні утиліти (isIPv4, isCIDR, q, calcNet...)
-
-├── sw.js ← Service Worker (офлайн кеш)
-
-├── manifest.webmanifest ← PWA маніфест
-
-├── test.html ← unit тести (core.js)
-
-├── icon-192.png ← PWA іконка
-
-└── icon-512.png ← PWA іконка (maskable)
-
-
-
-🛠️ Підтримувані конфігурації
-
-Моделі RouterOS
-
-hAP ac lite / ac2 / ac3
-
-hAP ax2 / ax3 / ax S (Wi-Fi 6)
-
-hEX, wAP ac, cAP ac
-
-Chateau LTE7/LTE12/5G/PRO ax
-
-Будь-яка інша (вручну)
-
-
-
-🔐 Безпека
-
-q() — екранує \\ $ " % \\n \\r перед вставкою в RouterOS скрипт
-
-isMac() — валідація MAC-адреси перед вставкою
-
-distance — обмежено 1-255 (RouterOS ліміт)
-
-API ключ не зберігається в localStorage і не експортується з профілем
-
-confirm() попередження перед експортом профілів з паролями
-
-
-
-Тестує реальні функції з core.js:
-
-
-
-q() — 15 тест-кейсів
-
-isIPv4() — 11 тест-кейсів
-
-isCIDR() — 10 тест-кейсів
-
-isPort() — 8 тест-кейсів
-
-isMac() — 8 тест-кейсів
-
-calcNet() — 10 тест-кейсів
-
-📋 Валідація полів (realtime)
-
-ПОЛЕ
-
-ПЕРЕВІРКА
-
-LAN/WAN IP
-
-isCIDR()
-
-DHCP діапазон
-
-Формат + однакова мережа /24
-
-DNS поля
-
-isIPv4() кожен через кому
-
-Port Forwarding
-
-proto:port:IP:port
-
-WireGuard peers
-
-base64 key 44 символи + CIDR
-
-IPsec peers
-
-PSK мін.8 символів + ike1/ike2
-
-IPsec policies
-
-peer:CIDR:CIDR
-
-Address-List
-
-IPv4 або CIDR
-
-Static routes
-
-CIDR=IP:distance (1-255)
-
-DNS static
-
-ім'я=IP + перевірка дублів
-
-OpenVPN range
-
-IP-IP + порядок + підмережа
-
-OpenVPN users
-
-Логін + пароль мін.8 + слабкі паролі
-
-MAC адреса
-
-isMac() regex
-
+| Генератор | Realtime генерація .rsc скриптів |
+| AI | 6 провайдерів: Claude, GPT, Grok, Groq, DeepSeek, Gemini |
+| Diff viewer | LCS алгоритм порівняння .rsc файлів |
+| Валідація | Realtime перевірка 20+ полів форми |
+| Highlighting | Syntax highlighting RouterOS команд |
+| PWA | Офлайн режим, встановлюється як застосунок |
+| Безпека | API ключ не в localStorage, екранування q() |
+
+## Структура
+
+    mikrotik-config-generator/
+     ├── index.html            - UI + логіка генерації
+     ├── core.js               - утиліти (isIPv4, isCIDR, q, calcNet)
+     ├── validators.js         - inline валідація форми
+     ├── sw.js                 - Service Worker (PWA офлайн)
+     ├── manifest.webmanifest  - PWA маніфест
+     ├── test.html             - Unit тести
+     ├── icon-192.png
+     └── icon-512.png
+
+## Швидкий старт
+
+    git clone https://github.com/Drepa666/mikrotik-config-generator.git
+    cd mikrotik-config-generator
+    python -m http.server 8080
+
+## RouterOS підтримка
+
+| Версія | Wi-Fi API | WireGuard | OpenVPN GCM |
+|---|---|---|---|
+| 7.13+ | /interface wifi | Yes | Yes |
+| 7.1-7.12 | /interface wifiwave2 | Yes | No |
+| 6.x | /interface wireless | No | No |
+
+## Безпека
+
+- q() — екранує \ $ " % newline перед вставкою в .rsc
+- isMac() — валідація MAC перед вставкою
+- distance — обмежено 1-255 (RouterOS ліміт)
+- API ключ не зберігається в localStorage
+- confirm() перед експортом профілів з паролями
+
+## Unit тести
+
+    http://localhost:8080/test.html
+
+| Suite | Тестів |
+|---|---|
+| q() екранування | 13 |
+| isIPv4() | 10 |
+| isCIDR() | 9 |
+| isPort() | 7 |
+| isMac() | 7 |
+| calcNet() | 7 |
+
+## Ліцензія
+
+MIT License

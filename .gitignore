@@ -1,13 +1,21 @@
+# Бекапи
 *.backup*.html
-patch*.py
-*.bak
-sw.backup*.js
 index.backup*.html
-generators.backup*.js
-test.backup*.html
-generators.backup*.js
-test.backup*.html
 sw.backup*.js
-fix_*.py
 generators.backup*.js
 test.backup*.html
+
+# Патч-файли
+patch*.py
+fix_*.py
+
+# Тимчасові файли
+*.bak
+*.tmp
+__pycache__/
+*.pyc
+
+# OS файли
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,8 +1,8 @@
 /* MikroTik Config Generator - Service Worker */
 'use strict';
 
-const CACHE_NAME    = 'mt-config-v5768';
-const CACHE_VERSION = 5768;
+const CACHE_NAME    = 'mt-config-v416';
+const CACHE_VERSION = 416;
 
 const PRECACHE_ASSETS = [
   './',
@@ -10,6 +10,7 @@ const PRECACHE_ASSETS = [
   './core.js',
   './validators.js',
   './sections.js',
+  './security-score.js',
   './manifest.webmanifest'
 ];
 

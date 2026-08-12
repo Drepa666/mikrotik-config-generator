@@ -5,26 +5,25 @@ var SECS = [
   { label: 'Бекап',      m: '# --- Резервна копія ---' },
   { label: 'Загальне',   m: '# --- Загальне ---' },
   { label: 'Interfaces', m: '# --- Interface Lists ---' },
-  { label: 'WAN',        m: '# --- WAN:' },
   { label: 'LAN',        m: '# --- LAN ---' },
+  { label: 'WAN',        m: '# --- WAN:' },
   { label: 'DHCP',       m: '# --- DHCP LAN ---' },
   { label: 'DNS',        m: '# --- DNS ---' },
   { label: 'NAT',        m: '# --- NAT ---' },
   { label: 'MAC',        m: '# --- Захист MAC ---' },
-  { label: 'Firewall',   m: '# --- Базовий firewall' },
+  { label: 'Firewall',   m: '# --- Firewall (defconf' },
   { label: 'NTP',        m: '# --- NTP ---' },
+  { label: 'Port FW',    m: '# --- Port Forwarding ---' },
   { label: 'Wi-Fi',      m: '# --- Wi-Fi' },
   { label: 'CAPsMAN',    m: '# --- CAPsMAN' },
   { label: 'Guest',      m: '# --- Guest' },
   { label: 'Failover',   m: '# --- Failover' },
   { label: 'WireGuard',  m: '# --- WireGuard' },
   { label: 'OpenVPN',    m: '# --- OpenVPN' },
-  { label: 'IPsec',      m: '# --- IPsec' },
-  { label: 'L2TP',       m: '# --- L2TP' },
-  { label: 'Scheduler',  m: '# --- Scheduler' },
-  { label: 'Email',      m: '# --- Email' },
+  { label: 'IPsec',      m: '# [x] IPsec' },
+  { label: 'Addr-List',  m: '# --- Address-List' },
+  { label: 'Routes',     m: '# --- Static Routes' },
 ];
-
 function secGetScript() {
   var el = document.getElementById('output');
   if (!el) return '';

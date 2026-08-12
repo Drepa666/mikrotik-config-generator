@@ -8,3 +8,6 @@ test.backup*.html
 generators.backup*.js
 test.backup*.html
 sw.backup*.js
+fix_*.py
+generators.backup*.js
+test.backup*.html

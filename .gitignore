@@ -1,3 +1,4 @@
 *.backup*.html
 patch*.py
 *.bak
+index.backup*.html

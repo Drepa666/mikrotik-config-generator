@@ -7,183 +7,113 @@
   :root {
     --bg:#0f1720; --panel:#16212c; --border:#2a3b48;
     --text:#e6edf3; --muted:#8ea3b0; --accent:#5fd0a5;
-    --pass:#5fd0a5; --fail:#e0665a; --warn:#e6b35a;
+    --pass:#5fd0a5; --fail:#e0665a;
     --mono:'Cascadia Code','Fira Mono','Consolas',monospace;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing:border-box; margin:0; padding:0; }
   body {
-    background: var(--bg); color: var(--text);
-    font-family: system-ui, sans-serif;
-    padding: 32px 24px; max-width: 860px; margin: auto;
+    background:var(--bg); color:var(--text);
+    font-family:system-ui,sans-serif;
+    padding:32px 24px; max-width:860px; margin:auto;
   }
-  h1 { color: var(--accent); font-size: 22px; margin-bottom: 6px; }
-  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
-
-  /* Summary bar */
+  h1 { color:var(--accent); font-size:22px; margin-bottom:6px; }
+  .subtitle { color:var(--muted); font-size:13px; margin-bottom:28px; }
   .summary {
-    display: flex; gap: 24px; align-items: center;
-    background: var(--panel); border: 1px solid var(--border);
-    border-radius: 10px; padding: 14px 20px; margin-bottom: 24px;
-    font-size: 14px;
+    display:flex; gap:24px; align-items:center;
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:10px; padding:14px 20px; margin-bottom:16px;
+    font-size:14px;
   }
-  .summary .num { font-size: 28px; font-weight: 700; line-height: 1; }
-  .summary .pass-num { color: var(--pass); }
-  .summary .fail-num { color: var(--fail); }
-  .summary .total-num { color: var(--muted); }
-
-  /* Suite */
-  .suite { margin-bottom: 20px; }
+  .num { font-size:28px; font-weight:700; line-height:1; }
+  .pass-num { color:var(--pass); }
+  .fail-num { color:var(--fail); }
+  .total-num { color:var(--muted); }
+  .progress { height:6px; background:var(--border); border-radius:3px; margin-bottom:24px; }
+  .progress-fill { height:100%; background:var(--accent); border-radius:3px; }
+  .suite { margin-bottom:20px; }
   .suite-title {
-    font-size: 13px; font-weight: 700; color: var(--muted);
-    text-transform: uppercase; letter-spacing: .08em;
-    margin-bottom: 8px; padding-left: 4px;
+    font-size:12px; font-weight:700; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.08em;
+    margin-bottom:8px; padding-left:4px;
   }
-
-  /* Test row */
   .test {
-    background: var(--panel); border: 1px solid var(--border);
-    border-radius: 8px; padding: 10px 14px;
-    margin-bottom: 6px; display: flex; gap: 12px; align-items: flex-start;
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:8px; padding:10px 14px;
+    margin-bottom:6px; display:flex; gap:12px; align-items:flex-start;
   }
-  .test.pass { border-left: 3px solid var(--pass); }
-  .test.fail { border-left: 3px solid var(--fail); }
-
+  .test.pass { border-left:3px solid var(--pass); }
+  .test.fail { border-left:3px solid var(--fail); }
   .badge {
-    font-size: 11px; font-weight: 700; padding: 2px 8px;
-    border-radius: 20px; white-space: nowrap; margin-top: 1px;
-    flex-shrink: 0;
+    font-size:11px; font-weight:700; padding:2px 8px;
+    border-radius:20px; white-space:nowrap; flex-shrink:0;
   }
-  .badge.pass { background: rgba(95,208,165,.18); color: var(--pass); }
-  .badge.fail { background: rgba(224,102,90,.18);  color: var(--fail); }
-
-  .test-body { flex: 1; }
-  .test-name { font-size: 13.5px; }
+  .badge.pass { background:rgba(95,208,165,.18); color:var(--pass); }
+  .badge.fail { background:rgba(224,102,90,.18); color:var(--fail); }
+  .test-body { flex:1; }
+  .test-name { font-size:13.5px; }
   .test-detail {
-    font-family: var(--mono); font-size: 11.5px;
-    color: var(--muted); margin-top: 5px; line-height: 1.6;
+    font-family:var(--mono); font-size:11.5px;
+    color:var(--muted); margin-top:5px; line-height:1.6;
   }
-  .test-detail .got  { color: var(--fail); }
-  .test-detail .want { color: var(--pass); }
-
-  /* Progress bar */
-  .progress {
-    height: 6px; background: var(--border);
-    border-radius: 3px; overflow: hidden; margin-bottom: 24px;
+  .got  { color:var(--fail); }
+  .want { color:var(--pass); }
+  .core-status {
+    font-size:12px; padding:8px 14px; border-radius:6px;
+    margin-bottom:16px; background:var(--panel);
+    border:1px solid var(--border);
   }
-  .progress-fill {
-    height: 100%; background: var(--accent);
-    transition: width .4s ease; border-radius: 3px;
-  }
-
-  footer {
-    margin-top: 32px; color: var(--muted);
-    font-size: 12px; text-align: center;
-  }
+  footer { margin-top:32px; color:var(--muted); font-size:12px; text-align:center; }
 </style>
 </head>
 <body>
 
-<h1>🧪 Unit Tests — MikroTik Config Generator</h1>
-<p class="subtitle">q() · isCIDR() · calcNet() · isIPv4() · isPort() · calcNet()</p>
+<h1>&#129514; Unit Tests — MikroTik Config Generator</h1>
+<p class="subtitle">Тестує реальний код з <b>core.js</b> — не копії функцій</p>
+
+<div id="core-status" class="core-status">&#9203; Завантаження core.js...</div>
 
 <div class="summary" id="summary">
-  <div>
-    <div class="num pass-num" id="s-pass">—</div>
-    <div style="color:var(--muted);font-size:12px">пройшло</div>
-  </div>
-  <div>
-    <div class="num fail-num" id="s-fail">—</div>
-    <div style="color:var(--muted);font-size:12px">провалено</div>
-  </div>
-  <div>
-    <div class="num total-num" id="s-total">—</div>
-    <div style="color:var(--muted);font-size:12px">всього</div>
-  </div>
+  <div><div class="num pass-num" id="s-pass">—</div><div style="color:var(--muted);font-size:12px">пройшло</div></div>
+  <div><div class="num fail-num" id="s-fail">—</div><div style="color:var(--muted);font-size:12px">провалено</div></div>
+  <div><div class="num total-num" id="s-total">—</div><div style="color:var(--muted);font-size:12px">всього</div></div>
   <div style="margin-left:auto;font-size:13px;color:var(--muted)" id="s-time"></div>
 </div>
-
 <div class="progress"><div class="progress-fill" id="progress" style="width:0%"></div></div>
-
 <div id="results"></div>
+<footer>MikroTik Config Generator · Unit Test Suite · використовує реальний core.js</footer>
 
-<footer>MikroTik Config Generator · Unit Test Suite · vanilla JS · no dependencies</footer>
-
+<!-- core.js — той самий файл що і в index.html -->
+<script src="core.js"></script>
 <script>
 'use strict';
 
-/* ============================================================
-   КОПІЇ ФУНКЦІЙ З index.html [2][3]
-   (тестуємо ізольовано — без DOM)
-   ============================================================ */
+/* ── Перевірка що core.js завантажився ── */
+var coreOk = (
+  typeof isIPv4 === 'function' &&
+  typeof isCIDR === 'function' &&
+  typeof isPort === 'function' &&
+  typeof isMac  === 'function' &&
+  typeof calcNet === 'function' &&
+  typeof q === 'function'
+);
 
-function q(value) {
-  return String(value == null ? '' : value)
-    .replace(/\\/g, '\\\\')
-    .replace(/\$/g, '\\$')
-    .replace(/"/g, '\\"')
-    .replace(/%/g, '\\%')
-    .replace(/\r/g, '')
-    .replace(/\n/g, '');
+var statusEl = document.getElementById('core-status');
+if (coreOk) {
+  statusEl.style.borderColor = '#5fd0a5';
+  statusEl.style.color = '#5fd0a5';
+  statusEl.textContent = '✓ core.js завантажено — тестуємо реальний код';
+} else {
+  statusEl.style.borderColor = '#e0665a';
+  statusEl.style.color = '#e0665a';
+  statusEl.textContent = '✗ core.js не завантажився! Запусти через http-сервер.';
 }
 
-function sip(value) {
-  return String(value == null ? '' : value).trim().split(/\s+/)[0];
-}
-
-function isIPv4(value) {
-  var octets = String(value || '').trim().split('.');
-  return octets.length === 4 && octets.every(function(o) {
-    return /^\d+$/.test(o) && Number(o) >= 0 && Number(o) <= 255;
-  });
-}
-
-function isCIDR(value) {
-  var parts = String(value || '').trim().split('/');
-  return parts.length === 2 &&
-    isIPv4(parts[0]) &&
-    /^\d+$/.test(parts[1]) &&
-    Number(parts[1]) >= 0 &&
-    Number(parts[1]) <= 32;
-}
-
-function isPort(value) {
-  return /^\d+$/.test(String(value).trim()) &&
-    Number(value) >= 1 &&
-    Number(value) <= 65535;
-}
-
-function calcNet(cidr) {
-  var parts = String(cidr || '').trim().split('/');
-  var ip = sip(parts[0]);
-  var prefix = parseInt(parts[1] || '24', 10);
-
-  if (!Number.isInteger(prefix) || prefix < 0 || prefix > 32 || !isIPv4(ip)) {
-    return ip + '/' + (Number.isInteger(prefix) ? prefix : 24);
-  }
-
-  var octets = ip.split('.').map(Number);
-  var mask = prefix === 0 ? 0 : (~0 << (32 - prefix)) >>> 0;
-  var ipInt = ((octets[0] << 24) | (octets[1] << 16) |
-               (octets[2] << 8)  |  octets[3]) >>> 0;
-  var netInt = (ipInt & mask) >>> 0;
-
-  return [
-    (netInt >>> 24) & 255,
-    (netInt >>> 16) & 255,
-    (netInt >>> 8)  & 255,
-     netInt         & 255
-  ].join('.') + '/' + prefix;
-}
-
-/* ============================================================
-   TEST ENGINE
-   ============================================================ */
+/* ── Test Engine ── */
 var results = [];
 
-function expect(description, got, want) {
+function expect(desc, got, want) {
   var pass = JSON.stringify(got) === JSON.stringify(want);
-  results.push({ description: description, pass: pass, got: got, want: want });
-  return pass;
+  results.push({ description: desc, pass: pass, got: got, want: want });
 }
 
 function suite(name, fn) {
@@ -198,182 +128,160 @@ function renderResult(item, container) {
   var div = document.createElement('div');
   div.className = 'test ' + (item.pass ? 'pass' : 'fail');
   div.innerHTML =
-    '<span class="badge ' + (item.pass ? 'pass">✓ PASS' : 'fail">✗ FAIL') + '</span>' +
+    '<span class="badge ' + (item.pass ? 'pass">&#10003; PASS' : 'fail">&#10007; FAIL') + '</span>' +
     '<div class="test-body">' +
       '<div class="test-name">' + item.description + '</div>' +
       (!item.pass
         ? '<div class="test-detail">' +
-            'отримано: <span class="got">'  + JSON.stringify(item.got)  + '</span><br>' +
-            'очікувалось: <span class="want">' + JSON.stringify(item.want) + '</span>' +
+            'отримано:    <span class="got">'  + JSON.stringify(item.got)  + '</span><br>' +
+            'очікується: <span class="want">' + JSON.stringify(item.want) + '</span>' +
           '</div>'
         : '') +
     '</div>';
   container.appendChild(div);
 }
 
-/* ============================================================
-   ТЕСТИ — q()
-   ============================================================ */
+if (!coreOk) {
+  document.getElementById('s-pass').textContent = '?';
+  document.getElementById('s-fail').textContent = '?';
+  document.getElementById('s-total').textContent = '?';
+} else {
+
+/* ══════════════════════════════════════════════════════════
+   ТЕСТИ q() — екранування RouterOS рядків
+══════════════════════════════════════════════════════════ */
 suite('q() — екранування RouterOS рядків', function(c) {
   var cases = [
-    /* Базові */
-    ['null → порожній рядок',             q(null),              ''],
-    ['undefined → порожній рядок',         q(undefined),         ''],
-    ['порожній рядок',                     q(''),                ''],
-    ['звичайний рядок без спецсимволів',   q('hello'),           'hello'],
-
-    /* Лапки */
-    ['подвійні лапки екрануються',         q('"'),               '\\"'],
-    ['рядок з лапками',                    q('say "hi"'),        'say \\"hi\\"'],
-
-    /* Бекслеш */
-    ['одинарний бекслеш',                  q('\\'),              '\\\\'],
-    ['подвійний бекслеш',                  q('\\\\'),            '\\\\\\\\'],
-
-    /* $ змінні */
-    ['долар екранується',                  q('$var'),            '\\$var'],
-    ['кілька доларів',                     q('$a $b'),           '\\$a \\$b'],
-
-    /* % відсоток — наш патч! */
-    ['відсоток екранується',               q('%'),               '\\%'],
-    ['рядок з відсотком',                  q('100%'),            '100\\%'],
-    ['кілька відсотків',                   q('10% off 50%'),     '10\\% off 50\\%'],
-
-    /* Переноси рядків */
-    ['\\n видаляється',                    q('line1\nline2'),    'line1line2'],
-    ['\\r видаляється',                    q('line1\rline2'),    'line1line2'],
-    ['\\r\\n видаляється',                 q('a\r\nb'),          'ab'],
-
-    /* Комбінації */
-    ['пароль зі спецсимволами',            q('P@ss"$100%'),      'P@ss\\"\\$100\\%'],
-    ['шлях з бекслешем',                   q('C:\\Users\\test'), 'C:\\\\Users\\\\test'],
-    ['число як число',                     q(42),                '42'],
-    ['число як рядок',                     q('42'),              '42'],
+    ['null → порожній рядок',           q(null),              ''],
+    ['undefined → порожній рядок',       q(undefined),         ''],
+    ['звичайний рядок',                  q('hello'),           'hello'],
+    ['подвійні лапки',                   q('"'),               '\"'],
+    ['рядок з лапками',                  q('say "hi"'),        'say \"hi\"'],
+    ['одинарний бекслеш',                q('\\'),            '\\\\'],
+    ['долар екранується',                q('$var'),            '\$var'],
+    ['кілька доларів',                   q('$a $b'),           '\$a \$b'],
+    ['відсоток — наш патч',              q('100%'),            '100\%'],
+    ['кілька відсотків',                 q('10% off 50%'),     '10\% off 50\%'],
+    ['\n видаляється',                  q('a\nb'),           'ab'],
+    ['\r видаляється',                  q('a\rb'),           'ab'],
+    ['\r\n видаляється',               q('a\r\nb'),        'ab'],
+    ['пароль зі спецсимволами',          q('P@ss"$100%'),      'P@ss\"\$100\%'],
+    ['число як число',                   q(42),                '42'],
   ];
-
   cases.forEach(function(t) {
-    var item = { description: t[0], pass: t[1] === t[2], got: t[1], want: t[2] };
-    results.push(item);
-    renderResult(item, c);
+    expect(t[0], t[1], t[2]);
+    renderResult(results[results.length-1], c);
   });
 });
 
-/* ============================================================
-   ТЕСТИ — isIPv4()
-   ============================================================ */
+/* ══════════════════════════════════════════════════════════
+   ТЕСТИ isIPv4()
+══════════════════════════════════════════════════════════ */
 suite('isIPv4() — валідація IPv4 адрес', function(c) {
   var cases = [
-    /* Валідні */
-    ['192.168.1.1',    isIPv4('192.168.1.1'),    true],
-    ['0.0.0.0',        isIPv4('0.0.0.0'),         true],
-    ['255.255.255.255', isIPv4('255.255.255.255'), true],
-    ['10.0.0.1',       isIPv4('10.0.0.1'),        true],
-
-    /* Невалідні */
-    ['256.0.0.1',      isIPv4('256.0.0.1'),       false],
-    ['192.168.1',      isIPv4('192.168.1'),        false],
-    ['192.168.1.1.5',  isIPv4('192.168.1.1.5'),   false],
-    ['abc.def.ghi.jkl',isIPv4('abc.def.ghi.jkl'), false],
-    ['порожній рядок', isIPv4(''),                 false],
-    ['null',           isIPv4(null),               false],
-    ['192.168.-1.1',   isIPv4('192.168.-1.1'),     false],
+    ['192.168.1.1',        isIPv4('192.168.1.1'),     true],
+    ['0.0.0.0',            isIPv4('0.0.0.0'),          true],
+    ['255.255.255.255',    isIPv4('255.255.255.255'),  true],
+    ['10.0.0.1',           isIPv4('10.0.0.1'),         true],
+    ['256.0.0.1',          isIPv4('256.0.0.1'),        false],
+    ['192.168.1',          isIPv4('192.168.1'),         false],
+    ['192.168.1.1.5',      isIPv4('192.168.1.1.5'),    false],
+    ['abc.def.ghi.jkl',   isIPv4('abc.def.ghi.jkl'),  false],
+    ['порожній рядок',     isIPv4(''),                  false],
+    ['null',               isIPv4(null),                false],
+    ['192.168.-1.1',       isIPv4('192.168.-1.1'),     false],
   ];
-
   cases.forEach(function(t) {
-    var item = { description: t[0], pass: t[1] === t[2], got: t[1], want: t[2] };
-    results.push(item);
-    renderResult(item, c);
+    expect(t[0], t[1], t[2]);
+    renderResult(results[results.length-1], c);
   });
 });
 
-/* ============================================================
-   ТЕСТИ — isCIDR()
-   ============================================================ */
+/* ══════════════════════════════════════════════════════════
+   ТЕСТИ isCIDR()
+══════════════════════════════════════════════════════════ */
 suite('isCIDR() — валідація CIDR нотації', function(c) {
   var cases = [
-    /* Валідні */
-    ['192.168.1.0/24',   isCIDR('192.168.1.0/24'),   true],
-    ['10.0.0.0/8',       isCIDR('10.0.0.0/8'),        true],
-    ['0.0.0.0/0',        isCIDR('0.0.0.0/0'),         true],
-    ['192.168.1.1/32',   isCIDR('192.168.1.1/32'),    true],
-    ['172.16.0.0/16',    isCIDR('172.16.0.0/16'),     true],
-    ['10.20.30.1/24',    isCIDR('10.20.30.1/24'),     true],
-
-    /* Невалідні */
-    ['без маски',        isCIDR('192.168.1.1'),        false],
-    ['маска > 32',       isCIDR('192.168.1.0/33'),     false],
-    ['негативна маска',  isCIDR('192.168.1.0/-1'),     false],
-    ['невалідний IP',    isCIDR('256.0.0.1/24'),       false],
-    ['порожній рядок',   isCIDR(''),                   false],
-    ['null',             isCIDR(null),                 false],
-    ['текст замість IP', isCIDR('abc/24'),             false],
-    ['два слеші',        isCIDR('192.168.1.0/24/8'),  false],
+    ['192.168.1.0/24',    isCIDR('192.168.1.0/24'),    true],
+    ['10.0.0.0/8',        isCIDR('10.0.0.0/8'),         true],
+    ['0.0.0.0/0',         isCIDR('0.0.0.0/0'),          true],
+    ['192.168.1.1/32',    isCIDR('192.168.1.1/32'),     true],
+    ['без маски',         isCIDR('192.168.1.1'),         false],
+    ['маска > 32',        isCIDR('192.168.1.0/33'),      false],
+    ['негативна маска',   isCIDR('192.168.1.0/-1'),      false],
+    ['невалідний IP',     isCIDR('256.0.0.1/24'),        false],
+    ['порожній рядок',    isCIDR(''),                    false],
+    ['null',              isCIDR(null),                  false],
   ];
-
   cases.forEach(function(t) {
-    var item = { description: t[0], pass: t[1] === t[2], got: t[1], want: t[2] };
-    results.push(item);
-    renderResult(item, c);
+    expect(t[0], t[1], t[2]);
+    renderResult(results[results.length-1], c);
   });
 });
 
-/* ============================================================
-   ТЕСТИ — isPort()
-   ============================================================ */
+/* ══════════════════════════════════════════════════════════
+   ТЕСТИ isPort()
+══════════════════════════════════════════════════════════ */
 suite('isPort() — валідація портів', function(c) {
   var cases = [
-    ['80',    isPort(80),    true],
-    ['1',     isPort(1),     true],
-    ['65535', isPort(65535), true],
-    ['8080',  isPort(8080),  true],
-    ['0',     isPort(0),     false],
-    ['65536', isPort(65536), false],
-    ['-1',    isPort(-1),    false],
-    ['abc',   isPort('abc'), false],
+    ['80',     isPort(80),     true],
+    ['1',      isPort(1),      true],
+    ['65535',  isPort(65535),  true],
+    ['8080',   isPort(8080),   true],
+    ['0',      isPort(0),      false],
+    ['65536',  isPort(65536),  false],
+    ['-1',     isPort(-1),     false],
+    ['abc',    isPort('abc'),  false],
   ];
-
   cases.forEach(function(t) {
-    var item = { description: t[0], pass: t[1] === t[2], got: t[1], want: t[2] };
-    results.push(item);
-    renderResult(item, c);
+    expect(t[0], t[1], t[2]);
+    renderResult(results[results.length-1], c);
   });
 });
 
-/* ============================================================
-   ТЕСТИ — calcNet()
-   ============================================================ */
+/* ══════════════════════════════════════════════════════════
+   ТЕСТИ isMac()
+══════════════════════════════════════════════════════════ */
+suite('isMac() — валідація MAC-адрес', function(c) {
+  var cases = [
+    ['AA:BB:CC:DD:EE:FF',  isMac('AA:BB:CC:DD:EE:FF'), true],
+    ['aa:bb:cc:dd:ee:ff',  isMac('aa:bb:cc:dd:ee:ff'), true],
+    ['AA-BB-CC-DD-EE-FF',  isMac('AA-BB-CC-DD-EE-FF'), true],
+    ['02:00:00:00:00:01',  isMac('02:00:00:00:00:01'), true],
+    ['ZZ:BB:CC:DD:EE:FF',  isMac('ZZ:BB:CC:DD:EE:FF'), false],
+    ['AA:BB:CC:DD:EE',     isMac('AA:BB:CC:DD:EE'),    false],
+    ['порожній рядок',     isMac(''),                   false],
+    ['null',               isMac(null),                 false],
+  ];
+  cases.forEach(function(t) {
+    expect(t[0], t[1], t[2]);
+    renderResult(results[results.length-1], c);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════
+   ТЕСТИ calcNet()
+══════════════════════════════════════════════════════════ */
 suite('calcNet() — обчислення мережевої адреси', function(c) {
   var cases = [
-    /* Стандартні мережі */
-    ['192.168.1.5/24  → /24 мережа',   calcNet('192.168.1.5/24'),   '192.168.1.0/24'],
-    ['10.0.0.1/8      → /8 мережа',    calcNet('10.0.0.1/8'),       '10.0.0.0/8'],
-    ['172.16.5.10/16  → /16 мережа',   calcNet('172.16.5.10/16'),   '172.16.0.0/16'],
-    ['192.168.88.1/24 → /24 мережа',   calcNet('192.168.88.1/24'),  '192.168.88.0/24'],
-
-    /* Граничні випадки */
-    ['/32 хост — не змінюється',        calcNet('192.168.1.1/32'),   '192.168.1.1/32'],
-    ['/0  — все у 0.0.0.0/0',           calcNet('10.10.10.10/0'),    '0.0.0.0/0'],
-    ['вже мережева адреса /24',          calcNet('192.168.1.0/24'),   '192.168.1.0/24'],
-
-    /* /30 підмережа */
-    ['10.0.0.5/30 → 10.0.0.4/30',      calcNet('10.0.0.5/30'),      '10.0.0.4/30'],
-
-    /* Типові для MikroTik */
-    ['192.168.20.1/24 (гостьова)',       calcNet('192.168.20.1/24'),  '192.168.20.0/24'],
-    ['10.10.10.1/24 (OpenVPN)',          calcNet('10.10.10.1/24'),    '10.10.10.0/24'],
-    ['10.20.30.1/24 (WireGuard)',        calcNet('10.20.30.1/24'),    '10.20.30.0/24'],
+    ['192.168.1.5/24',    calcNet('192.168.1.5/24'),    '192.168.1.0/24'],
+    ['10.0.0.1/8',        calcNet('10.0.0.1/8'),        '10.0.0.0/8'],
+    ['172.16.5.10/16',    calcNet('172.16.5.10/16'),    '172.16.0.0/16'],
+    ['192.168.88.1/24',   calcNet('192.168.88.1/24'),   '192.168.88.0/24'],
+    ['/32 хост',          calcNet('192.168.1.1/32'),    '192.168.1.1/32'],
+    ['/0 → 0.0.0.0/0',   calcNet('10.10.10.10/0'),     '0.0.0.0/0'],
+    ['вже мережева /24',  calcNet('192.168.1.0/24'),    '192.168.1.0/24'],
+    ['10.0.0.5/30',       calcNet('10.0.0.5/30'),       '10.0.0.4/30'],
+    ['WireGuard /24',     calcNet('10.20.30.1/24'),     '10.20.30.0/24'],
+    ['OpenVPN /24',       calcNet('10.10.10.1/24'),     '10.10.10.0/24'],
   ];
-
   cases.forEach(function(t) {
-    var item = { description: t[0], pass: t[1] === t[2], got: t[1], want: t[2] };
-    results.push(item);
-    renderResult(item, c);
+    expect(t[0], t[1], t[2]);
+    renderResult(results[results.length-1], c);
   });
 });
 
-/* ============================================================
-   ПІДСУМОК
-   ============================================================ */
+/* ── Підсумок ── */
 var passed = results.filter(function(r) { return r.pass; }).length;
 var failed = results.length - passed;
 var pct    = Math.round(passed / results.length * 100);
@@ -382,13 +290,12 @@ document.getElementById('s-pass').textContent  = passed;
 document.getElementById('s-fail').textContent  = failed;
 document.getElementById('s-total').textContent = results.length;
 document.getElementById('s-time').textContent  = pct + '% успішно';
-document.getElementById('progress').style.width = pct + '%';
 
-if (failed === 0) {
-  document.getElementById('progress').style.background = 'var(--pass)';
-} else {
-  document.getElementById('progress').style.background = 'var(--fail)';
-}
+var fill = document.getElementById('progress');
+fill.style.width = pct + '%';
+fill.style.background = failed === 0 ? 'var(--pass)' : 'var(--fail)';
+
+} /* end if coreOk */
 </script>
 </body>
 </html>

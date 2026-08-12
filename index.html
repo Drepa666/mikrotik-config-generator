@@ -1182,6 +1182,7 @@ textarea.ta-valid   { border-color: #5fd0a5 !important; }
   <pre id="rsc-output" style="display:none;background:#0a1017;border:1px solid var(--border);border-radius:10px;padding:16px;font-family:var(--mono);font-size:12.3px;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-height:500px;overflow-y:auto;color:#c9e8d8;margin-top:10px;"></pre>
 </div>
 
+<script src="core.js"></script>
 <script>
 'use strict';
 
@@ -5139,6 +5140,192 @@ function highlightRos(rawText) {
 
     /* [3] WireGuard peers */
     attach('wgpeers', validateWgPeers);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+})();
+
+/* ============================================================
+   PATCH 17 — валідація ipsecpeers та addrlistentries
+   ============================================================ */
+(function() {
+  'use strict';
+
+  function _isIPv4(v) {
+    var o = String(v || '').trim().split('.');
+    return o.length === 4 && o.every(function(x) {
+      return /^\d+$/.test(x) && +x >= 0 && +x <= 255;
+    });
+  }
+  function _isCIDR(v) {
+    var p = String(v || '').trim().split('/');
+    return p.length === 2 && _isIPv4(p[0]) &&
+      /^\d+$/.test(p[1]) && +p[1] >= 0 && +p[1] <= 32;
+  }
+
+  /* --- UI утиліти --- */
+  function getOrCreate(parent, cls) {
+    var el = parent.parentNode.querySelector('.' + cls);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = cls;
+      parent.parentNode.appendChild(el);
+    }
+    return el;
+  }
+
+  function showErrors(el, errors) {
+    el.classList.remove('ta-valid');
+    el.classList.add('ta-invalid');
+    var errEl = getOrCreate(el, 'ta-error-list');
+    errEl.innerHTML = errors.map(function(e){ return '&#10007; ' + e; }).join('<br>');
+    errEl.classList.add('visible');
+    var okEl = getOrCreate(el, 'ta-ok-msg');
+    okEl.classList.remove('visible');
+  }
+
+  function showOk(el, msg) {
+    el.classList.remove('ta-invalid');
+    el.classList.add('ta-valid');
+    var errEl = getOrCreate(el, 'ta-error-list');
+    errEl.classList.remove('visible');
+    var okEl = getOrCreate(el, 'ta-ok-msg');
+    okEl.textContent = '&#10003; ' + (msg || 'Все вірно');
+    okEl.classList.add('visible');
+  }
+
+  function clearState(el) {
+    el.classList.remove('ta-invalid', 'ta-valid');
+    ['ta-error-list', 'ta-ok-msg'].forEach(function(cls) {
+      var e = el.parentNode.querySelector('.' + cls);
+      if (e) { e.classList.remove('visible'); e.textContent = ''; }
+    });
+  }
+
+  /* ── [A] IPsec peers ──────────────────────────────────────
+     Формат: ім'я:IP:PSK:режим
+     Приклад: peer1:195.123.10.1:MyStrongPSK:ike2
+  ──────────────────────────────────────────────────────── */
+  function validateIpsecPeers(textarea) {
+    var raw = textarea.value.trim();
+    if (!raw) { clearState(textarea); return; }
+
+    var lines  = raw.split('\n');
+    var errors = [];
+    var valid  = 0;
+    var MODES  = ['ike1', 'ike2'];
+
+    lines.forEach(function(line, i) {
+      var val = line.trim();
+      if (!val || val.startsWith('#')) return;
+
+      var num   = i + 1;
+      var parts = val.split(':');
+
+      if (parts.length < 4) {
+        errors.push('Рядок ' + num + ': формат — ім\'я:IP:PSK:режим (ike1/ike2)');
+        return;
+      }
+
+      var name = parts[0].trim();
+      var ip   = parts[1].trim();
+      var psk  = parts[2].trim();
+      var mode = parts[3].trim().toLowerCase();
+
+      if (!name) {
+        errors.push('Рядок ' + num + ': ім\'я не може бути порожнім');
+      }
+      if (!_isIPv4(ip)) {
+        errors.push('Рядок ' + num + ': IP "' + ip + '" — некоректна IPv4-адреса');
+      }
+      if (!psk) {
+        errors.push('Рядок ' + num + ': PSK не може бути порожнім');
+      } else if (psk.length < 8) {
+        errors.push('Рядок ' + num + ': PSK занадто короткий (мін. 8 символів)');
+      }
+      if (!MODES.includes(mode)) {
+        errors.push('Рядок ' + num + ': режим "' + mode + '" — має бути ike1 або ike2');
+      }
+
+      if (name && _isIPv4(ip) && psk.length >= 8 && MODES.includes(mode)) {
+        valid++;
+      }
+    });
+
+    if (errors.length) {
+      showErrors(textarea, errors);
+    } else {
+      showOk(textarea, 'IPsec peers (' + valid + ' шт.) — коректні');
+    }
+  }
+
+  /* ── [B] Address-List ─────────────────────────────────────
+     Формат: список=IP або список=CIDR
+     Приклад: TRUSTED=192.168.1.100
+              BLOCKED=10.0.0.0/24
+  ──────────────────────────────────────────────────────── */
+  function validateAddrList(textarea) {
+    var raw = textarea.value.trim();
+    if (!raw) { clearState(textarea); return; }
+
+    var lines  = raw.split('\n');
+    var errors = [];
+    var valid  = 0;
+
+    lines.forEach(function(line, i) {
+      var val = line.trim();
+      if (!val || val.startsWith('#')) return;
+
+      var num = i + 1;
+      var sep = val.indexOf('=');
+
+      if (sep < 1) {
+        errors.push('Рядок ' + num + ': формат — список=IP або список=CIDR');
+        return;
+      }
+
+      var listName = val.slice(0, sep).trim();
+      var address  = val.slice(sep + 1).trim().split(/\s+/)[0];
+
+      if (!listName) {
+        errors.push('Рядок ' + num + ': назва списку порожня');
+      }
+      if (!_isIPv4(address) && !_isCIDR(address)) {
+        errors.push(
+          'Рядок ' + num + ': "' + address +
+          '" — має бути IPv4 (192.168.1.1) або CIDR (10.0.0.0/24)'
+        );
+      }
+
+      if (listName && (_isIPv4(address) || _isCIDR(address))) {
+        valid++;
+      }
+    });
+
+    if (errors.length) {
+      showErrors(textarea, errors);
+    } else {
+      showOk(textarea, 'Address-List (' + valid + ' записів) — коректні');
+    }
+  }
+
+  /* ── Підключення ─────────────────────────────────────── */
+  function attach(id, validator) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input',  function() { validator(el); });
+    el.addEventListener('blur',   function() { validator(el); });
+    if (el.value.trim()) validator(el);
+  }
+
+  function init() {
+    attach('ipsecpeers',      validateIpsecPeers);
+    attach('addrlistentries', validateAddrList);
   }
 
   if (document.readyState === 'loading') {

@@ -4,8 +4,8 @@
    ============================================================ */
 'use strict';
 
-const CACHE_NAME    = 'mt-config-v1';
-const CACHE_VERSION = 1;
+const CACHE_NAME    = 'mt-config-v6460';
+const CACHE_VERSION = 6460;
 
 /* Файли для кешування при встановленні */
 const PRECACHE_ASSETS = [

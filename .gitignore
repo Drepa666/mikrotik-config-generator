@@ -5,3 +5,6 @@ sw.backup*.js
 index.backup*.html
 generators.backup*.js
 test.backup*.html
+generators.backup*.js
+test.backup*.html
+sw.backup*.js

@@ -1,0 +1,47 @@
+name: Auto-increment CACHE_VERSION
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'index.html'
+      - 'core.js'
+      - 'sw.js'
+
+jobs:
+  update-cache-version:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Calculate hash and update sw.js
+        run: |
+          # MD5 хеш index.html → число 0-9999
+          HASH=$(md5sum index.html | cut -c1-8)
+          VERSION=$((16#$HASH % 9999 + 1))
+          echo "New CACHE_VERSION: $VERSION"
+          
+          # Замінити CACHE_NAME та CACHE_VERSION в sw.js
+          sed -i "s/const CACHE_NAME\s*=\s*'mt-config-v[0-9]*'/const CACHE_NAME    = 'mt-config-v${VERSION}'/" sw.js
+          sed -i "s/const CACHE_VERSION\s*=\s*[0-9]*/const CACHE_VERSION = ${VERSION}/" sw.js
+          
+          echo "Updated sw.js to version $VERSION"
+          cat sw.js | grep CACHE_VERSION
+          
+      - name: Commit if changed
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          if git diff --quiet sw.js; then
+            echo "No changes to sw.js"
+          else
+            git add sw.js
+            git commit -m "ci: auto CACHE_VERSION update [skip ci]"
+            git push
+            echo "Pushed updated sw.js"
+          fi

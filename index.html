@@ -5854,6 +5854,355 @@ function highlightRos(rawText) {
   }
 
 })();
+
+/* ============================================================
+   PATCH 20 — PPPoE / APN / routername / netwatchinterval
+              + RouterOS semantic checker
+   ============================================================ */
+(function() {
+  'use strict';
+
+  /* Глобальні з core.js */
+  function _isIPv4(v)  { return typeof isIPv4  === 'function' ? isIPv4(v)  : false; }
+  function _isCIDR(v)  { return typeof isCIDR  === 'function' ? isCIDR(v)  : false; }
+  function _isPort(v)  { return typeof isPort  === 'function' ? isPort(v)  : false; }
+
+  /* --- UI утиліти --- */
+  function getHintEl(input, cls) {
+    var el = input.parentNode ? input.parentNode.querySelector('.' + cls) : null;
+    if (!el) {
+      el = document.createElement('div');
+      el.className = cls;
+      if (input.parentNode) input.parentNode.appendChild(el);
+    }
+    return el;
+  }
+
+  function setErr(input, msg) {
+    input.classList.remove('valid', 'warn');
+    input.classList.add('invalid');
+    var el = getHintEl(input, 'field-error');
+    el.textContent = '✗ ' + msg;
+    el.style.display = 'block';
+    var w = getHintEl(input, 'field-warn');
+    w.style.display = 'none';
+  }
+
+  function setWarn(input, msg) {
+    input.classList.remove('invalid', 'valid');
+    input.classList.add('warn');
+    var el = getHintEl(input, 'field-warn');
+    el.textContent = '⚠ ' + msg;
+    el.style.display = 'block';
+    var e = getHintEl(input, 'field-error');
+    e.style.display = 'none';
+  }
+
+  function setOk(input) {
+    input.classList.remove('invalid', 'warn');
+    input.classList.add('valid');
+    ['field-error', 'field-warn'].forEach(function(cls) {
+      var el = input.parentNode ? input.parentNode.querySelector('.' + cls) : null;
+      if (el) el.style.display = 'none';
+    });
+  }
+
+  function clearFld(input) {
+    input.classList.remove('invalid', 'valid', 'warn');
+    ['field-error', 'field-warn'].forEach(function(cls) {
+      var el = input.parentNode ? input.parentNode.querySelector('.' + cls) : null;
+      if (el) el.style.display = 'none';
+    });
+  }
+
+  /* ── [A] Ім'я роутера — routername ───────────────────────
+     Лише a-z A-Z 0-9 - _ макс 64 символи
+  ────────────────────────────────────────────────────────── */
+  function validateRouterName(input) {
+    var val = input.value.trim();
+    if (!val) { clearFld(input); return; }
+
+    if (val.length > 64) {
+      setErr(input, 'Максимум 64 символи (зараз: ' + val.length + ')');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_\-]+$/.test(val)) {
+      setErr(input, 'Лише a-z, A-Z, 0-9, -, _ (пробіли та спецсимволи не дозволені)');
+      return;
+    }
+    if (/^[\-_]/.test(val)) {
+      setWarn(input, 'Назва починається з - або _ — деякі RouterOS версії не підтримують');
+      return;
+    }
+    setOk(input);
+  }
+
+  /* ── [B] PPPoE логін/пароль ───────────────────────────────
+     Логін: не порожній якщо PPPoE вибрано
+     Пароль: не обов'язковий але мін.1 символ
+  ────────────────────────────────────────────────────────── */
+  function validatePppoeLogin(input) {
+    var val = input.value.trim();
+    var wanType = document.getElementById('wantype');
+    if (!wanType || wanType.value !== 'pppoe') { clearFld(input); return; }
+    if (!val) {
+      setErr(input, 'PPPoE логін не може бути порожнім');
+      return;
+    }
+    if (val.length > 253) {
+      setErr(input, 'Логін занадто довгий (макс. 253 символи)');
+      return;
+    }
+    setOk(input);
+  }
+
+  function validatePppoePass(input) {
+    var val = input.value;
+    var wanType = document.getElementById('wantype');
+    if (!wanType || wanType.value !== 'pppoe') { clearFld(input); return; }
+    if (!val) { clearFld(input); return; }
+    if (val.length < 1) {
+      setWarn(input, 'PPPoE пароль порожній — деякі ISP вимагають пароль');
+      return;
+    }
+    setOk(input);
+  }
+
+  /* ── [C] APN рядок ────────────────────────────────────────
+     Лише допустимі символи: a-z 0-9 . - _
+     Без пробілів та спецсимволів
+  ────────────────────────────────────────────────────────── */
+  function validateApn(input) {
+    var val = input.value.trim();
+    if (!val) { clearFld(input); return; }
+
+    if (/\s/.test(val)) {
+      setErr(input, 'APN не може містити пробіли');
+      return;
+    }
+    if (!/^[a-zA-Z0-9.\-_]+$/.test(val)) {
+      setErr(input, 'APN: лише a-z, 0-9, ., -, _ (наприклад: internet або web.kyivstar.ua)');
+      return;
+    }
+    if (val.length > 100) {
+      setErr(input, 'APN занадто довгий (макс. 100 символів)');
+      return;
+    }
+    setOk(input);
+  }
+
+  /* ── [D] Netwatch інтервал ────────────────────────────────
+     Формат: число + одиниця (s/m/h)
+     Приклади: 30s, 1m, 1h, 5m
+     RouterOS мін: 1s, макс: не обмежений практично
+  ────────────────────────────────────────────────────────── */
+  function validateNetwatchInterval(input) {
+    var val = input.value.trim();
+    if (!val) { clearFld(input); return; }
+
+    var m = val.match(/^(\d+)(s|m|h)$/i);
+    if (!m) {
+      setErr(input, 'Формат: число + одиниця (30s, 5m, 1h). Поточне: "' + val + '"');
+      return;
+    }
+
+    var num  = parseInt(m[1], 10);
+    var unit = m[2].toLowerCase();
+
+    /* Мінімальні значення */
+    if (unit === 's' && num < 1) {
+      setErr(input, 'Мінімальний інтервал: 1s');
+      return;
+    }
+    if (unit === 's' && num < 10) {
+      setWarn(input, 'Інтервал < 10s може навантажувати роутер');
+      return;
+    }
+    if (unit === 'h' && num > 24) {
+      setWarn(input, 'Інтервал > 24h — моніторинг може бути неефективним');
+      return;
+    }
+
+    setOk(input);
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     [2] RouterOS СЕМАНТИЧНИЙ ЧЕКЕР
+     Перевіряє несумісності між версією RouterOS та опціями
+     ══════════════════════════════════════════════════════════ */
+  var semanticWarnings = [];
+  var semanticPanel = null;
+
+  function createSemanticPanel() {
+    if (semanticPanel) return semanticPanel;
+    var outWrap = document.getElementById('out-wrap');
+    if (!outWrap) return null;
+
+    semanticPanel = document.createElement('div');
+    semanticPanel.id = 'semantic-panel';
+    semanticPanel.style.cssText = [
+      'display:none',
+      'background:#2a2614',
+      'border:1px solid #e6b35a',
+      'border-radius:8px',
+      'padding:10px 14px',
+      'margin-bottom:12px',
+      'font-size:12px',
+      'color:#ffe3a3',
+      'line-height:1.7'
+    ].join(';');
+
+    outWrap.insertBefore(semanticPanel, outWrap.firstChild);
+    return semanticPanel;
+  }
+
+  function runSemanticCheck() {
+    var warnings = [];
+
+    var firmware = (document.getElementById('firmware') || {}).value || '';
+    var wgEnable = document.getElementById('wgenable');
+    var ovpnEnable = document.getElementById('ovpnenable');
+    var ovpnCipher = (document.getElementById('ovpncipher') || {}).value || '';
+    var capsEnable = document.getElementById('capsmanserv');
+    var wifiEnable = document.getElementById('wifienable');
+    var guestEnable = document.getElementById('guestenable');
+    var model = (document.getElementById('model') || {}).value || '';
+
+    /* ── WireGuard тільки RouterOS 7+ ── */
+    if (wgEnable && wgEnable.checked && firmware === '6.x') {
+      warnings.push(
+        '🔴 <b>WireGuard</b> не підтримується в RouterOS 6.x — ' +
+        'потрібна версія 7.x або вище'
+      );
+    }
+
+    /* ── OpenVPN AES-GCM тільки 7.13+ ── */
+    if (ovpnEnable && ovpnEnable.checked &&
+        ovpnCipher === 'aes256-gcm' && firmware !== '7.13+') {
+      warnings.push(
+        '🔴 <b>OpenVPN aes256-gcm</b> підтримується лише в RouterOS 7.13+ — ' +
+        'обери aes256-cbc для ' + firmware
+      );
+    }
+
+    /* ── blowfish128 тільки 6.x ── */
+    if (ovpnEnable && ovpnEnable.checked &&
+        ovpnCipher === 'blowfish128' && firmware !== '6.x') {
+      warnings.push(
+        '⚠️ <b>blowfish128</b> рекомендований лише для RouterOS 6.x — ' +
+        'для 7.x обери aes256-cbc'
+      );
+    }
+
+    /* ── CAPsMAN на single-port моделях ── */
+    var singleModels = ['wap-ac', 'cap-ac'];
+    if (capsEnable && capsEnable.checked && singleModels.includes(model)) {
+      warnings.push(
+        '⚠️ <b>CAPsMAN</b> на ' + model + ' (1 порт) — ' +
+        'переконайся що LAN і Management в різних VLAN'
+      );
+    }
+
+    /* ── Wi-Fi 6 API на старих версіях ── */
+    var wifiSixModels = ['hap-ax2', 'hap-ax3', 'hap-ax-s', 'chateau-lte7',
+                         'chateau-5g', 'chateau-pro-ax'];
+    if (wifiEnable && wifiEnable.checked &&
+        wifiSixModels.includes(model) && firmware === '6.x') {
+      warnings.push(
+        '🔴 <b>Wi-Fi 6</b> моделі не підтримують RouterOS 6.x — ' +
+        'потрібна версія 7.x або вище'
+      );
+    }
+
+    /* ── Гостьова мережа на single-port ── */
+    if (guestEnable && guestEnable.checked && singleModels.includes(model)) {
+      warnings.push(
+        '⚠️ <b>Гостьова мережа</b> на single-port моделі ' + model + ' — ' +
+        'потребує VLAN-aware switch конфігурації'
+      );
+    }
+
+    /* ── VLAN ID конфлікт (перевіряємо чи не 1) ── */
+    var guestVlan = document.getElementById('guestvlan');
+    if (guestEnable && guestEnable.checked && guestVlan) {
+      var vlanId = parseInt(guestVlan.value, 10);
+      if (vlanId === 1) {
+        warnings.push(
+          '🔴 <b>VLAN ID = 1</b> — це native VLAN, може конфліктувати з LAN. ' +
+          'Використай ID 10, 20, 100 тощо'
+        );
+      }
+    }
+
+    /* ── hEX не має Wi-Fi ── */
+    if (wifiEnable && wifiEnable.checked && model === 'hex') {
+      warnings.push(
+        '🔴 <b>hEX</b> не має Wi-Fi модуля — Wi-Fi блок не буде генеруватись'
+      );
+    }
+
+    /* Оновити панель */
+    var panel = createSemanticPanel();
+    if (!panel) return;
+
+    if (warnings.length > 0) {
+      panel.style.display = 'block';
+      panel.innerHTML = '<b>⚠️ Семантичні попередження:</b><br>' +
+        warnings.map(function(w) { return '• ' + w; }).join('<br>');
+    } else {
+      panel.style.display = 'none';
+      panel.innerHTML = '';
+    }
+  }
+
+  /* ── Підключення полів ───────────────────────────────── */
+  function attachField(id, validator) {
+    var el = document.getElementById(id);
+    if (!el) return false;
+    el.addEventListener('input',  function() { validator(el); });
+    el.addEventListener('blur',   function() { validator(el); });
+    el.addEventListener('change', function() { validator(el); });
+    if (el.value && el.value.trim()) validator(el);
+    return true;
+  }
+
+  function attachSemantic(ids) {
+    ids.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('change', runSemanticCheck);
+      el.addEventListener('input',  runSemanticCheck);
+    });
+  }
+
+  function init() {
+    /* [1] Поля валідації */
+    attachField('routername',       validateRouterName);
+    attachField('pppoeuser',        validatePppoeLogin);
+    attachField('pppoepass',        validatePppoePass);
+    attachField('apn',              validateApn);
+    attachField('foapn',            validateApn);
+    attachField('netwatchinterval', validateNetwatchInterval);
+
+    /* [2] Семантичний чекер */
+    attachSemantic([
+      'firmware', 'model',
+      'wgenable', 'ovpnenable', 'ovpncipher',
+      'capsmanserv', 'wifienable',
+      'guestenable', 'guestvlan'
+    ]);
+
+    /* Запустити одразу */
+    runSemanticCheck();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+})();
 </script>
 
 <div class="card diff-wrap">

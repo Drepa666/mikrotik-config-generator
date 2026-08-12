@@ -4886,26 +4886,7 @@ function highlightRos(rawText) {
 (function() {
   'use strict';
 
-  /* --- Утиліти (локальні копії щоб не залежати від порядку) --- */
-  function _isIPv4(v) {
-    var o = String(v || '').trim().split('.');
-    return o.length === 4 && o.every(function(x) {
-      return /^\d+$/.test(x) && +x >= 0 && +x <= 255;
-    });
-  }
-  function _isPort(v) {
-    return /^\d+$/.test(String(v).trim()) && +v >= 1 && +v <= 65535;
-  }
-  function _isBase64Key(v) {
-    /* WireGuard public key: base64, 44 символи з '=' на кінці */
-    return /^[A-Za-z0-9+\/]{43}=$/.test(String(v || '').trim());
-  }
-  function _isCIDR(v) {
-    var p = String(v || '').trim().split('/');
-    return p.length === 2 && _isIPv4(p[0]) &&
-      /^\d+$/.test(p[1]) && +p[1] >= 0 && +p[1] <= 32;
-  }
-
+  /* Утиліти: використовуємо глобальні функції з core.js */
   /* --- Допоміжні UI функції --- */
   function getOrCreate(parentEl, cls, tag) {
     var el = parentEl.parentNode.querySelector('.' + cls);
@@ -4968,7 +4949,7 @@ function highlightRos(rawText) {
     var valid   = 0;
 
     entries.forEach(function(entry) {
-      if (!_isIPv4(entry)) {
+      if (!isIPv4(entry)) {
         errors.push('"' + entry + '" — некоректна IPv4-адреса');
       } else {
         valid++;
@@ -5015,19 +4996,19 @@ function highlightRos(rawText) {
       if (!['tcp', 'udp'].includes(proto)) {
         errors.push('Рядок ' + num + ': протокол "' + proto + '" — має бути tcp або udp');
       }
-      if (!_isPort(extPort)) {
+      if (!isPort(extPort)) {
         errors.push('Рядок ' + num + ': зовнішній порт "' + extPort + '" — має бути 1-65535');
       }
-      if (!_isIPv4(intIp)) {
+      if (!isIPv4(intIp)) {
         errors.push('Рядок ' + num + ': IP "' + intIp + '" — некоректна IPv4-адреса');
       }
-      if (!_isPort(intPort)) {
+      if (!isPort(intPort)) {
         errors.push('Рядок ' + num + ': внутрішній порт "' + intPort + '" — має бути 1-65535');
       }
 
       if (
         ['tcp','udp'].includes(proto) &&
-        _isPort(extPort) && _isIPv4(intIp) && _isPort(intPort)
+        isPort(extPort) && isIPv4(intIp) && isPort(intPort)
       ) {
         valid++;
       }
@@ -5079,7 +5060,7 @@ function highlightRos(rawText) {
           'має бути base64, 44 символи (напр. з wg genkey | wg pubkey)'
         );
       }
-      if (!_isCIDR(allowedIp)) {
+      if (!isCIDR(allowedIp)) {
         errors.push('Рядок ' + num + ': "' + allowedIp + '" — має бути CIDR, напр. 10.20.30.2/32');
       } else if (!allowedIp.endsWith('/32') && !allowedIp.endsWith('/24')) {
         /* Попередження — не помилка */
@@ -5090,7 +5071,7 @@ function highlightRos(rawText) {
       }
 
       if (
-        name && _isBase64Key(publicKey) && _isCIDR(allowedIp)
+        name && _isBase64Key(publicKey) && isCIDR(allowedIp)
       ) {
         valid++;
       }
@@ -5156,15 +5137,15 @@ function highlightRos(rawText) {
 (function() {
   'use strict';
 
-  function _isIPv4(v) {
+  function isIPv4(v) {
     var o = String(v || '').trim().split('.');
     return o.length === 4 && o.every(function(x) {
       return /^\d+$/.test(x) && +x >= 0 && +x <= 255;
     });
   }
-  function _isCIDR(v) {
+  function isCIDR(v) {
     var p = String(v || '').trim().split('/');
-    return p.length === 2 && _isIPv4(p[0]) &&
+    return p.length === 2 && isIPv4(p[0]) &&
       /^\d+$/.test(p[1]) && +p[1] >= 0 && +p[1] <= 32;
   }
 
@@ -5240,7 +5221,7 @@ function highlightRos(rawText) {
       if (!name) {
         errors.push('Рядок ' + num + ': ім\'я не може бути порожнім');
       }
-      if (!_isIPv4(ip)) {
+      if (!isIPv4(ip)) {
         errors.push('Рядок ' + num + ': IP "' + ip + '" — некоректна IPv4-адреса');
       }
       if (!psk) {
@@ -5252,7 +5233,7 @@ function highlightRos(rawText) {
         errors.push('Рядок ' + num + ': режим "' + mode + '" — має бути ike1 або ike2');
       }
 
-      if (name && _isIPv4(ip) && psk.length >= 8 && MODES.includes(mode)) {
+      if (name && isIPv4(ip) && psk.length >= 8 && MODES.includes(mode)) {
         valid++;
       }
     });
@@ -5295,14 +5276,14 @@ function highlightRos(rawText) {
       if (!listName) {
         errors.push('Рядок ' + num + ': назва списку порожня');
       }
-      if (!_isIPv4(address) && !_isCIDR(address)) {
+      if (!isIPv4(address) && !isCIDR(address)) {
         errors.push(
           'Рядок ' + num + ': "' + address +
           '" — має бути IPv4 (192.168.1.1) або CIDR (10.0.0.0/24)'
         );
       }
 
-      if (listName && (_isIPv4(address) || _isCIDR(address))) {
+      if (listName && (isIPv4(address) || isCIDR(address))) {
         valid++;
       }
     });
@@ -5326,6 +5307,226 @@ function highlightRos(rawText) {
   function init() {
     attach('ipsecpeers',      validateIpsecPeers);
     attach('addrlistentries', validateAddrList);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+})();
+
+/* ============================================================
+   PATCH 18 — валідація routesentries та dnsstaticentries
+   ============================================================ */
+(function() {
+  'use strict';
+
+  /* Використовуємо глобальні функції з core.js */
+  function _isIPv4(v)  { return typeof isIPv4 === 'function' ? isIPv4(v)  : false; }
+  function _isCIDR(v)  { return typeof isCIDR === 'function' ? isCIDR(v)  : false; }
+
+  /* --- UI утиліти --- */
+  function getOrCreate(parent, cls) {
+    var el = parent.parentNode
+      ? parent.parentNode.querySelector('.' + cls)
+      : null;
+    if (!el) {
+      el = document.createElement('div');
+      el.className = cls;
+      if (parent.parentNode) parent.parentNode.appendChild(el);
+    }
+    return el;
+  }
+
+  function showErrors(el, errors) {
+    el.classList.remove('ta-valid');
+    el.classList.add('ta-invalid');
+    var errEl = getOrCreate(el, 'ta-error-list');
+    errEl.style.borderColor = '';
+    errEl.style.background  = '';
+    errEl.style.color       = '';
+    errEl.innerHTML = errors.map(function(e) {
+      return '&#10007; ' + e;
+    }).join('<br>');
+    errEl.classList.add('visible');
+    var okEl = getOrCreate(el, 'ta-ok-msg');
+    okEl.classList.remove('visible');
+  }
+
+  function showOk(el, msg) {
+    el.classList.remove('ta-invalid');
+    el.classList.add('ta-valid');
+    var errEl = getOrCreate(el, 'ta-error-list');
+    errEl.classList.remove('visible');
+    var okEl = getOrCreate(el, 'ta-ok-msg');
+    okEl.textContent = '&#10003; ' + (msg || 'Все вірно');
+    okEl.classList.add('visible');
+  }
+
+  function clearState(el) {
+    el.classList.remove('ta-invalid', 'ta-valid');
+    ['ta-error-list', 'ta-ok-msg'].forEach(function(cls) {
+      var e = el.parentNode ? el.parentNode.querySelector('.' + cls) : null;
+      if (e) { e.classList.remove('visible'); e.textContent = ''; }
+    });
+  }
+
+  /* ── [A] Статичні маршрути — routesentries ────────────────
+     Формат: CIDR=IP:distance:коментар
+     Приклад: 10.0.0.0/8=192.168.88.1:10:Office
+              0.0.0.0/0=192.168.88.1:5:Default
+  ────────────────────────────────────────────────────────── */
+  function validateRoutes(textarea) {
+    var raw = textarea.value.trim();
+    if (!raw) { clearState(textarea); return; }
+
+    var lines  = raw.split('\n');
+    var errors = [];
+    var valid  = 0;
+
+    lines.forEach(function(line, i) {
+      var val = line.trim();
+      if (!val || val.charAt(0) === '#') return;
+
+      var num = i + 1;
+      var eqIdx = val.indexOf('=');
+
+      if (eqIdx < 1) {
+        errors.push(
+          'Рядок ' + num + ': формат — CIDR=IP:distance[:коментар]' +
+          ' (наприклад 10.0.0.0/8=192.168.88.1:10:Office)'
+        );
+        return;
+      }
+
+      var dst   = val.slice(0, eqIdx).trim();
+      var rest  = val.slice(eqIdx + 1).trim();
+      var parts = rest.split(':');
+      var gw    = parts[0].trim();
+      var dist  = parts[1] ? parts[1].trim() : '1';
+
+      /* Перевірка мережі призначення */
+      if (!_isCIDR(dst)) {
+        errors.push(
+          'Рядок ' + num + ': мережа "' + dst +
+          '" — має бути CIDR (наприклад 10.0.0.0/8 або 0.0.0.0/0)'
+        );
+      }
+
+      /* Перевірка шлюзу */
+      if (!_isIPv4(gw)) {
+        errors.push(
+          'Рядок ' + num + ': шлюз "' + gw +
+          '" — має бути IPv4-адреса (наприклад 192.168.88.1)'
+        );
+      }
+
+      /* Перевірка distance 1-255 */
+      if (dist !== '' && (!/^\d+$/.test(dist) || +dist < 1 || +dist > 255)) {
+        errors.push(
+          'Рядок ' + num + ': distance "' + dist +
+          '" — має бути числом від 1 до 255'
+        );
+      }
+
+      if (_isCIDR(dst) && _isIPv4(gw) &&
+          (/^\d+$/.test(dist) && +dist >= 1 && +dist <= 255)) {
+        valid++;
+      }
+    });
+
+    if (errors.length) {
+      showErrors(textarea, errors);
+    } else {
+      showOk(textarea, 'Маршрути (' + valid + ' шт.) — коректні');
+    }
+  }
+
+  /* ── [B] Статичні DNS записи — dnsstaticentries ───────────
+     Формат: ім'я=IP
+     Приклад: router.lan=192.168.88.1
+              nas.lan=192.168.88.10
+  ────────────────────────────────────────────────────────── */
+  function validateDnsStatic(textarea) {
+    var raw = textarea.value.trim();
+    if (!raw) { clearState(textarea); return; }
+
+    var lines  = raw.split('\n');
+    var errors = [];
+    var valid  = 0;
+    var names  = {};
+
+    lines.forEach(function(line, i) {
+      var val = line.trim();
+      if (!val || val.charAt(0) === '#') return;
+
+      var num   = i + 1;
+      var eqIdx = val.indexOf('=');
+
+      if (eqIdx < 1) {
+        errors.push(
+          'Рядок ' + num + ': формат — ім\'я=IP' +
+          ' (наприклад router.lan=192.168.88.1)'
+        );
+        return;
+      }
+
+      var name = val.slice(0, eqIdx).trim();
+      var ip   = val.slice(eqIdx + 1).trim().split(/\s+/)[0];
+
+      /* Перевірка імені — лише дозволені символи */
+      if (!name) {
+        errors.push('Рядок ' + num + ': ім\'я не може бути порожнім');
+      } else if (!/^[a-zA-Z0-9._\-]+$/.test(name)) {
+        errors.push(
+          'Рядок ' + num + ': ім\'я "' + name +
+          '" містить недозволені символи (лише a-z, 0-9, ., -, _)'
+        );
+      } else if (names[name]) {
+        errors.push(
+          'Рядок ' + num + ': дубльоване ім\'я "' + name + '"'
+        );
+      } else {
+        names[name] = true;
+      }
+
+      /* Перевірка IP */
+      if (!_isIPv4(ip)) {
+        errors.push(
+          'Рядок ' + num + ': IP "' + ip +
+          '" — некоректна IPv4-адреса'
+        );
+      }
+
+      if (name && /^[a-zA-Z0-9._\-]+$/.test(name) && _isIPv4(ip)) {
+        valid++;
+      }
+    });
+
+    if (errors.length) {
+      showErrors(textarea, errors);
+    } else {
+      showOk(textarea, 'DNS записи (' + valid + ' шт.) — коректні');
+    }
+  }
+
+  /* ── Підключення ─────────────────────────────────────── */
+  function attach(id, validator) {
+    var el = document.getElementById(id);
+    if (!el) return false;
+    el.addEventListener('input',  function() { validator(el); });
+    el.addEventListener('blur',   function() { validator(el); });
+    if (el.value.trim()) validator(el);
+    return true;
+  }
+
+  function init() {
+    var r = attach('routesentries',   validateRoutes);
+    var d = attach('dnsstaticentries', validateDnsStatic);
+    if (!r) console.warn('[patch18] #routesentries не знайдено');
+    if (!d) console.warn('[patch18] #dnsstaticentries не знайдено');
   }
 
   if (document.readyState === 'loading') {

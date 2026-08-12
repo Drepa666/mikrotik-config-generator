@@ -4,14 +4,13 @@
    ============================================================ */
 'use strict';
 
-const CACHE_NAME    = 'mt-config-v4594';
-const CACHE_VERSION = 4594;
+const CACHE_NAME    = 'mt-config-v6460';
+const CACHE_VERSION = 6460;
 
 /* Файли для кешування при встановленні */
 const PRECACHE_ASSETS = [
   './',
   './index.html',
-  './core.js',
   './manifest.webmanifest'
 ];
 

@@ -13,16 +13,16 @@ var SECS = [
   { label: 'MAC',        m: '# --- Захист MAC ---' },
   { label: 'Firewall',   m: '# --- Firewall (defconf' },
   { label: 'NTP',        m: '# --- NTP ---' },
-  { label: 'Port FW',    m: '# --- Port Forwarding ---' },
+  { label: 'Failover',   m: '# --- Failover:' },
   { label: 'Wi-Fi',      m: '# --- Wi-Fi' },
   { label: 'CAPsMAN',    m: '# --- CAPsMAN' },
   { label: 'Guest',      m: '# --- Guest' },
-  { label: 'Failover',   m: '# --- Failover' },
   { label: 'WireGuard',  m: '# --- WireGuard' },
   { label: 'OpenVPN',    m: '# --- OpenVPN' },
   { label: 'IPsec',      m: '# [x] IPsec' },
+  { label: 'Port FW',    m: '# --- Port Forwarding' },
+  { label: 'Routes',     m: '# --- Static' },
   { label: 'Addr-List',  m: '# --- Address-List' },
-  { label: 'Routes',     m: '# --- Static Routes' },
 ];
 function secGetScript() {
   var el = document.getElementById('output');

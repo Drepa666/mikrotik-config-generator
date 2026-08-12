@@ -2,300 +2,172 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<title>MikroTik Config — Unit Tests</title>
+<title>MikroTik Config — Unit Tests v2</title>
 <style>
   :root {
-    --bg:#0f1720; --panel:#16212c; --border:#2a3b48;
-    --text:#e6edf3; --muted:#8ea3b0; --accent:#5fd0a5;
-    --pass:#5fd0a5; --fail:#e0665a;
-    --mono:'Cascadia Code','Fira Mono','Consolas',monospace;
+    --bg:#0f1720;--panel:#16212c;--border:#2a3b48;
+    --text:#e6edf3;--muted:#8ea3b0;--accent:#5fd0a5;
+    --pass:#5fd0a5;--fail:#e0665a;
+    --mono:'Cascadia Code','Consolas',monospace;
   }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body {
-    background:var(--bg); color:var(--text);
-    font-family:system-ui,sans-serif;
-    padding:32px 24px; max-width:860px; margin:auto;
-  }
-  h1 { color:var(--accent); font-size:22px; margin-bottom:6px; }
-  .subtitle { color:var(--muted); font-size:13px; margin-bottom:28px; }
-  .summary {
-    display:flex; gap:24px; align-items:center;
-    background:var(--panel); border:1px solid var(--border);
-    border-radius:10px; padding:14px 20px; margin-bottom:16px;
-    font-size:14px;
-  }
-  .num { font-size:28px; font-weight:700; line-height:1; }
-  .pass-num { color:var(--pass); }
-  .fail-num { color:var(--fail); }
-  .total-num { color:var(--muted); }
-  .progress { height:6px; background:var(--border); border-radius:3px; margin-bottom:24px; }
-  .progress-fill { height:100%; background:var(--accent); border-radius:3px; }
-  .suite { margin-bottom:20px; }
-  .suite-title {
-    font-size:12px; font-weight:700; color:var(--muted);
-    text-transform:uppercase; letter-spacing:.08em;
-    margin-bottom:8px; padding-left:4px;
-  }
-  .test {
-    background:var(--panel); border:1px solid var(--border);
-    border-radius:8px; padding:10px 14px;
-    margin-bottom:6px; display:flex; gap:12px; align-items:flex-start;
-  }
-  .test.pass { border-left:3px solid var(--pass); }
-  .test.fail { border-left:3px solid var(--fail); }
-  .badge {
-    font-size:11px; font-weight:700; padding:2px 8px;
-    border-radius:20px; white-space:nowrap; flex-shrink:0;
-  }
-  .badge.pass { background:rgba(95,208,165,.18); color:var(--pass); }
-  .badge.fail { background:rgba(224,102,90,.18); color:var(--fail); }
-  .test-body { flex:1; }
-  .test-name { font-size:13.5px; }
-  .test-detail {
-    font-family:var(--mono); font-size:11.5px;
-    color:var(--muted); margin-top:5px; line-height:1.6;
-  }
-  .got  { color:var(--fail); }
-  .want { color:var(--pass); }
-  .core-status {
-    font-size:12px; padding:8px 14px; border-radius:6px;
-    margin-bottom:16px; background:var(--panel);
-    border:1px solid var(--border);
-  }
-  footer { margin-top:32px; color:var(--muted); font-size:12px; text-align:center; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;
+       padding:32px 24px;max-width:900px;margin:auto;}
+  h1{color:var(--accent);font-size:22px;margin-bottom:6px;}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:24px;}
+  .summary{display:flex;gap:24px;align-items:center;
+    background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;padding:14px 20px;margin-bottom:16px;}
+  .num{font-size:28px;font-weight:700;line-height:1;}
+  .pass-num{color:var(--pass);}
+  .fail-num{color:var(--fail);}
+  .total-num{color:var(--muted);}
+  .progress{height:6px;background:var(--border);border-radius:3px;margin-bottom:24px;}
+  .progress-fill{height:100%;background:var(--accent);border-radius:3px;}
+  .suite{margin-bottom:20px;}
+  .suite-title{font-size:12px;font-weight:700;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;padding-left:4px;}
+  .test{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    padding:10px 14px;margin-bottom:6px;display:flex;gap:12px;align-items:flex-start;}
+  .test.pass{border-left:3px solid var(--pass);}
+  .test.fail{border-left:3px solid var(--fail);}
+  .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;
+    white-space:nowrap;flex-shrink:0;}
+  .badge.pass{background:rgba(95,208,165,.18);color:var(--pass);}
+  .badge.fail{background:rgba(224,102,90,.18);color:var(--fail);}
+  .test-body{flex:1;}
+  .test-name{font-size:13.5px;}
+  .test-detail{font-family:var(--mono);font-size:11.5px;color:var(--muted);
+    margin-top:5px;line-height:1.6;}
+  .got{color:var(--fail);}
+  .want{color:var(--pass);}
+  .core-status{font-size:12px;padding:8px 14px;border-radius:6px;
+    margin-bottom:16px;background:var(--panel);border:1px solid var(--border);}
+  footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center;}
 </style>
 </head>
 <body>
-
 <h1>&#129514; Unit Tests — MikroTik Config Generator</h1>
-<p class="subtitle">Тестує реальний код з <b>core.js</b> — не копії функцій</p>
+<p class="sub">Тестує реальний код з <b>core.js</b> — не копії функцій</p>
 
 <div id="core-status" class="core-status">&#9203; Завантаження core.js...</div>
 
-<div class="summary" id="summary">
-  <div><div class="num pass-num" id="s-pass">—</div><div style="color:var(--muted);font-size:12px">пройшло</div></div>
-  <div><div class="num fail-num" id="s-fail">—</div><div style="color:var(--muted);font-size:12px">провалено</div></div>
-  <div><div class="num total-num" id="s-total">—</div><div style="color:var(--muted);font-size:12px">всього</div></div>
+<div class="summary">
+  <div><div class="num pass-num" id="s-pass">&#8212;</div>
+       <div style="color:var(--muted);font-size:12px">пройшло</div></div>
+  <div><div class="num fail-num" id="s-fail">&#8212;</div>
+       <div style="color:var(--muted);font-size:12px">провалено</div></div>
+  <div><div class="num total-num" id="s-total">&#8212;</div>
+       <div style="color:var(--muted);font-size:12px">всього</div></div>
   <div style="margin-left:auto;font-size:13px;color:var(--muted)" id="s-time"></div>
 </div>
 <div class="progress"><div class="progress-fill" id="progress" style="width:0%"></div></div>
 <div id="results"></div>
-<footer>MikroTik Config Generator · Unit Test Suite · використовує реальний core.js</footer>
+<footer>MikroTik Config Generator &middot; Unit Test Suite v2 &middot; використовує реальний core.js</footer>
 
-<!-- core.js — той самий файл що і в index.html -->
 <script src="core.js"></script>
 <script>
 'use strict';
-
-/* ── Перевірка що core.js завантажився ── */
 var coreOk = (
   typeof isIPv4 === 'function' &&
   typeof isCIDR === 'function' &&
   typeof isPort === 'function' &&
   typeof isMac  === 'function' &&
-  typeof calcNet === 'function' &&
-  typeof q === 'function'
+  typeof calcNet=== 'function' &&
+  typeof q      === 'function'
 );
-
 var statusEl = document.getElementById('core-status');
 if (coreOk) {
-  statusEl.style.borderColor = '#5fd0a5';
-  statusEl.style.color = '#5fd0a5';
-  statusEl.textContent = '✓ core.js завантажено — тестуємо реальний код';
+  statusEl.style.borderColor='#5fd0a5';
+  statusEl.style.color='#5fd0a5';
+  statusEl.textContent='\u2713 core.js завантажено ('+
+    Object.keys({isIPv4,isCIDR,isPort,isMac,calcNet,q}).length+' функцій)';
 } else {
-  statusEl.style.borderColor = '#e0665a';
-  statusEl.style.color = '#e0665a';
-  statusEl.textContent = '✗ core.js не завантажився! Запусти через http-сервер.';
+  statusEl.style.borderColor='#e0665a';
+  statusEl.style.color='#e0665a';
+  statusEl.textContent='\u2717 core.js не завантажився! Запусти через http-сервер.';
 }
 
-/* ── Test Engine ── */
-var results = [];
-
-function expect(desc, got, want) {
-  var pass = JSON.stringify(got) === JSON.stringify(want);
-  results.push({ description: desc, pass: pass, got: got, want: want });
+var results=[];
+function expect(desc,got,want){
+  var pass=JSON.stringify(got)===JSON.stringify(want);
+  results.push({description:desc,pass:pass,got:got,want:want});
 }
-
-function suite(name, fn) {
-  var el = document.createElement('div');
-  el.className = 'suite';
-  el.innerHTML = '<div class="suite-title">' + name + '</div>';
+function suite(name,fn){
+  var el=document.createElement('div');
+  el.className='suite';
+  el.innerHTML='<div class="suite-title">'+name+'</div>';
   document.getElementById('results').appendChild(el);
   fn(el);
 }
-
-function renderResult(item, container) {
-  var div = document.createElement('div');
-  div.className = 'test ' + (item.pass ? 'pass' : 'fail');
-  div.innerHTML =
-    '<span class="badge ' + (item.pass ? 'pass">&#10003; PASS' : 'fail">&#10007; FAIL') + '</span>' +
-    '<div class="test-body">' +
-      '<div class="test-name">' + item.description + '</div>' +
-      (!item.pass
-        ? '<div class="test-detail">' +
-            'отримано:    <span class="got">'  + JSON.stringify(item.got)  + '</span><br>' +
-            'очікується: <span class="want">' + JSON.stringify(item.want) + '</span>' +
-          '</div>'
-        : '') +
+function renderResult(item,container){
+  var div=document.createElement('div');
+  div.className='test '+(item.pass?'pass':'fail');
+  div.innerHTML=
+    '<span class="badge '+(item.pass?'pass">&#10003; PASS':'fail">&#10007; FAIL')+'</span>'+
+    '<div class="test-body">'+
+      '<div class="test-name">'+item.description+'</div>'+
+      (!item.pass?
+        '<div class="test-detail">'+
+          '&#xe90b;&#xe90b;отримано: <span class="got">'+JSON.stringify(item.got)+'</span><br>'+
+          'очікується: <span class="want">'+JSON.stringify(item.want)+'</span>'+
+        '</div>':'')+
     '</div>';
   container.appendChild(div);
 }
 
-if (!coreOk) {
-  document.getElementById('s-pass').textContent = '?';
-  document.getElementById('s-fail').textContent = '?';
-  document.getElementById('s-total').textContent = '?';
-} else {
+if (coreOk) {
 
-/* ══════════════════════════════════════════════════════════
-   ТЕСТИ q() — екранування RouterOS рядків
-══════════════════════════════════════════════════════════ */
-suite('q() — екранування RouterOS рядків', function(c) {
-  var cases = [
-    ['null → порожній рядок',           q(null),              ''],
-    ['undefined → порожній рядок',       q(undefined),         ''],
-    ['звичайний рядок',                  q('hello'),           'hello'],
-    ['подвійні лапки',                   q('"'),               '\"'],
-    ['рядок з лапками',                  q('say "hi"'),        'say \"hi\"'],
-    ['одинарний бекслеш',                q('\\'),            '\\\\'],
-    ['долар екранується',                q('$var'),            '\$var'],
-    ['кілька доларів',                   q('$a $b'),           '\$a \$b'],
-    ['відсоток — наш патч',              q('100%'),            '100\%'],
-    ['кілька відсотків',                 q('10% off 50%'),     '10\% off 50\%'],
-    ['\n видаляється',                  q('a\nb'),           'ab'],
-    ['\r видаляється',                  q('a\rb'),           'ab'],
-    ['\r\n видаляється',               q('a\r\nb'),        'ab'],
-    ['пароль зі спецсимволами',          q('P@ss"$100%'),      'P@ss\"\$100\%'],
-    ['число як число',                   q(42),                '42'],
-  ];
-  cases.forEach(function(t) {
-    expect(t[0], t[1], t[2]);
-    renderResult(results[results.length-1], c);
-  });
+suite('q() &#8212; екранування RouterOS',function(c){
+  [[null,''],['hello','hello'],['"','\"'],['say "hi"','say \"hi\"'],
+   ['\\','\\\\'],['$var','\$var'],['100%','100\%'],
+   ['P@ss"$100%','P@ss\"\$100\%'],['a\nb','ab'],['a\rb','ab'],[42,'42']
+  ].forEach(function(t){expect(String(t[0]),q(t[0]),t[1]);renderResult(results[results.length-1],c);});
 });
 
-/* ══════════════════════════════════════════════════════════
-   ТЕСТИ isIPv4()
-══════════════════════════════════════════════════════════ */
-suite('isIPv4() — валідація IPv4 адрес', function(c) {
-  var cases = [
-    ['192.168.1.1',        isIPv4('192.168.1.1'),     true],
-    ['0.0.0.0',            isIPv4('0.0.0.0'),          true],
-    ['255.255.255.255',    isIPv4('255.255.255.255'),  true],
-    ['10.0.0.1',           isIPv4('10.0.0.1'),         true],
-    ['256.0.0.1',          isIPv4('256.0.0.1'),        false],
-    ['192.168.1',          isIPv4('192.168.1'),         false],
-    ['192.168.1.1.5',      isIPv4('192.168.1.1.5'),    false],
-    ['abc.def.ghi.jkl',   isIPv4('abc.def.ghi.jkl'),  false],
-    ['порожній рядок',     isIPv4(''),                  false],
-    ['null',               isIPv4(null),                false],
-    ['192.168.-1.1',       isIPv4('192.168.-1.1'),     false],
-  ];
-  cases.forEach(function(t) {
-    expect(t[0], t[1], t[2]);
-    renderResult(results[results.length-1], c);
-  });
+suite('isIPv4() &#8212; валідація IPv4',function(c){
+  [['192.168.1.1',true],['0.0.0.0',true],['255.255.255.255',true],
+   ['256.0.0.1',false],['192.168.1',false],['abc.def.ghi.jkl',false],
+   ['',false],[null,false],['192.168.-1.1',false]
+  ].forEach(function(t){expect(String(t[0]),isIPv4(t[0]),t[1]);renderResult(results[results.length-1],c);});
 });
 
-/* ══════════════════════════════════════════════════════════
-   ТЕСТИ isCIDR()
-══════════════════════════════════════════════════════════ */
-suite('isCIDR() — валідація CIDR нотації', function(c) {
-  var cases = [
-    ['192.168.1.0/24',    isCIDR('192.168.1.0/24'),    true],
-    ['10.0.0.0/8',        isCIDR('10.0.0.0/8'),         true],
-    ['0.0.0.0/0',         isCIDR('0.0.0.0/0'),          true],
-    ['192.168.1.1/32',    isCIDR('192.168.1.1/32'),     true],
-    ['без маски',         isCIDR('192.168.1.1'),         false],
-    ['маска > 32',        isCIDR('192.168.1.0/33'),      false],
-    ['негативна маска',   isCIDR('192.168.1.0/-1'),      false],
-    ['невалідний IP',     isCIDR('256.0.0.1/24'),        false],
-    ['порожній рядок',    isCIDR(''),                    false],
-    ['null',              isCIDR(null),                  false],
-  ];
-  cases.forEach(function(t) {
-    expect(t[0], t[1], t[2]);
-    renderResult(results[results.length-1], c);
-  });
+suite('isCIDR() &#8212; валідація CIDR',function(c){
+  [['192.168.1.0/24',true],['0.0.0.0/0',true],['192.168.1.1/32',true],
+   ['192.168.1.1',false],['192.168.1.0/33',false],['256.0.0.1/24',false],
+   ['',false],[null,false]
+  ].forEach(function(t){expect(String(t[0]),isCIDR(t[0]),t[1]);renderResult(results[results.length-1],c);});
 });
 
-/* ══════════════════════════════════════════════════════════
-   ТЕСТИ isPort()
-══════════════════════════════════════════════════════════ */
-suite('isPort() — валідація портів', function(c) {
-  var cases = [
-    ['80',     isPort(80),     true],
-    ['1',      isPort(1),      true],
-    ['65535',  isPort(65535),  true],
-    ['8080',   isPort(8080),   true],
-    ['0',      isPort(0),      false],
-    ['65536',  isPort(65536),  false],
-    ['-1',     isPort(-1),     false],
-    ['abc',    isPort('abc'),  false],
-  ];
-  cases.forEach(function(t) {
-    expect(t[0], t[1], t[2]);
-    renderResult(results[results.length-1], c);
-  });
+suite('isPort() &#8212; валідація портів',function(c){
+  [[80,true],[1,true],[65535,true],[0,false],[65536,false],[-1,false],['abc',false]
+  ].forEach(function(t){expect(String(t[0]),isPort(t[0]),t[1]);renderResult(results[results.length-1],c);});
 });
 
-/* ══════════════════════════════════════════════════════════
-   ТЕСТИ isMac()
-══════════════════════════════════════════════════════════ */
-suite('isMac() — валідація MAC-адрес', function(c) {
-  var cases = [
-    ['AA:BB:CC:DD:EE:FF',  isMac('AA:BB:CC:DD:EE:FF'), true],
-    ['aa:bb:cc:dd:ee:ff',  isMac('aa:bb:cc:dd:ee:ff'), true],
-    ['AA-BB-CC-DD-EE-FF',  isMac('AA-BB-CC-DD-EE-FF'), true],
-    ['02:00:00:00:00:01',  isMac('02:00:00:00:00:01'), true],
-    ['ZZ:BB:CC:DD:EE:FF',  isMac('ZZ:BB:CC:DD:EE:FF'), false],
-    ['AA:BB:CC:DD:EE',     isMac('AA:BB:CC:DD:EE'),    false],
-    ['порожній рядок',     isMac(''),                   false],
-    ['null',               isMac(null),                 false],
-  ];
-  cases.forEach(function(t) {
-    expect(t[0], t[1], t[2]);
-    renderResult(results[results.length-1], c);
-  });
+suite('isMac() &#8212; валідація MAC-адрес',function(c){
+  [['AA:BB:CC:DD:EE:FF',true],['aa:bb:cc:dd:ee:ff',true],['AA-BB-CC-DD-EE-FF',true],
+   ['ZZ:BB:CC:DD:EE:FF',false],['AA:BB:CC:DD:EE',false],['',false],[null,false]
+  ].forEach(function(t){expect(String(t[0]),isMac(t[0]),t[1]);renderResult(results[results.length-1],c);});
 });
 
-/* ══════════════════════════════════════════════════════════
-   ТЕСТИ calcNet()
-══════════════════════════════════════════════════════════ */
-suite('calcNet() — обчислення мережевої адреси', function(c) {
-  var cases = [
-    ['192.168.1.5/24',    calcNet('192.168.1.5/24'),    '192.168.1.0/24'],
-    ['10.0.0.1/8',        calcNet('10.0.0.1/8'),        '10.0.0.0/8'],
-    ['172.16.5.10/16',    calcNet('172.16.5.10/16'),    '172.16.0.0/16'],
-    ['192.168.88.1/24',   calcNet('192.168.88.1/24'),   '192.168.88.0/24'],
-    ['/32 хост',          calcNet('192.168.1.1/32'),    '192.168.1.1/32'],
-    ['/0 → 0.0.0.0/0',   calcNet('10.10.10.10/0'),     '0.0.0.0/0'],
-    ['вже мережева /24',  calcNet('192.168.1.0/24'),    '192.168.1.0/24'],
-    ['10.0.0.5/30',       calcNet('10.0.0.5/30'),       '10.0.0.4/30'],
-    ['WireGuard /24',     calcNet('10.20.30.1/24'),     '10.20.30.0/24'],
-    ['OpenVPN /24',       calcNet('10.10.10.1/24'),     '10.10.10.0/24'],
-  ];
-  cases.forEach(function(t) {
-    expect(t[0], t[1], t[2]);
-    renderResult(results[results.length-1], c);
-  });
+suite('calcNet() &#8212; мережева адреса',function(c){
+  [['192.168.1.5/24','192.168.1.0/24'],['10.0.0.1/8','10.0.0.0/8'],
+   ['172.16.5.10/16','172.16.0.0/16'],['192.168.1.1/32','192.168.1.1/32'],
+   ['10.10.10.10/0','0.0.0.0/0'],['10.0.0.5/30','10.0.0.4/30']
+  ].forEach(function(t){expect(t[0],calcNet(t[0]),t[1]);renderResult(results[results.length-1],c);});
 });
 
-/* ── Підсумок ── */
-var passed = results.filter(function(r) { return r.pass; }).length;
-var failed = results.length - passed;
-var pct    = Math.round(passed / results.length * 100);
-
-document.getElementById('s-pass').textContent  = passed;
-document.getElementById('s-fail').textContent  = failed;
-document.getElementById('s-total').textContent = results.length;
-document.getElementById('s-time').textContent  = pct + '% успішно';
-
-var fill = document.getElementById('progress');
-fill.style.width = pct + '%';
-fill.style.background = failed === 0 ? 'var(--pass)' : 'var(--fail)';
-
-} /* end if coreOk */
+var passed=results.filter(function(r){return r.pass;}).length;
+var failed=results.length-passed;
+var pct=Math.round(passed/results.length*100);
+document.getElementById('s-pass').textContent=passed;
+document.getElementById('s-fail').textContent=failed;
+document.getElementById('s-total').textContent=results.length;
+document.getElementById('s-time').textContent=pct+'% успішно';
+var fill=document.getElementById('progress');
+fill.style.width=pct+'%';
+fill.style.background=failed===0?'var(--pass)':'var(--fail)';
+}
 </script>
 </body>
 </html>

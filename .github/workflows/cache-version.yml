@@ -8,36 +8,35 @@ on:
       - 'core.js'
 
 jobs:
-  update-cache-version:
+  update:
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update CACHE_VERSION
+      - name: Calc version and update sw.js
         run: |
           VERSION=$(python3 -c "
           import hashlib
           with open('index.html','rb') as f:
-              h = hashlib.md5(f.read()).hexdigest()[:8]
-          print(int(h, 16) % 9999 + 1)
+            h = hashlib.md5(f.read()).hexdigest()[:8]
+          print(int(h,16) % 9999 + 1)
           ")
-          echo "New version: $VERSION"
-          sed -i "s/const CACHE_NAME *= *'mt-config-v[0-9]*'/const CACHE_NAME    = 'mt-config-v${VERSION}'/" sw.js
+          echo "VERSION=$VERSION"
+          sed -i "s/const CACHE_NAME *= *'mt-config-v[0-9]*'/const CACHE_NAME = 'mt-config-v${VERSION}'/" sw.js
           sed -i "s/const CACHE_VERSION *= *[0-9]*/const CACHE_VERSION = ${VERSION}/" sw.js
-          cat sw.js | grep -E "CACHE_(NAME|VERSION)"
+          grep "CACHE_" sw.js
 
       - name: Commit if changed
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
           if git diff --quiet sw.js; then
-            echo "No changes"
+            echo "No changes — skip"
           else
             git add sw.js
             git commit -m "ci: CACHE_VERSION auto-update [skip ci]"

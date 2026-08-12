@@ -5536,6 +5536,324 @@ function highlightRos(rawText) {
   }
 
 })();
+
+/* ============================================================
+   PATCH 19 — ipsecpolicies / ovpnrange / ovpnusers
+   ============================================================ */
+(function() {
+  'use strict';
+
+  /* Використовуємо глобальні функції з core.js */
+  function _isIPv4(v)  { return typeof isIPv4 === 'function' ? isIPv4(v)  : false; }
+  function _isCIDR(v)  { return typeof isCIDR === 'function' ? isCIDR(v)  : false; }
+
+  /* --- UI утиліти --- */
+  function getOrCreate(parent, cls) {
+    var el = parent.parentNode
+      ? parent.parentNode.querySelector('.' + cls)
+      : null;
+    if (!el) {
+      el = document.createElement('div');
+      el.className = cls;
+      if (parent.parentNode) parent.parentNode.appendChild(el);
+    }
+    return el;
+  }
+
+  function showErrors(el, errors) {
+    el.classList.remove('ta-valid');
+    el.classList.add('ta-invalid');
+    var errEl = getOrCreate(el, 'ta-error-list');
+    errEl.style.borderColor = '';
+    errEl.style.color       = '';
+    errEl.style.background  = '';
+    errEl.innerHTML = errors.map(function(e) {
+      return '&#10007; ' + e;
+    }).join('<br>');
+    errEl.classList.add('visible');
+    var okEl = getOrCreate(el, 'ta-ok-msg');
+    okEl.classList.remove('visible');
+  }
+
+  function showWarn(el, warns) {
+    el.classList.remove('ta-valid', 'ta-invalid');
+    el.classList.add('ta-invalid');
+    var errEl = getOrCreate(el, 'ta-error-list');
+    errEl.style.borderColor = '#e6b35a';
+    errEl.style.color       = '#e6b35a';
+    errEl.style.background  = 'rgba(230,179,90,.10)';
+    errEl.innerHTML = warns.map(function(e) {
+      return '&#9888; ' + e;
+    }).join('<br>');
+    errEl.classList.add('visible');
+    var okEl = getOrCreate(el, 'ta-ok-msg');
+    okEl.classList.remove('visible');
+  }
+
+  function showOk(el, msg) {
+    el.classList.remove('ta-invalid');
+    el.classList.add('ta-valid');
+    var errEl = getOrCreate(el, 'ta-error-list');
+    errEl.classList.remove('visible');
+    var okEl = getOrCreate(el, 'ta-ok-msg');
+    okEl.textContent = '&#10003; ' + (msg || 'Все вірно');
+    okEl.classList.add('visible');
+  }
+
+  function clearState(el) {
+    el.classList.remove('ta-invalid', 'ta-valid');
+    ['ta-error-list', 'ta-ok-msg'].forEach(function(cls) {
+      var e = el.parentNode ? el.parentNode.querySelector('.' + cls) : null;
+      if (e) { e.classList.remove('visible'); e.textContent = ''; }
+    });
+  }
+
+  /* ── [1] IPsec Policies ───────────────────────────────────
+     Формат: peer:src_net:dst_net [3]
+     Приклад: peer1:10.1.0.0/24:10.2.0.0/24
+  ────────────────────────────────────────────────────────── */
+  function validateIpsecPolicies(textarea) {
+    var raw = textarea.value.trim();
+    if (!raw) { clearState(textarea); return; }
+
+    var lines  = raw.split('\n');
+    var errors = [];
+    var warns  = [];
+    var valid  = 0;
+
+    lines.forEach(function(line, i) {
+      var val = line.trim();
+      if (!val || val.charAt(0) === '#') return;
+
+      var num   = i + 1;
+      var parts = val.split(':');
+
+      if (parts.length < 3) {
+        errors.push(
+          'Рядок ' + num + ': формат — peer:src_net:dst_net' +
+          ' (наприклад peer1:10.1.0.0/24:10.2.0.0/24)'
+        );
+        return;
+      }
+
+      var peer   = parts[0].trim();
+      var srcNet = parts[1].trim();
+      var dstNet = parts[2].trim();
+
+      if (!peer) {
+        errors.push('Рядок ' + num + ': ім\'я peer не може бути порожнім');
+      }
+
+      if (!_isCIDR(srcNet)) {
+        errors.push(
+          'Рядок ' + num + ': src_net "' + srcNet +
+          '" — має бути CIDR (наприклад 10.1.0.0/24)'
+        );
+      }
+
+      if (!_isCIDR(dstNet)) {
+        errors.push(
+          'Рядок ' + num + ': dst_net "' + dstNet +
+          '" — має бути CIDR (наприклад 10.2.0.0/24)'
+        );
+      }
+
+      /* Попередження якщо src і dst однакові */
+      if (_isCIDR(srcNet) && _isCIDR(dstNet) && srcNet === dstNet) {
+        warns.push(
+          'Рядок ' + num + ': src_net та dst_net однакові (' + srcNet + ') — ' +
+          'це може бути помилкою конфігурації'
+        );
+      }
+
+      if (peer && _isCIDR(srcNet) && _isCIDR(dstNet)) {
+        valid++;
+      }
+    });
+
+    if (errors.length) {
+      showErrors(textarea, errors);
+    } else if (warns.length) {
+      showWarn(textarea, warns);
+    } else {
+      showOk(textarea, 'IPsec Policies (' + valid + ' шт.) — коректні');
+    }
+  }
+
+  /* ── [2] OpenVPN діапазон клієнтів — ovpnrange ────────────
+     Формат: IP-IP [3]
+     Приклад: 10.10.10.2-10.10.10.254
+  ────────────────────────────────────────────────────────── */
+  function validateOvpnRange(input) {
+    var val = input.value.trim();
+    if (!val) { clearState(input); return; }
+
+    var parts = val.split('-');
+
+    if (parts.length !== 2) {
+      showErrors(input, [
+        'Формат: IP_початок-IP_кінець (наприклад 10.10.10.2-10.10.10.254)'
+      ]);
+      return;
+    }
+
+    var start = parts[0].trim();
+    var end   = parts[1].trim();
+    var errors = [];
+
+    if (!_isIPv4(start)) {
+      errors.push('Початок діапазону "' + start + '" — некоректна IPv4-адреса');
+    }
+    if (!_isIPv4(end)) {
+      errors.push('Кінець діапазону "' + end + '" — некоректна IPv4-адреса');
+    }
+
+    if (!errors.length) {
+      /* Перевірка що кінець > початок */
+      var startParts = start.split('.').map(Number);
+      var endParts   = end.split('.').map(Number);
+      var startInt   = (startParts[0]<<24)|(startParts[1]<<16)|
+                       (startParts[2]<<8)|startParts[3];
+      var endInt     = (endParts[0]<<24)|(endParts[1]<<16)|
+                       (endParts[2]<<8)|endParts[3];
+
+      if (endInt <= startInt) {
+        errors.push(
+          'Кінець діапазону (' + end + ') має бути більше початку (' + start + ')'
+        );
+      }
+
+      /* Перевірка що в одній мережі /24 */
+      var sameNet = (
+        startParts[0] === endParts[0] &&
+        startParts[1] === endParts[1] &&
+        startParts[2] === endParts[2]
+      );
+      if (!sameNet) {
+        errors.push(
+          'Початок (' + start + ') і кінець (' + end + ') — ' +
+          'в різних мережах /24. Діапазон має бути в одній підмережі.'
+        );
+      }
+    }
+
+    if (errors.length) {
+      showErrors(input, errors);
+    } else {
+      showOk(input, 'Діапазон ' + start + ' — ' + end + ' коректний');
+    }
+  }
+
+  /* ── [3] OpenVPN користувачі — ovpnusers ──────────────────
+     Формат: логін:пароль [3]
+     Приклад: vpnuser:СкладнийПароль
+  ────────────────────────────────────────────────────────── */
+  function validateOvpnUsers(textarea) {
+    var raw = textarea.value.trim();
+    if (!raw) { clearState(textarea); return; }
+
+    var lines  = raw.split('\n');
+    var errors = [];
+    var warns  = [];
+    var valid  = 0;
+    var logins = {};
+
+    lines.forEach(function(line, i) {
+      var val = line.trim();
+      if (!val || val.charAt(0) === '#') return;
+
+      var num     = i + 1;
+      var colonIdx = val.indexOf(':');
+
+      if (colonIdx < 1) {
+        errors.push(
+          'Рядок ' + num + ': формат — логін:пароль' +
+          ' (наприклад vpnuser:МійПароль123)'
+        );
+        return;
+      }
+
+      var login    = val.slice(0, colonIdx).trim();
+      var password = val.slice(colonIdx + 1).trim();
+
+      /* Валідація логіну */
+      if (!login) {
+        errors.push('Рядок ' + num + ': логін не може бути порожнім');
+      } else if (!/^[a-zA-Z0-9_\.\-]+$/.test(login)) {
+        errors.push(
+          'Рядок ' + num + ': логін "' + login +
+          '" — лише a-z, 0-9, _, ., -'
+        );
+      } else if (logins[login]) {
+        errors.push('Рядок ' + num + ': дублікат логіну "' + login + '"');
+      } else {
+        logins[login] = true;
+      }
+
+      /* Валідація паролю */
+      if (!password) {
+        errors.push('Рядок ' + num + ': пароль не може бути порожнім');
+      } else if (password.length < 8) {
+        errors.push(
+          'Рядок ' + num + ': пароль "' + login + '" — мінімум 8 символів ' +
+          '(зараз: ' + password.length + ')'
+        );
+      } else if (password.length < 12) {
+        warns.push(
+          'Рядок ' + num + ': пароль "' + login + '" — ' +
+          'рекомендовано 12+ символів для VPN'
+        );
+      }
+
+      /* Слабкі паролі */
+      var weakPasswords = ['password', '12345678', 'qwerty123', 'admin123'];
+      if (weakPasswords.includes(password.toLowerCase())) {
+        errors.push(
+          'Рядок ' + num + ': пароль "' + login + '" — ' +
+          'занадто простий, використай складніший'
+        );
+      }
+
+      if (login && /^[a-zA-Z0-9_\.\-]+$/.test(login) &&
+          password && password.length >= 8 &&
+          !weakPasswords.includes(password.toLowerCase())) {
+        valid++;
+      }
+    });
+
+    if (errors.length) {
+      showErrors(textarea, errors);
+    } else if (warns.length) {
+      showWarn(textarea, warns);
+    } else {
+      showOk(textarea, 'Користувачі (' + valid + ' шт.) — коректні');
+    }
+  }
+
+  /* ── Підключення ─────────────────────────────────────── */
+  function attach(id, validator, isInput) {
+    var el = document.getElementById(id);
+    if (!el) return false;
+    var evt = isInput ? 'input' : 'input';
+    el.addEventListener(evt,   function() { validator(el); });
+    el.addEventListener('blur', function() { validator(el); });
+    if (el.value && el.value.trim()) validator(el);
+    return true;
+  }
+
+  function init() {
+    attach('ipsecpolicies', validateIpsecPolicies);
+    attach('ovpnrange',     validateOvpnRange, true);
+    attach('ovpnusers',     validateOvpnUsers);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+})();
 </script>
 
 <div class="card diff-wrap">

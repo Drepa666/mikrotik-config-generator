@@ -2484,7 +2484,7 @@ function render() {
   let lanInterface = 'bridge-lan';
 
   lines.push('');
-  lines.push('# --- LAN ---');
+  lines.push('# LAN');
 
   if (model.single) {
     lanInterface = wanInterface;
@@ -2731,7 +2731,7 @@ function render() {
     lines.push('');
 
     if (!password) {
-      lines.push('# --- Wi-Fi ---');
+      lines.push('# Wi-Fi');
       lines.push('# ⚠ Пароль Wi‑Fi не задано. Wi‑Fi-блок не згенеровано.');
     } else if (model.wifi === 'legacy') {
       lines.push('# --- Wi-Fi legacy (wireless) ---');
@@ -6433,7 +6433,7 @@ function highlightRos(rawText) {
     }
 
     /* Додаємо нові секції в кінець output */
-    var out = document.getElementById('out');
+    var out = document.getElementById('output');
     if (!out) return;
 
     var extra = [];
@@ -6443,19 +6443,19 @@ function highlightRos(rawText) {
     extra.push.apply(extra, genVlanTrunk());
 
     if (extra.length) {
-      out.value = out.value + '\n' + extra.join('\n');
+      out.textContent = out.textContent + '\n' + extra.join('\n');
     }
 
     /* Оновлюємо лічильник рядків */
-    updateLineCounter(out);
+    updateLineCounter(document.getElementById('output'));
   };
 
   /* ── [B] Прогрес-бар + Лічильник рядків ──────────────────── */
   function updateLineCounter(out) {
     var counter = document.getElementById('line-counter');
     if (!counter || !out) return;
-    var lines = out.value ? out.value.split('\n').length : 0;
-    var chars = out.value ? out.value.length : 0;
+    var lines = out.textContent ? out.textContent.split('\n').length : 0;
+    var chars = out.textContent ? out.textContent.length : 0;
     counter.textContent = lines + ' рядків | ' + chars.toLocaleString() + ' символів';
   }
 
@@ -6478,21 +6478,21 @@ function highlightRos(rawText) {
 
   /* ── [B] Кнопки копіювання секцій ────────────────────────── */
   var SECTIONS = [
-    { label: '📋 LAN',        marker: '# --- LAN ---' },
-    { label: '📋 WAN',        marker: '# --- WAN ---' },
-    { label: '📋 Wi-Fi',      marker: '# --- Wi-Fi ---' },
-    { label: '📋 Firewall',   marker: '# --- Firewall' },
-    { label: '📋 WireGuard',  marker: '# --- WireGuard' },
-    { label: '📋 OpenVPN',    marker: '# --- OpenVPN' },
-    { label: '📋 IPsec',      marker: '# --- IPsec' },
-    { label: '📋 Routes',     marker: '# --- Статичні' },
+    { label: '📋 LAN',        marker: '# LAN' },
+    { label: '📋 WAN',        marker: '# WAN' },
+    { label: '📋 Wi-Fi',      marker: '# Wi-Fi' },
+    { label: '📋 Firewall',   marker: '# Firewall' },
+    { label: '📋 WireGuard',  marker: '# WireGuard' },
+    { label: '📋 OpenVPN',    marker: '# OpenVPN' },
+    { label: '📋 IPsec',      marker: '# IPsec' },
+    { label: '📋 Routes',     marker: '# Routes' },
   ];
 
   function copySection(marker) {
-    var out = document.getElementById('out');
-    if (!out || !out.value) return;
+    var out = document.getElementById('output');
+    if (!out || !out.textContent) return;
 
-    var lines = out.value.split('\n');
+    var lines = out.textContent.split('\n');
     var start = -1;
     var end   = lines.length;
 

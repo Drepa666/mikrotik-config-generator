@@ -1,8 +1,8 @@
 /* MikroTik Config Generator - Service Worker */
 'use strict';
 
-const CACHE_NAME    = 'mt-config-v3755';
-const CACHE_VERSION = 3755;
+const CACHE_NAME    = 'mt-config-v923';
+const CACHE_VERSION = 923;
 
 const PRECACHE_ASSETS = [
   './',

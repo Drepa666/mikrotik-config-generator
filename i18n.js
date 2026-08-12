@@ -1,6 +1,7 @@
 /* ============================================================
    i18n.js — Мультимовність UI
    UA | EN | PL | DE
+   Виправлені ID: btn-dl, btn-validate, btn-strip, btn-ai-gen
    ============================================================ */
 'use strict';
 
@@ -8,7 +9,6 @@ var I18N = {
   uk: {
     name: '🇺🇦 UA',
     translations: {
-      /* Кнопки */
       'btn-save':            '💾 Зберегти налаштування',
       'btn-load':            '📂 Завантажити',
       'btn-reset':           '🔄 Скинути',
@@ -17,10 +17,21 @@ var I18N = {
       'btn-verify':          '🔍 Перевірити',
       'btn-minimize':        '✂️ Мінімізувати',
       'btn-aigen':           'Генерувати (AI)',
+      'pre-home':            '🏠 Дім',
+      'pre-office':          '🏢 Офіс',
+      'pre-lte':             '📶 LTE',
+      'btn-install':         '📲 Встановити',
+      'btn-key-save':        'Зберегти',
+      'btn-key-show':        'Показати',
+      'btn-key-test':        'Тест',
+      'btn-parse':           'Розібрати офлайн',
+      'btn-fill':            'Заповнити форму',
+      'btn-explain':         'Пояснити (AI)',
+      'btn-diff':            '🔍 Порівняти',
+      'btn-diff-clear':      '✖ Очистити',
       'wizard-btn':          '🧙 Майстер',
       'topo-btn':            '🗺️ Топологія',
       'tmpl-btn':            '📚 Шаблони',
-      /* Секції */
       'section-profiles':    'Профілі та налаштування',
       'section-ai':          'AI-генерація команд',
       'section-model':       'Модель роутера',
@@ -43,7 +54,6 @@ var I18N = {
       'section-custom':      'Власні команди (AI або вручну)',
       'section-diff':        'Diff .rsc файлів',
       'section-rsc':         'Аналіз .rsc файлу',
-      /* Labels */
       'lbl-hostname':        "Ім'я роутера",
       'lbl-timezone':        'Часовий пояс',
       'lbl-wanif':           'WAN-інтерфейс',
@@ -57,7 +67,6 @@ var I18N = {
       'lbl-netwatchint':     'Інтервал',
       'lbl-aitask':          'Опис задачі',
       'lbl-aicmd':           'Команди RouterOS',
-      /* Чекбокси */
       'chk-backup':          'Резервна копія перед змінами',
       'chk-safetynet':       'Запобіжник від блокування (авто-відкат)',
       'chk-ddns':            'Cloud DDNS',
@@ -107,6 +116,18 @@ var I18N = {
       'btn-verify':          '🔍 Verify',
       'btn-minimize':        '✂️ Minimize',
       'btn-aigen':           'Generate (AI)',
+      'pre-home':            '🏠 Home',
+      'pre-office':          '🏢 Office',
+      'pre-lte':             '📶 LTE',
+      'btn-install':         '📲 Install',
+      'btn-key-save':        'Save',
+      'btn-key-show':        'Show',
+      'btn-key-test':        'Test',
+      'btn-parse':           'Parse offline',
+      'btn-fill':            'Fill form',
+      'btn-explain':         'Explain (AI)',
+      'btn-diff':            '🔍 Compare',
+      'btn-diff-clear':      '✖ Clear',
       'wizard-btn':          '🧙 Wizard',
       'topo-btn':            '🗺️ Topology',
       'tmpl-btn':            '📚 Templates',
@@ -194,6 +215,18 @@ var I18N = {
       'btn-verify':          '🔍 Weryfikuj',
       'btn-minimize':        '✂️ Minimalizuj',
       'btn-aigen':           'Generuj (AI)',
+      'pre-home':            '🏠 Dom',
+      'pre-office':          '🏢 Biuro',
+      'pre-lte':             '📶 LTE',
+      'btn-install':         '📲 Zainstaluj',
+      'btn-key-save':        'Zapisz',
+      'btn-key-show':        'Pokaż',
+      'btn-key-test':        'Test',
+      'btn-parse':           'Analizuj offline',
+      'btn-fill':            'Wypełnij formularz',
+      'btn-explain':         'Wyjaśnij (AI)',
+      'btn-diff':            '🔍 Porównaj',
+      'btn-diff-clear':      '✖ Wyczyść',
       'wizard-btn':          '🧙 Kreator',
       'topo-btn':            '🗺️ Topologia',
       'tmpl-btn':            '📚 Szablony',
@@ -281,6 +314,18 @@ var I18N = {
       'btn-verify':          '🔍 Prüfen',
       'btn-minimize':        '✂️ Minimieren',
       'btn-aigen':           'Generieren (KI)',
+      'pre-home':            '🏠 Zuhause',
+      'pre-office':          '🏢 Büro',
+      'pre-lte':             '📶 LTE',
+      'btn-install':         '📲 Installieren',
+      'btn-key-save':        'Speichern',
+      'btn-key-show':        'Anzeigen',
+      'btn-key-test':        'Test',
+      'btn-parse':           'Offline analysieren',
+      'btn-fill':            'Formular ausfüllen',
+      'btn-explain':         'Erklären (KI)',
+      'btn-diff':            '🔍 Vergleichen',
+      'btn-diff-clear':      '✖ Löschen',
       'wizard-btn':          '🧙 Assistent',
       'topo-btn':            '🗺️ Topologie',
       'tmpl-btn':            '📚 Vorlagen',
@@ -370,35 +415,67 @@ function t(key) {
 /* ── Застосувати всі переклади ── */
 function applyTranslations() {
 
+  /* ── Кнопки — ПРАВИЛЬНІ ID з index.html ── */
+  var btnMap = [
+    { id: 'btn-save',        key: 'btn-save' },
+    { id: 'btn-reset',       key: 'btn-reset' },
+    { id: 'btn-copy',        key: 'btn-copy' },
+    { id: 'btn-dl',          key: 'btn-download' },
+    { id: 'btn-validate',    key: 'btn-verify' },
+    { id: 'btn-strip',       key: 'btn-minimize' },
+    { id: 'btn-ai-gen',      key: 'btn-aigen' },
+    { id: 'pre-home',        key: 'pre-home' },
+    { id: 'pre-office',      key: 'pre-office' },
+    { id: 'pre-lte',         key: 'pre-lte' },
+    { id: 'pwa-install-btn', key: 'btn-install' },
+    { id: 'btn-key-save',    key: 'btn-key-save' },
+    { id: 'btn-key-show',    key: 'btn-key-show' },
+    { id: 'btn-key-test',    key: 'btn-key-test' },
+    { id: 'btn-parse',       key: 'btn-parse' },
+    { id: 'btn-fill',        key: 'btn-fill' },
+    { id: 'btn-explain',     key: 'btn-explain' },
+    { id: 'btn-diff',        key: 'btn-diff' },
+    { id: 'btn-diff-clear',  key: 'btn-diff-clear' },
+    { id: 'wizard-btn',      key: 'wizard-btn' },
+    { id: 'topo-btn',        key: 'topo-btn' },
+    { id: 'tmpl-btn',        key: 'tmpl-btn' },
+  ];
+
+  btnMap.forEach(function(m) {
+    var el = document.getElementById(m.id);
+    if (el) el.textContent = t(m.key);
+  });
+
   /* ── Заголовки секцій h2 ── */
   var h2Map = [
-    { text: 'Профілі',          key: 'section-profiles' },
-    { text: 'AI-генерація',     key: 'section-ai' },
-    { text: 'Модель роутера',   key: 'section-model' },
-    { text: 'Загальне',         key: 'section-general' },
-    { text: 'WAN',              key: 'section-wan' },
-    { text: 'Резервний WAN',    key: 'section-failover' },
-    { text: 'LAN',              key: 'section-lan' },
-    { text: 'DNS та NAT',       key: 'section-dns' },
-    { text: 'Wi-Fi',            key: 'section-wifi' },
-    { text: 'CAPsMAN',          key: 'section-capsman' },
-    { text: 'Гостьова мережа',  key: 'section-guest' },
-    { text: 'WireGuard',        key: 'section-wg' },
-    { text: 'OpenVPN сервер',   key: 'section-ovpn' },
-    { text: 'OpenVPN клієнт',   key: 'section-ovpnclient' },
-    { text: 'IPsec',            key: 'section-ipsec' },
-    { text: 'Address-List',     key: 'section-addrlist' },
-    { text: 'Статичні маршрути',key: 'section-routes' },
-    { text: 'Фаєрвол',         key: 'section-fw' },
-    { text: 'NTP та моніторинг',key: 'section-ntp' },
-    { text: 'Власні команди',   key: 'section-custom' },
-    { text: 'Diff',             key: 'section-diff' },
-    { text: 'Аналіз .rsc',     key: 'section-rsc' },
+    { text: 'Профілі',           key: 'section-profiles' },
+    { text: 'AI-генерація',      key: 'section-ai' },
+    { text: 'Модель роутера',    key: 'section-model' },
+    { text: 'Загальне',          key: 'section-general' },
+    { text: 'WAN',               key: 'section-wan' },
+    { text: 'Резервний WAN',     key: 'section-failover' },
+    { text: 'LAN',               key: 'section-lan' },
+    { text: 'DNS та NAT',        key: 'section-dns' },
+    { text: 'Wi-Fi',             key: 'section-wifi' },
+    { text: 'CAPsMAN',           key: 'section-capsman' },
+    { text: 'Гостьова мережа',   key: 'section-guest' },
+    { text: 'WireGuard',         key: 'section-wg' },
+    { text: 'OpenVPN сервер',    key: 'section-ovpn' },
+    { text: 'OpenVPN клієнт',    key: 'section-ovpnclient' },
+    { text: 'IPsec',             key: 'section-ipsec' },
+    { text: 'Address-List',      key: 'section-addrlist' },
+    { text: 'Статичні маршрути', key: 'section-routes' },
+    { text: 'Фаєрвол',          key: 'section-fw' },
+    { text: 'NTP та моніторинг', key: 'section-ntp' },
+    { text: 'Власні команди',    key: 'section-custom' },
+    { text: 'Diff',              key: 'section-diff' },
+    { text: 'Аналіз .rsc',      key: 'section-rsc' },
   ];
 
   document.querySelectorAll('h2').forEach(function(h2) {
     h2Map.forEach(function(m) {
-      if (h2.textContent.trim().indexOf(m.text.substring(0, 8)) === 0) {
+      var txt = h2.textContent.trim();
+      if (txt.indexOf(m.text.substring(0, 8)) === 0) {
         var badge = h2.querySelector('.badge');
         var badgeHtml = badge ? ' ' + badge.outerHTML : '';
         h2.innerHTML = t(m.key) + badgeHtml;
@@ -428,7 +505,7 @@ function applyTranslations() {
     { id: 'dhcpenable',       key: 'chk-dhcp' },
     { id: 'dnsprotect',       key: 'chk-dnsprotect' },
     { id: 'allowremote',      key: 'chk-allowremote' },
-    { id: 'staticdns',        key: 'chk-staticdns' },
+    { id: 'dnsstaticenable',  key: 'chk-staticdns' },
     { id: 'pfwenable',        key: 'chk-portfw' },
     { id: 'wifienable',       key: 'chk-wifi' },
     { id: 'band24',           key: 'chk-band24' },
@@ -438,7 +515,7 @@ function applyTranslations() {
     { id: 'guestwifi',        key: 'chk-guestwifi' },
     { id: 'wgenable',         key: 'chk-wg' },
     { id: 'ovpnenable',       key: 'chk-ovpn' },
-    { id: 'ovpnclientenable', key: 'chk-ovpnclient' },
+    { id: 'ovpnclenable',     key: 'chk-ovpnclient' },
     { id: 'ipsecenable',      key: 'chk-ipsec' },
     { id: 'addrlistenable',   key: 'chk-addrlist' },
     { id: 'routesenable',     key: 'chk-routes' },
@@ -452,53 +529,32 @@ function applyTranslations() {
 
   /* ── Labels для input полів ── */
   var lblMap = [
-    { id: 'hostname',      key: 'lbl-hostname' },
-    { id: 'timezone',      key: 'lbl-timezone' },
-    { id: 'adminpass',     key: 'lbl-adminpass' },
-    { id: 'wanif',         key: 'lbl-wanif' },
-    { id: 'wantype',       key: 'lbl-wantype' },
-    { id: 'lanip',         key: 'lbl-lanip' },
-    { id: 'lanports',      key: 'lbl-lanports' },
-    { id: 'ssid',          key: 'lbl-ssid' },
-    { id: 'wifipass',      key: 'lbl-password' },
-    { id: 'netwatchhost',  key: 'lbl-netwatchhost' },
+    { id: 'hostname',         key: 'lbl-hostname' },
+    { id: 'timezone',         key: 'lbl-timezone' },
+    { id: 'adminpass',        key: 'lbl-adminpass' },
+    { id: 'wanif',            key: 'lbl-wanif' },
+    { id: 'wantype',          key: 'lbl-wantype' },
+    { id: 'lanip',            key: 'lbl-lanip' },
+    { id: 'lanports',         key: 'lbl-lanports' },
+    { id: 'ssid',             key: 'lbl-ssid' },
+    { id: 'wifipass',         key: 'lbl-password' },
+    { id: 'netwatchhost',     key: 'lbl-netwatchhost' },
     { id: 'netwatchinterval', key: 'lbl-netwatchint' },
-    { id: 'aitask',        key: 'lbl-aitask' },
-    { id: 'aicmd',         key: 'lbl-aicmd' },
+    { id: 'aitask',           key: 'lbl-aitask' },
+    { id: 'aicmd',            key: 'lbl-aicmd' },
   ];
 
   lblMap.forEach(function(m) {
     var input = document.getElementById(m.id);
     if (!input) return;
-    /* Шукаємо label в батьківському div */
     var parent = input.parentNode;
     var label = parent ? parent.querySelector('label') : null;
-    if (!label && parent) {
-      label = parent.parentNode ? parent.parentNode.querySelector('label') : null;
+    if (!label && parent && parent.parentNode) {
+      label = parent.parentNode.querySelector('label');
     }
     if (label) label.textContent = t(m.key);
   });
 
-  /* ── Кнопки ── */
-  var btnMap = [
-    { id: 'btn-save',    key: 'btn-save' },
-    { id: 'btn-reset',   key: 'btn-reset' },
-    { id: 'btn-copy',    key: 'btn-copy' },
-    { id: 'btn-download',key: 'btn-download' },
-    { id: 'btn-verify',  key: 'btn-verify' },
-    { id: 'btn-minimize',key: 'btn-minimize' },
-    { id: 'btn-ai',      key: 'btn-aigen' },
-    { id: 'wizard-btn',  key: 'wizard-btn' },
-    { id: 'topo-btn',    key: 'topo-btn' },
-    { id: 'tmpl-btn',    key: 'tmpl-btn' },
-  ];
-
-  btnMap.forEach(function(m) {
-    var el = document.getElementById(m.id);
-    if (el) el.textContent = t(m.key);
-  });
-
-  /* Зберегти мову */
   localStorage.setItem('mt-lang', currentLang);
 }
 

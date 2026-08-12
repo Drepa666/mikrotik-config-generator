@@ -2,3 +2,4 @@
 patch*.py
 *.bak
 index.backup*.html
+sw.backup*.js

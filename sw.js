@@ -9,6 +9,7 @@ const PRECACHE_ASSETS = [
   './index.html',
   './core.js',
   './validators.js',
+  './sections.js',
   './manifest.webmanifest'
 ];
 

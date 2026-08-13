@@ -1,4 +1,4 @@
-/* ============================================================
+content = r"""/* ============================================================
    backup-scheduler.js — Patch 34C v2
    Генерує повний .rsc що імпортується через /import
    ============================================================ */
@@ -28,24 +28,16 @@ function generateBackupScript(opts) {
   };
   var interval = intervalMap[days] || '1d';
 
-  /* ── Тіло скрипту ── */
+  /* ── Тіло скрипту (кожен рядок окремо) ── */
   var src = [];
 
-  src.push(':local bname "' + prefix + '"');
+  src.push(':local date [/system clock get date]');
+  src.push(':local time [/system clock get time]');
+  src.push(':set time [:pick $time 0 5]');
+  src.push(':set time [:convert from=text to=text $time]');
+  src.push(':local bname ("' + prefix + '-" . $date)');
   src.push(':local fname ($bname . ".backup")');
   src.push(':local rname ($bname . ".rsc")');
-  src.push('');
-  src.push(':log info "Backup started..."');
-  src.push('/system backup save name=$bname dont-encrypt=yes');
-  src.push(':delay 5s');
-  src.push('/export file=$bname');
-  src.push(':delay 5s');
-  src.push('');
-  src.push(':local chk [/file find name=$rname]');
-  src.push(':if ([:len $chk] = 0) do={');
-  src.push('  :log error "Export FAILED!"');
-  src.push('  :error "export failed"');
-  src.push('}');
   src.push('');
   src.push('# Зберегти backup');
   src.push('/system backup save name=$bname dont-encrypt=yes');
@@ -58,8 +50,14 @@ function generateBackupScript(opts) {
   /* FTP */
   if (method === 'ftp' && ftpHost) {
     src.push('');
-    src.push('/tool fetch address="' + ftpHost + '" src-path=$rname dst-path="' + ftpDir + '/" user="' + ftpUser + '" password="' + ftpPass + '" upload=yes mode=ftp');
-    src.push(':log info ("FTP upload OK: " . $rname)');
+    src.push('# Відправити на FTP');
+    src.push('/tool fetch address="' + ftpHost + '" src-path=$fname \\');
+    src.push('  dst-path="' + ftpDir + '/" user="' + ftpUser + '" \\');
+    src.push('  password="' + ftpPass + '" upload=yes mode=ftp');
+    src.push('/tool fetch address="' + ftpHost + '" src-path=$rname \\');
+    src.push('  dst-path="' + ftpDir + '/" user="' + ftpUser + '" \\');
+    src.push('  password="' + ftpPass + '" upload=yes mode=ftp');
+    src.push(':log info ("FTP upload OK: " . $fname)');
   }
 
   /* Email */
@@ -76,11 +74,16 @@ function generateBackupScript(opts) {
   /* Google Drive */
   if (method === 'gdrive' && gdriveUrl) {
     src.push('');
+    src.push('# Відправити на Google Drive через Apps Script');
     src.push(':local gurl "' + gdriveUrl + '"');
     src.push(':local rcontent [/file get $rname contents]');
     src.push(':local b64 [:convert from=raw to=base64 $rcontent]');
-    src.push('/tool fetch url=$gurl mode=https http-method=post http-data=("filename=" . $rname . "&content=" . $b64) output=none');
-    src.push(':log info ("Google Drive OK: " . $rname)');
+    src.push('/tool fetch url=$gurl \\');
+    src.push('  http-method=post \\');
+    src.push('  http-header-field="Content-Type: application/x-www-form-urlencoded" \\');
+    src.push('  http-data=("filename=" . $rname . "&content=" . $b64) \\');
+    src.push('  output=none');
+    src.push(':log info ("Google Drive upload OK: " . $rname)');
   }
 
   /* MikroTik Cloud */
@@ -94,7 +97,6 @@ function generateBackupScript(opts) {
   /* Видалення старих файлів */
   src.push('');
   src.push('# Видалити старі файли (зберігати ' + keepMax + ')');
-  src.push('');
   src.push(':local bfiles [/file find name~"' + prefix + '" name~".backup"]');
   src.push(':local bcnt [:len $bfiles]');
   src.push(':if ($bcnt > ' + keepMax + ') do={');
@@ -103,7 +105,8 @@ function generateBackupScript(opts) {
   src.push('    /file remove [:pick $bfiles $i]');
   src.push('  }');
   src.push('}');
-  src.push(':log info ("Auto-backup done: " . $fname)');
+  src.push('');
+  src.push(':log info ("Auto-backup completed: " . $fname)');
 
   /* ── Будуємо .rsc файл ── */
   var lines = [];
@@ -124,14 +127,11 @@ function generateBackupScript(opts) {
   /* ── Скрипт через :execute або multiline source ── */
   /* Правильний спосіб для /import — використовуємо heredoc-стиль */
   lines.push('# --- Створити скрипт ---');
-  lines.push('# Вставте в Winbox → System → Scripts → Source:');
-  lines.push('# Name: ' + name);
-  lines.push('# Policy: всі галочки');
-  lines.push('# --- SOURCE (вставляй в поле Source в Winbox) ---');
-  lines.push('');
-  src.forEach(function(line) { lines.push(line); });
-  lines.push('');
-  lines.push('# --- КІНЕЦЬ SOURCE ---');
+  lines.push('/system script add \\');
+  lines.push('  name="' + name + '" \\');
+  lines.push('  policy=ftp,reboot,read,write,policy,test,password,sniff,sensitive \\');
+  lines.push('  comment="Auto backup - ' + method + '" \\');
+  lines.push('  source="' + src.join('\\r\\n') + '"');
   lines.push('');
 
   /* Scheduler */
@@ -461,3 +461,8 @@ if (document.readyState === 'loading') {
 } else {
   initBackupScheduler();
 }
+"""
+
+with open('backup-scheduler.js', 'w', encoding='utf-8', newline='\n') as f:
+    f.write(content)
+print('backup-scheduler.js v2 OK!')

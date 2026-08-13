@@ -74,6 +74,23 @@ function generateBackupScript(opts) {
     scriptBody.push('  secret-download-key=yes');
   }
 
+  if (method === 'gdrive' && opts.gdriveUrl) {
+    scriptBody.push('');
+    scriptBody.push('# --- Google Drive через Apps Script ---');
+    scriptBody.push(':local gdurl "' + opts.gdriveUrl + '"');
+    scriptBody.push('');
+    scriptBody.push('# Відправляємо .rsc файл (base64 encode)');
+    scriptBody.push(':local rscdata [/file get $rscname contents]');
+    scriptBody.push(':local b64data [:convert from=raw to=base64 $rscdata]');
+    scriptBody.push('');
+    scriptBody.push('/tool fetch url=$gdurl \\');
+    scriptBody.push('  http-method=post \\');
+    scriptBody.push('  http-data=("filename=" . $rscname . "&content=" . $b64data) \\');
+    scriptBody.push('  output=none');
+    scriptBody.push('');
+    scriptBody.push(':log info "Google Drive backup uploaded: $rscname"');
+  }
+
   /* Видалення старих backup */
   scriptBody.push('');
   scriptBody.push('# Видалити старі backup файли (зберігати лише ' + keepMax + ')');
@@ -181,6 +198,7 @@ function initBackupScheduler() {
     '<option value="ftp">📤 FTP сервер</option>' +
     '<option value="email">📧 Email</option>' +
     '<option value="cloud">☁️ MikroTik Cloud</option>' +
+    '<option value="gdrive">🟢 Google Drive (Apps Script)</option>' +
     '</select>' +
     '</div>' +
 
@@ -190,6 +208,11 @@ function initBackupScheduler() {
     mkField('bs-ftp-user', 'FTP логін', 'text', 'backup') +
     mkField('bs-ftp-pass', 'FTP пароль', 'password', '') +
     mkField('bs-ftp-dir',  'FTP директорія', 'text', '/backups') +
+    '</div>' +
+
+    /* Google Drive блок */
+    '<div id="bs-gdrive-block" style="display:none;background:#0d1a24;border:1px solid #2a3b48;border-radius:8px;padding:14px;gap:10px;display:none;flex-direction:column;">' +
+    mkField('bs-gdrive-url', '🟢 Google Apps Script URL', 'text', 'https://script.google.com/macros/s/.../exec') +
     '</div>' +
 
     /* Email блок */
@@ -250,6 +273,8 @@ function initBackupScheduler() {
     var emailBlock = document.getElementById('bs-email-block');
     ftpBlock.style.display   = v === 'ftp'   ? 'flex' : 'none';
     emailBlock.style.display = v === 'email' ? 'block' : 'none';
+    var gdriveBlock = document.getElementById('bs-gdrive-block');
+    if (gdriveBlock) gdriveBlock.style.display = v === 'gdrive' ? 'flex' : 'none';
     updatePreview();
   });
 
@@ -266,6 +291,7 @@ function initBackupScheduler() {
       ftpPass: document.getElementById('bs-ftp-pass') ? document.getElementById('bs-ftp-pass').value : '',
       ftpDir:  document.getElementById('bs-ftp-dir')  ? document.getElementById('bs-ftp-dir').value  : '/backups',
       email:   document.getElementById('bs-email')    ? document.getElementById('bs-email').value    : '',
+      gdriveUrl: document.getElementById('bs-gdrive-url') ? document.getElementById('bs-gdrive-url').value : '',
       prefix:  document.getElementById('bs-prefix').value || 'mt-backup',
     };
   }

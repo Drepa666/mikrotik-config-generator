@@ -584,7 +584,6 @@ function initTerminal() {
         appendOutput('\n⚠️ SSH: ' + e.message + '\n', '#e6b35a');
       });
 
-      loadServices();
       loadScheduler();
       loadScripts();
     })
@@ -608,6 +607,15 @@ function initTerminal() {
     fetch(PROXY + '/rest/ip/service', { method:'GET', headers:getHeaders() })
     .then(function(r) { return r.json(); })
     .then(function(services) {
+      /* Дедублікація по імені */
+      var seen = {};
+      services = services.filter(function(svc) {
+        if (seen[svc.name]) return false;
+        seen[svc.name] = true;
+        return true;
+      });
+
+      updatePortIndicators(services);
       var list = document.getElementById('tm-services-list');
       list.innerHTML = '';
 
@@ -649,7 +657,6 @@ function initTerminal() {
           .then(function(r) {
             if (!r.ok) throw new Error('HTTP ' + r.status);
             appendOutput('[' + new Date().toLocaleTimeString() + '] ' + name + ' → ' + (disabled ? 'увімкнено' : 'вимкнено'), '#5fd0a5');
-            loadServices();
           })
           .catch(function(e) {
             appendOutput('❌ Помилка: ' + e.message, '#e0665a');

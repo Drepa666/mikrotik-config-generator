@@ -374,8 +374,8 @@ function initCheatsheet() {
   btn.textContent = '📖 Шпаргалка';
   btn.title = 'RouterOS команди шпаргалка (Ctrl+K)';
 
-  var btnbar = document.querySelector('.btnbar');
-  if (btnbar) btnbar.appendChild(btn);
+  /* Кнопка Шпаргалка прихована з верхньої панелі */
+  // if (btnbar) btnbar.appendChild(btn);
 
   btn.addEventListener('click', openCheatsheet);
 

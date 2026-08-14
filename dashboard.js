@@ -322,8 +322,8 @@ function initDashboard() {
   btn.className = 'sec';
   btn.textContent = '📊 Dashboard';
 
-  var btnbar = document.querySelector('.btnbar');
-  if (btnbar) btnbar.appendChild(btn);
+  /* Кнопка Dashboard прихована з верхньої панелі */
+  // if (btnbar) btnbar.appendChild(btn);
 
   btn.addEventListener('click', function() {
     document.getElementById('db-body').innerHTML = renderDashboard(collectDashboardData());

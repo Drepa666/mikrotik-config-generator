@@ -42,13 +42,50 @@ def get_ssh(host, port, user, password):
         print(f'[SSH] Підключено: {key}')
         return cl
 
-def ssh_exec(host, port, user, password, command):
-    """Виконати команду і повернути вивід."""
+def ssh_exec(host, port, user, password, command, timeout=10):
+    """Виконати команду і повернути вивід з таймаутом."""
     cl  = get_ssh(host, port, user, password)
-    _, stdout, stderr = cl.exec_command(command, timeout=15)
-    out = stdout.read().decode('utf-8', errors='replace')
-    err = stderr.read().decode('utf-8', errors='replace')
-    return out, err
+    _, stdout, stderr = cl.exec_command(command, timeout=timeout)
+    
+    # Читаємо з таймаутом по шматках
+    output = ''
+    error  = ''
+    
+    import select, time
+    start = time.time()
+    channel = stdout.channel
+    channel.setblocking(False)
+    
+    while True:
+        elapsed = time.time() - start
+        if elapsed > timeout:
+            output += '\n[⚠️ Таймаут {}s — команда перервана]'.format(timeout)
+            try: channel.close()
+            except: pass
+            break
+            
+        # Перевіряємо чи є дані
+        if channel.exit_status_ready() and not channel.recv_ready():
+            break
+            
+        ready, _, _ = select.select([channel], [], [], 0.5)
+        if ready:
+            chunk = ''
+            while channel.recv_ready():
+                chunk += channel.recv(4096).decode('utf-8', errors='replace')
+            while channel.recv_stderr_ready():
+                error += channel.recv_stderr(4096).decode('utf-8', errors='replace')
+            if chunk:
+                output += chunk
+        elif channel.exit_status_ready():
+            break
+    
+    # Читаємо залишок stderr
+    try:
+        error += stderr.read().decode('utf-8', errors='replace')
+    except: pass
+    
+    return output, error
 
 # ── HTTP Handler ──────────────────────────────────────────────
 class ProxyHandler(BaseHTTPRequestHandler):

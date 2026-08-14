@@ -634,6 +634,33 @@ function initTerminal() {
     var runBtn = document.getElementById('tm-run');
     if (runBtn) { runBtn.textContent = '\u23f3'; runBtn.disabled = true; }
 
+    /* Таймаут залежно від команди */
+    var cmdTimeout = 10000;
+    var longCmds = ['ip-scan', 'flood-ping', 'bandwidth-test', 'torch', 'packet-sniffer'];
+    longCmds.forEach(function(lc) {
+      if (cmd.indexOf(lc) !== -1) cmdTimeout = 15000;
+    });
+
+    /* AbortController для скасування */
+    var controller = new AbortController();
+    var timeoutId  = setTimeout(function() {
+      controller.abort();
+      appendOutput('\n⚠️ Таймаут — команда перервана після ' + (cmdTimeout/1000) + 's', '#e6b35a');
+    }, cmdTimeout + 2000);
+
+    /* Показуємо Stop кнопку */
+    var stopBtn = document.getElementById('tm-stop');
+    if (stopBtn) {
+      stopBtn.style.display = 'inline-block';
+      stopBtn.onclick = function() {
+        controller.abort();
+        clearTimeout(timeoutId);
+        appendOutput('\n⏹ Команду зупинено вручну', '#e6b35a');
+        if (runBtn) { runBtn.textContent = '\u25b6'; runBtn.disabled = false; }
+        if (stopBtn) stopBtn.style.display = 'none';
+      };
+    }
+
     fetch('http://localhost:8888/ssh/exec', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -643,10 +670,13 @@ function initTerminal() {
         user:     sshConn.user,
         password: sshConn.password,
         command:  cmd.trim(),
+        timeout:  Math.floor(cmdTimeout / 1000),
       }),
+      signal: controller.signal,
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
+      clearTimeout(timeoutId);
       if (!d.ok) throw new Error(d.error || 'SSH помилка');
 
       var output = (d.output || '').trimEnd();
@@ -655,9 +685,10 @@ function initTerminal() {
       if (output) {
         output.split('\n').forEach(function(line) {
           var color = '#c9e8d8';
-          if (/^Flags:|^Columns:|^\s*#\s*\d/i.test(line)) color = '#4a8070';
-          if (/invalid|failed|error/i.test(line))             color = '#e0665a';
-          if (/warning/i.test(line))                          color = '#e6b35a';
+          if (/^Flags:|^Columns:/i.test(line))     color = '#4a8070';
+          if (/invalid|failed|error/i.test(line))  color = '#e0665a';
+          if (/warning/i.test(line))               color = '#e6b35a';
+          if (/timeout|перервана/i.test(line))     color = '#e6b35a';
           appendOutput(line, color);
         });
       }
@@ -672,10 +703,17 @@ function initTerminal() {
       appendOutput('', '#4a6070');
     })
     .catch(function(e) {
-      appendOutput('\u274c ' + e.message + '\n', '#e0665a');
+      clearTimeout(timeoutId);
+      if (e.name === 'AbortError') {
+        appendOutput('⏹ Запит скасовано\n', '#e6b35a');
+      } else {
+        appendOutput('\u274c ' + e.message + '\n', '#e0665a');
+      }
     })
     .finally(function() {
-      if (runBtn) { runBtn.textContent = '\u25b6\ufe0f'; runBtn.disabled = false; }
+      clearTimeout(timeoutId);
+      if (runBtn)  { runBtn.textContent = '\u25b6'; runBtn.disabled = false; }
+      if (stopBtn) stopBtn.style.display = 'none';
     });
   }
 

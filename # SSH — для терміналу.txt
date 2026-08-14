@@ -1,0 +1,12 @@
+# SSH — для терміналу
+/ip service set ssh disabled=no port=22
+
+# REST API — для Deploy через генератор
+/ip service set www disabled=no port=80
+
+# Winbox — для Winbox програми
+/ip service set winbox disabled=no port=8291
+
+# Вимкнути небезпечні (опційно)
+/ip service set telnet disabled=yes
+/ip service set ftp disabled=yes

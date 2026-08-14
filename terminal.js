@@ -53,44 +53,53 @@ function initTerminal() {
     /* Рядок протокол + порти */
     '<div style="background:#0a1520;border:1px solid #1c2a37;border-radius:8px;padding:12px;margin-top:8px;">' +
     '<div style="font-size:11px;color:#8ea3b0;margin-bottom:10px;font-weight:700;">🔌 Протоколи та порти</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;" id="tm-ports-grid">' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;" id="tm-ports-grid">' +
 
     /* SSH */
-    '<div style="background:#0d1a24;border:1px solid #2a3b48;border-radius:6px;padding:8px;">' +
+    '<div style="background:#0d1a24;border:1px solid #2a3b48;border-radius:6px;padding:8px;" id="tm-ssh-card">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
-    '<label style="font-size:11px;color:#5fd0a5;font-weight:700;">🔒 SSH</label>' +
+    '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;">' +
+    '<input type="checkbox" id="tm-ssh-enabled" checked style="accent-color:#5fd0a5;width:14px;height:14px;cursor:pointer;" onchange="tmToggleProto(&apos;ssh&apos;)">' +
+    '<span style="font-size:11px;color:#5fd0a5;font-weight:700;">\uD83D\uDD12 SSH</span>' +
+    '</label>' +
     '<div id="tm-ssh-indicator" style="width:8px;height:8px;border-radius:50%;background:#4a6070;"></div>' +
     '</div>' +
-    '<div style="display:flex;gap:4px;">' +
-    '<select id="tm-ssh-proto" style="' + tmInputSm() + 'flex:1;" onchange="tmUpdatePort(this,&apos;tm-ssh-port&apos;)">' +
+    '<div style="display:flex;gap:4px;" id="tm-ssh-inputs">' +
+    '<select id="tm-ssh-proto" style="' + tmInputSm() + 'flex:1;">' +
     '<option value="22">ssh</option>' +
     '</select>' +
-    '<input id="tm-ssh-port" type="number" value="22" min="1" max="65535" style="' + tmInputSm() + 'width:70px;" title="SSH порт">' +
+    '<input id="tm-ssh-port" type="number" value="22" min="1" max="65535" style="' + tmInputSm() + 'width:70px;">' +
     '</div>' +
     '</div>' +
 
     /* Winbox */
-    '<div style="background:#0d1a24;border:1px solid #2a3b48;border-radius:6px;padding:8px;">' +
+    '<div style="background:#0d1a24;border:1px solid #2a3b48;border-radius:6px;padding:8px;" id="tm-winbox-card">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
-    '<label style="font-size:11px;color:#5b9bd5;font-weight:700;">📦 Winbox</label>' +
+    '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;">' +
+    '<input type="checkbox" id="tm-winbox-enabled" checked style="accent-color:#5b9bd5;width:14px;height:14px;cursor:pointer;" onchange="tmToggleProto(&apos;winbox&apos;)">' +
+    '<span style="font-size:11px;color:#5b9bd5;font-weight:700;">\uD83D\uDCE6 Winbox</span>' +
+    '</label>' +
     '<div id="tm-winbox-indicator" style="width:8px;height:8px;border-radius:50%;background:#4a6070;"></div>' +
     '</div>' +
-    '<div style="display:flex;gap:4px;">' +
-    '<select id="tm-winbox-proto" style="' + tmInputSm() + 'flex:1;" onchange="tmUpdatePort(this,&apos;tm-winbox-port&apos;)">' +
+    '<div style="display:flex;gap:4px;" id="tm-winbox-inputs">' +
+    '<select id="tm-winbox-proto" style="' + tmInputSm() + 'flex:1;">' +
     '<option value="8291">winbox</option>' +
     '</select>' +
     '<input id="tm-winbox-port" type="number" value="8291" min="1" max="65535" style="' + tmInputSm() + 'width:70px;">' +
     '</div>' +
     '</div>' +
 
-    /* HTTP API */
-    '<div style="background:#0d1a24;border:1px solid #2a3b48;border-radius:6px;padding:8px;">' +
+    /* REST API */
+    '<div style="background:#0d1a24;border:1px solid #2a3b48;border-radius:6px;padding:8px;" id="tm-api-card">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
-    '<label style="font-size:11px;color:#e6b35a;font-weight:700;">🌐 REST API</label>' +
+    '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;">' +
+    '<input type="checkbox" id="tm-api-enabled" checked style="accent-color:#e6b35a;width:14px;height:14px;cursor:pointer;" onchange="tmToggleProto(&apos;api&apos;)">' +
+    '<span style="font-size:11px;color:#e6b35a;font-weight:700;">\uD83C\uDF10 REST API</span>' +
+    '</label>' +
     '<div id="tm-api-indicator" style="width:8px;height:8px;border-radius:50%;background:#4a6070;"></div>' +
     '</div>' +
-    '<div style="display:flex;gap:4px;">' +
-    '<select id="tm-api-proto" style="' + tmInputSm() + 'flex:1;" onchange="tmUpdatePort(this,&apos;tm-api-port&apos;)">' +
+    '<div style="display:flex;gap:4px;" id="tm-api-inputs">' +
+    '<select id="tm-api-proto" style="' + tmInputSm() + 'flex:1;">' +
     '<option value="80">http</option>' +
     '<option value="443">https</option>' +
     '</select>' +
@@ -99,13 +108,16 @@ function initTerminal() {
     '</div>' +
 
     /* FTP */
-    '<div style="background:#0d1a24;border:1px solid #2a3b48;border-radius:6px;padding:8px;">' +
+    '<div style="background:#0d1a24;border:1px solid #2a3b48;border-radius:6px;padding:8px;" id="tm-ftp-card">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
-    '<label style="font-size:11px;color:#9b87f5;font-weight:700;">📁 FTP</label>' +
+    '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;">' +
+    '<input type="checkbox" id="tm-ftp-enabled" style="accent-color:#9b87f5;width:14px;height:14px;cursor:pointer;" onchange="tmToggleProto(&apos;ftp&apos;)">' +
+    '<span style="font-size:11px;color:#9b87f5;font-weight:700;">\uD83D\uDCC1 FTP</span>' +
+    '</label>' +
     '<div id="tm-ftp-indicator" style="width:8px;height:8px;border-radius:50%;background:#4a6070;"></div>' +
     '</div>' +
-    '<div style="display:flex;gap:4px;">' +
-    '<select id="tm-ftp-proto" style="' + tmInputSm() + 'flex:1;" onchange="tmUpdatePort(this,&apos;tm-ftp-port&apos;)">' +
+    '<div style="display:flex;gap:4px;" id="tm-ftp-inputs">' +
+    '<select id="tm-ftp-proto" style="' + tmInputSm() + 'flex:1;">' +
     '<option value="21">ftp</option>' +
     '</select>' +
     '<input id="tm-ftp-port" type="number" value="21" min="1" max="65535" style="' + tmInputSm() + 'width:70px;">' +
@@ -113,13 +125,16 @@ function initTerminal() {
     '</div>' +
 
     /* Telnet */
-    '<div style="background:#0d1a24;border:1px solid #2a3b48;border-radius:6px;padding:8px;">' +
+    '<div style="background:#0d1a24;border:1px solid #2a3b48;border-radius:6px;padding:8px;" id="tm-telnet-card">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
-    '<label style="font-size:11px;color:#e0665a;font-weight:700;">📟 Telnet</label>' +
+    '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;">' +
+    '<input type="checkbox" id="tm-telnet-enabled" style="accent-color:#e0665a;width:14px;height:14px;cursor:pointer;" onchange="tmToggleProto(&apos;telnet&apos;)">' +
+    '<span style="font-size:11px;color:#e0665a;font-weight:700;">\uD83D\uDCDF Telnet</span>' +
+    '</label>' +
     '<div id="tm-telnet-indicator" style="width:8px;height:8px;border-radius:50%;background:#4a6070;"></div>' +
     '</div>' +
-    '<div style="display:flex;gap:4px;">' +
-    '<select id="tm-telnet-proto" style="' + tmInputSm() + 'flex:1;" onchange="tmUpdatePort(this,&apos;tm-telnet-port&apos;)">' +
+    '<div style="display:flex;gap:4px;" id="tm-telnet-inputs">' +
+    '<select id="tm-telnet-proto" style="' + tmInputSm() + 'flex:1;">' +
     '<option value="23">telnet</option>' +
     '</select>' +
     '<input id="tm-telnet-port" type="number" value="23" min="1" max="65535" style="' + tmInputSm() + 'width:70px;">' +
@@ -127,13 +142,16 @@ function initTerminal() {
     '</div>' +
 
     /* WWW */
-    '<div style="background:#0d1a24;border:1px solid #2a3b48;border-radius:6px;padding:8px;">' +
+    '<div style="background:#0d1a24;border:1px solid #2a3b48;border-radius:6px;padding:8px;" id="tm-www-card">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
-    '<label style="font-size:11px;color:#5fd0a5;font-weight:700;">🌍 WWW</label>' +
+    '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;">' +
+    '<input type="checkbox" id="tm-www-enabled" style="accent-color:#5fd0a5;width:14px;height:14px;cursor:pointer;" onchange="tmToggleProto(&apos;www&apos;)">' +
+    '<span style="font-size:11px;color:#5fd0a5;font-weight:700;">\uD83C\uDF0D WWW</span>' +
+    '</label>' +
     '<div id="tm-www-indicator" style="width:8px;height:8px;border-radius:50%;background:#4a6070;"></div>' +
     '</div>' +
-    '<div style="display:flex;gap:4px;">' +
-    '<select id="tm-www-proto" style="' + tmInputSm() + 'flex:1;" onchange="tmUpdatePort(this,&apos;tm-www-port&apos;)">' +
+    '<div style="display:flex;gap:4px;" id="tm-www-inputs">' +
+    '<select id="tm-www-proto" style="' + tmInputSm() + 'flex:1;">' +
     '<option value="80">http</option>' +
     '<option value="443">https</option>' +
     '</select>' +
@@ -141,13 +159,21 @@ function initTerminal() {
     '</div>' +
     '</div>' +
 
-    '</div>' +
-
     /* Кнопки дій */
     '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
     '<button id="tm-apply-ports" style="background:#5b9bd5;color:#fff;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">✅ Застосувати порти</button>' +
     '<button id="tm-reset-ports" style="background:transparent;border:1px solid #2a3b48;color:#8ea3b0;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;">🔄 Скинути до стандартних</button>' +
     '<div id="tm-ports-status" style="font-size:11.5px;line-height:32px;color:#4a6070;"></div>' +
+    '</div>' +
+    '<div style="background:#0a1f14;border:1px solid #1a4a2a;border-radius:6px;padding:10px 14px;margin-top:10px;">' +
+    '<div style="font-size:11px;color:#5fd0a5;font-weight:700;margin-bottom:6px;">💡 Що вмикати на новому роутері для підключення:</div>' +
+    '<div style="font-size:11px;color:#8ea3b0;line-height:1.8;">' +
+    '🔒 <b style="color:#5fd0a5;">SSH</b> — для терміналу конфігуратора<br>' +
+    '🌐 <b style="color:#e6b35a;">REST API (www)</b> — для Deploy скриптів<br>' +
+    '📦 <b style="color:#5b9bd5;">Winbox</b> — для програми Winbox<br>' +
+    '<span style="color:#4a6070;">Команди: <code style="color:#5fd0a5;">/ip service set ssh disabled=no</code><br>' +
+    '<code style="color:#5fd0a5;">/ip service set www disabled=no</code></span>' +
+    '</div>' +
     '</div>' +
     '</div>' +
     '<div id="tm-conn-status" style="margin-top:8px;font-size:11.5px;color:#4a6070;"></div>' +
@@ -233,6 +259,18 @@ function initTerminal() {
   }
 
   /* Глобальна функція для onchange в select */
+  /* Вмикає/вимикає протокол */
+  window.tmToggleProto = function(svc) {
+    var chk    = document.getElementById('tm-' + svc + '-enabled');
+    var inputs = document.getElementById('tm-' + svc + '-inputs');
+    var card   = document.getElementById('tm-' + svc + '-card');
+    if (!chk || !inputs) return;
+    var enabled = chk.checked;
+    inputs.style.opacity    = enabled ? '1'    : '0.3';
+    inputs.style.pointerEvents = enabled ? 'auto' : 'none';
+    if (card) card.style.borderColor = enabled ? '#2a4a38' : '#2a3b48';
+  };
+
   window.tmUpdatePort = function(selectEl, portId) {
     var portEl = document.getElementById(portId);
     if (portEl) portEl.value = selectEl.value;
@@ -309,7 +347,8 @@ function initTerminal() {
       return;
     }
 
-    var ports = [
+    /* Збираємо тільки увімкнені протоколи */
+    var allPorts = [
       { svc:'ssh',    port: document.getElementById('tm-ssh-port').value },
       { svc:'winbox', port: document.getElementById('tm-winbox-port').value },
       { svc:'www',    port: document.getElementById('tm-www-port').value },
@@ -317,6 +356,16 @@ function initTerminal() {
       { svc:'telnet', port: document.getElementById('tm-telnet-port').value },
       { svc:'api',    port: document.getElementById('tm-api-port').value },
     ];
+
+    /* Вмикаємо/вимикаємо сервіси відповідно до чекбоксів */
+    var ports = allPorts.map(function(item) {
+      var chkEl = document.getElementById('tm-' + item.svc + '-enabled');
+      return {
+        svc:      item.svc,
+        port:     item.port,
+        disabled: chkEl ? !chkEl.checked : false,
+      };
+    });
 
     var statusEl = document.getElementById('tm-ports-status');
     statusEl.style.color = '#5b9bd5';
@@ -335,7 +384,10 @@ function initTerminal() {
         return fetch(PROXY + '/rest/ip/service/' + svc['.id'], {
           method: 'PATCH',
           headers: hdrs,
-          body: JSON.stringify({ port: parseInt(item.port) }),
+          body: JSON.stringify({
+            port:     parseInt(item.port),
+            disabled: item.disabled,
+          }),
         })
         .then(function(r) {
           /* Оновлюємо індикатор */

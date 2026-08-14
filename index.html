@@ -2027,7 +2027,7 @@ function genRoutes() {
     const distance = params[1] ? params[1].trim() : '1';
     const comment = params.slice(2).join(':').trim();
 
-   if (!/^\d+$/.test(distance) || +distance < 1 || +distance > 255) {
+   if (/^\d+$/.test(distance) && +distance >= 1 && +distance <= 255) {
       lines.push(
         '/ip route add dst-address=' + destination +
         ' gateway=' + gateway +
@@ -6083,7 +6083,7 @@ function highlightRos(rawText) {
     var wgEnable = document.getElementById('wgenable');
     var ovpnEnable = document.getElementById('ovpnenable');
     var ovpnCipher = (document.getElementById('ovpncipher') || {}).value || '';
-    var capsEnable = document.getElementById('capsmanserv');
+    var capsEnable = document.getElementById('capsmanenable');
     var wifiEnable = document.getElementById('wifienable');
     var guestEnable = document.getElementById('guestenable');
     var model = (document.getElementById('model') || {}).value || '';
@@ -6197,10 +6197,10 @@ function highlightRos(rawText) {
 
   function init() {
     /* [1] Поля валідації */
-    attachField('routername',       validateRouterName);
+    attachField('hostname',       validateRouterName);
     attachField('pppoeuser',        validatePppoeLogin);
     attachField('pppoepass',        validatePppoePass);
-    attachField('apn',              validateApn);
+    attachField('lteapn',              validateApn);
     attachField('foapn',            validateApn);
     attachField('netwatchinterval', validateNetwatchInterval);
 

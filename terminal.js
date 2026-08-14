@@ -682,6 +682,7 @@ function initTerminal() {
     cmdHistory.unshift(cmd);
     if (cmdHistory.length > 100) cmdHistory.pop();
     historyIdx = -1;
+    saveHistory();
 
     appendOutput('[admin@MikroTik] > ' + cmd, '#8ea3b0');
 
@@ -792,6 +793,342 @@ function initTerminal() {
   document.getElementById('tm-clear').addEventListener('click', function() {
     var out = document.getElementById('tm-output');
     out.innerHTML = '<span style="color:#5fd0a5;">Terminal cleared\n\n</span>';
+  });
+
+  /* ══════════════════════════════════════════
+     ЗБЕРЕЖЕННЯ ІСТОРІЇ В localStorage
+  ══════════════════════════════════════════ */
+  function saveHistory() {
+    try {
+      localStorage.setItem('tm-cmd-history', JSON.stringify(cmdHistory.slice(0, 100)));
+    } catch(e) {}
+  }
+
+  function loadHistory() {
+    try {
+      var saved = localStorage.getItem('tm-cmd-history');
+      if (saved) {
+        cmdHistory = JSON.parse(saved);
+        appendOutput('[' + cmdHistory.length + ' команд з попередньої сесії]\n', '#3a5048');
+      }
+    } catch(e) {}
+  }
+
+  loadHistory();
+
+  /* ══════════════════════════════════════════
+     ПОШУК В ВИВОДІ
+  ══════════════════════════════════════════ */
+  var searchMatches = [];
+  var searchIdx     = 0;
+
+  var _tm_search_btn = document.getElementById('tm-search-btn'); if (_tm_search_btn) _tm_search_btn.addEventListener('click', function() {
+    var bar = document.getElementById('tm-search-bar');
+    bar.style.display = bar.style.display === 'none' ? 'flex' : 'none';
+    if (bar.style.display === 'flex') {
+      document.getElementById('tm-search-input').focus();
+    }
+  });
+
+  var _tm_search_close = document.getElementById('tm-search-close'); if (_tm_search_close) _tm_search_close.addEventListener('click', function() {
+    document.getElementById('tm-search-bar').style.display = 'none';
+    clearSearchHighlights();
+  });
+
+  var _btn_tm_search_input = document.getElementById('tm-search-input'); if (_btn_tm_search_input) _btn_tm_search_input.addEventListener('input', function() {
+    performSearch(this.value);
+  });
+
+  var _btn_tm_search_input = document.getElementById('tm-search-input'); if (_btn_tm_search_input) _btn_tm_search_input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') nextSearchMatch();
+    if (e.key === 'Escape') document.getElementById('tm-search-close').click();
+  });
+
+  var _tm_search_next = document.getElementById('tm-search-next'); if (_tm_search_next) _tm_search_next.addEventListener('click', nextSearchMatch);
+  var _tm_search_prev = document.getElementById('tm-search-prev'); if (_tm_search_prev) _tm_search_prev.addEventListener('click', prevSearchMatch);
+
+  /* Ctrl+F відкриває пошук */
+  document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.key === 'f') {
+      var termTab = document.getElementById('tm-tab-terminal');
+      if (termTab && termTab.style.display !== 'none') {
+        e.preventDefault();
+        document.getElementById('tm-search-btn').click();
+      }
+    }
+  });
+
+  function clearSearchHighlights() {
+    var out = document.getElementById('tm-output');
+    out.querySelectorAll('mark.tm-hl').forEach(function(m) {
+      m.replaceWith(document.createTextNode(m.textContent));
+    });
+    searchMatches = [];
+    document.getElementById('tm-search-count').textContent = '';
+  }
+
+  function performSearch(query) {
+    clearSearchHighlights();
+    if (!query) return;
+
+    var out   = document.getElementById('tm-output');
+    var spans = out.querySelectorAll('span');
+    searchMatches = [];
+
+    spans.forEach(function(span) {
+      var text = span.textContent;
+      if (text.toLowerCase().indexOf(query.toLowerCase()) === -1) return;
+
+      var html = span.innerHTML;
+      var re   = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+      span.innerHTML = html.replace(re, '<mark class="tm-hl" style="background:#e6b35a;color:#082018;border-radius:2px;">$1</mark>');
+      span.querySelectorAll('mark.tm-hl').forEach(function(m) {
+        searchMatches.push(m);
+      });
+    });
+
+    if (searchMatches.length) {
+      searchIdx = 0;
+      searchMatches[0].scrollIntoView({ block: 'center' });
+      document.getElementById('tm-search-count').textContent =
+        '1 / ' + searchMatches.length;
+    } else {
+      document.getElementById('tm-search-count').textContent = 'Не знайдено';
+    }
+  }
+
+  function nextSearchMatch() {
+    if (!searchMatches.length) return;
+    searchIdx = (searchIdx + 1) % searchMatches.length;
+    searchMatches[searchIdx].scrollIntoView({ block: 'center' });
+    document.getElementById('tm-search-count').textContent =
+      (searchIdx + 1) + ' / ' + searchMatches.length;
+  }
+
+  function prevSearchMatch() {
+    if (!searchMatches.length) return;
+    searchIdx = (searchIdx - 1 + searchMatches.length) % searchMatches.length;
+    searchMatches[searchIdx].scrollIntoView({ block: 'center' });
+    document.getElementById('tm-search-count').textContent =
+      (searchIdx + 1) + ' / ' + searchMatches.length;
+  }
+
+  /* ══════════════════════════════════════════
+     КОПІЮВАННЯ ВИВОДУ
+  ══════════════════════════════════════════ */
+  var _tm_copy_btn = document.getElementById('tm-copy-btn'); if (_tm_copy_btn) _tm_copy_btn.addEventListener('click', function() {
+    var out  = document.getElementById('tm-output');
+    var text = out.innerText || out.textContent;
+    navigator.clipboard.writeText(text).then(function() {
+      var btn = document.getElementById('tm-copy-btn');
+      btn.textContent = '✅';
+      setTimeout(function() { btn.textContent = '📋'; }, 1500);
+    });
+  });
+
+  /* ══════════════════════════════════════════
+     ЗАКЛАДКИ
+  ══════════════════════════════════════════ */
+  var bookmarks = [];
+
+  function loadBookmarks() {
+    try {
+      bookmarks = JSON.parse(localStorage.getItem('tm-bookmarks') || '[]');
+    } catch(e) { bookmarks = []; }
+    renderBookmarks();
+  }
+
+  function saveBookmarks() {
+    try {
+      localStorage.setItem('tm-bookmarks', JSON.stringify(bookmarks));
+    } catch(e) {}
+  }
+
+  function renderBookmarks() {
+    var list = document.getElementById('tm-bookmarks-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (!bookmarks.length) {
+      list.innerHTML = '<span style="font-size:11px;color:#4a6070;">Немає закладок. Введи команду і натисни "+ Додати поточну"</span>';
+      return;
+    }
+
+    bookmarks.forEach(function(bm, idx) {
+      var btn = document.createElement('button');
+      btn.style.cssText = 'background:#0d1a24;border:1px solid #2a3b48;color:#5b9bd5;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:10px;font-family:monospace;display:flex;align-items:center;gap:4px;';
+      btn.innerHTML = bm + ' <span style="color:#4a6070;font-size:9px;cursor:pointer;" data-idx="' + idx + '">✕</span>';
+
+      btn.addEventListener('click', function(e) {
+        if (e.target.getAttribute('data-idx') !== null) {
+          bookmarks.splice(parseInt(e.target.getAttribute('data-idx')), 1);
+          saveBookmarks();
+          renderBookmarks();
+        } else {
+          document.getElementById('tm-cmd').value = bm;
+          document.getElementById('tm-cmd').focus();
+        }
+      });
+      list.appendChild(btn);
+    });
+  }
+
+  var _tm_bookmarks_btn = document.getElementById('tm-bookmarks-btn'); if (_tm_bookmarks_btn) _tm_bookmarks_btn.addEventListener('click', function() {
+    var bar = document.getElementById('tm-bookmarks-bar');
+    bar.style.display = bar.style.display === 'none' ? 'block' : 'none';
+    if (bar.style.display === 'block') renderBookmarks();
+  });
+
+  var _tm_bookmark_add = document.getElementById('tm-bookmark-add'); if (_tm_bookmark_add) _tm_bookmark_add.addEventListener('click', function() {
+    var cmd = document.getElementById('tm-cmd').value.trim() ||
+              (cmdHistory.length ? cmdHistory[0] : '');
+    if (!cmd) {
+      appendOutput('⚠️ Спочатку введи команду\n', '#e6b35a');
+      return;
+    }
+    if (bookmarks.indexOf(cmd) === -1) {
+      bookmarks.push(cmd);
+      saveBookmarks();
+      renderBookmarks();
+      appendOutput('🔖 Додано в закладки: ' + cmd + '\n', '#5fd0a5');
+    } else {
+      appendOutput('⚠️ Вже є в закладках\n', '#e6b35a');
+    }
+  });
+
+  loadBookmarks();
+
+  /* ══════════════════════════════════════════
+     МАКРОСИ
+  ══════════════════════════════════════════ */
+  var macros = [
+    { name: '🔍 Статус', cmds: ['/system identity print', '/system resource print', '/ip address print'] },
+    { name: '🔥 Firewall', cmds: ['/ip firewall filter print', '/ip firewall nat print'] },
+    { name: '📡 Мережа', cmds: ['/interface print', '/ip route print', '/ip neighbor print'] },
+    { name: '👥 Клієнти', cmds: ['/ip dhcp-server lease print', '/user active print'] },
+    { name: '📋 Логи', cmds: ['/log print'] },
+  ];
+
+  function loadMacros() {
+    try {
+      var saved = JSON.parse(localStorage.getItem('tm-macros') || 'null');
+      if (saved) macros = saved;
+    } catch(e) {}
+    renderMacros();
+  }
+
+  function saveMacros() {
+    try {
+      localStorage.setItem('tm-macros', JSON.stringify(macros));
+    } catch(e) {}
+  }
+
+  function renderMacros() {
+    var list = document.getElementById('tm-macros-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    macros.forEach(function(macro, idx) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;align-items:center;gap:2px;';
+
+      var btn = document.createElement('button');
+      btn.style.cssText = 'background:#0d1a24;border:1px solid #2a3b48;color:#e6b35a;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:10px;';
+      btn.textContent = macro.name;
+      btn.title = macro.cmds.join(' → ');
+
+      btn.addEventListener('click', function() {
+        appendOutput('\n📝 Макрос: ' + macro.name + '\n', '#e6b35a');
+        var delay = 0;
+        macro.cmds.forEach(function(cmd) {
+          setTimeout(function() { runCommand(cmd); }, delay);
+          delay += 2000;
+        });
+      });
+
+      var del = document.createElement('button');
+      del.style.cssText = 'background:transparent;border:none;color:#4a6070;cursor:pointer;font-size:9px;padding:0 2px;';
+      del.textContent = '✕';
+      del.title = 'Видалити макрос';
+      del.addEventListener('click', function() {
+        if (confirm('Видалити макрос "' + macro.name + '"?')) {
+          macros.splice(idx, 1);
+          saveMacros();
+          renderMacros();
+        }
+      });
+
+      wrap.appendChild(btn);
+      wrap.appendChild(del);
+      list.appendChild(wrap);
+    });
+  }
+
+  var _tm_macros_btn = document.getElementById('tm-macros-btn'); if (_tm_macros_btn) _tm_macros_btn.addEventListener('click', function() {
+    var bar = document.getElementById('tm-macros-bar');
+    bar.style.display = bar.style.display === 'none' ? 'block' : 'none';
+    if (bar.style.display === 'block') renderMacros();
+  });
+
+  var _tm_macro_add = document.getElementById('tm-macro-add'); if (_tm_macro_add) _tm_macro_add.addEventListener('click', function() {
+    var name = prompt('Назва макросу:');
+    if (!name) return;
+    var cmdsRaw = prompt('Команди (через крапку з комою):',
+      '/system identity print;/system resource print');
+    if (!cmdsRaw) return;
+    var cmds = cmdsRaw.split(';').map(function(s) { return s.trim(); }).filter(Boolean);
+    macros.push({ name: name, cmds: cmds });
+    saveMacros();
+    renderMacros();
+    appendOutput('📝 Макрос "' + name + '" створено (' + cmds.length + ' команд)\n', '#5fd0a5');
+  });
+
+  loadMacros();
+
+  /* ══════════════════════════════════════════
+     LIVE МОНІТОРИНГ
+  ══════════════════════════════════════════ */
+  var liveTimer   = null;
+  var liveRunning = false;
+
+  var _tm_live_btn = document.getElementById('tm-live-btn'); if (_tm_live_btn) _tm_live_btn.addEventListener('click', function() {
+    var bar = document.getElementById('tm-live-bar');
+    bar.style.display = bar.style.display === 'none' ? 'block' : 'none';
+  });
+
+  var _tm_live_start = document.getElementById('tm-live-start'); if (_tm_live_start) _tm_live_start.addEventListener('click', function() {
+    if (liveRunning) return;
+    if (!sshConnected) {
+      appendOutput('❌ Підключись по SSH!\n', '#e0665a');
+      return;
+    }
+
+    var cmd      = document.getElementById('tm-live-cmd').value;
+    var interval = parseInt(document.getElementById('tm-live-interval').value);
+    liveRunning  = true;
+
+    document.getElementById('tm-live-start').style.display = 'none';
+    document.getElementById('tm-live-stop').style.display  = 'inline-block';
+    document.getElementById('tm-live-status').textContent  = '🟢 Оновлення кожні ' + (interval/1000) + 's';
+
+    function tick() {
+      if (!liveRunning) return;
+      var ts = new Date().toLocaleTimeString();
+      appendOutput('\n── 📊 ' + cmd + ' [' + ts + '] ──', '#3a5048');
+      runCommand(cmd);
+      liveTimer = setTimeout(tick, interval);
+    }
+
+    tick();
+  });
+
+  var _tm_live_stop = document.getElementById('tm-live-stop'); if (_tm_live_stop) _tm_live_stop.addEventListener('click', function() {
+    liveRunning = false;
+    clearTimeout(liveTimer);
+    document.getElementById('tm-live-start').style.display = 'inline-block';
+    document.getElementById('tm-live-stop').style.display  = 'none';
+    document.getElementById('tm-live-status').textContent  = '⏹ Зупинено';
+    appendOutput('⏹ Live моніторинг зупинено\n', '#e6b35a');
   });
 
   inner.addEventListener('click', function(e) {

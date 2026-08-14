@@ -1,4 +1,4 @@
-/* ============================================================
+content = r"""/* ============================================================
    backup-scheduler.js — Повна версія v3
    Tabs: ⚙️ Налаштування | 🚀 Deploy | ▶️ Тест
    ============================================================ */
@@ -40,19 +40,12 @@ function generateSource(opts) {
   s.push('');
 
   /* Google Drive */
-  var validGdrive = gdriveUrl &&
-    gdriveUrl.indexOf('script.google.com/macros/s/') !== -1 &&
-    gdriveUrl.indexOf('/exec') !== -1;
-
-  if (method === 'gdrive' && validGdrive) {
+  if (method === 'gdrive' && gdriveUrl) {
     s.push('# --- Google Drive ---');
     s.push(':local gurl "' + gdriveUrl + '"');
     s.push(':local rcontent [/file get $rname contents]');
     s.push(':local b64 [:convert from=raw to=base64 $rcontent]');
-    s.push('/tool fetch url=$gurl mode=https http-method=post \\');
-    s.push('  http-header-field="Content-Type: application/x-www-form-urlencoded" \\');
-    s.push('  http-data=("filename=" . $rname . "&content=" . $b64) \\');
-    s.push('  output=none');
+    s.push('/tool fetch url=$gurl mode=https http-method=post http-data=("filename=" . $rname . "&content=" . $b64) output=none');
     s.push(':log info ("Google Drive OK: " . $rname)');
     s.push('');
   }
@@ -168,14 +161,10 @@ function mkField(id, label, type, placeholder, val) {
 }
 
 function mkSelect(id, label, options, selected) {
-  var opts = '';
-  for (var i = 0; i < options.length; i++) {
-    var o = options[i];
-    var val = o.value || '';
-    var lbl = o.label || '';
-    var sel = val === selected ? ' selected' : '';
-    opts += '<option value="' + val + '"' + sel + '>' + lbl + '</option>';
-  }
+  var opts = options.map(function(o) {
+    var sel = o.value === selected ? ' selected' : '';
+    return '<option value="' + o.value + '"' + sel + '>' + o.label + '</option>';
+  }).join('');
   return '<div>' +
     '<label style="font-size:11px;color:#8ea3b0;display:block;margin-bottom:5px;">' + label + '</label>' +
     '<select id="' + id + '" style="' + iStyle() + '">' + opts + '</select>' +
@@ -217,20 +206,18 @@ function initBackupScheduler() {
 
     mkField('bs-name', '📝 Назва скрипту', 'text', 'auto-backup', 'auto-backup') +
 
-    '<div><label style="font-size:11px;color:#8ea3b0;display:block;margin-bottom:5px;">💾 Метод збереження</label>' +
-    '<select id="bs-method" style="' + iStyle() + '">' +
-    '<option value="local">💾 Локально (на роутері)</option>' +
-    '<option value="gdrive">🟢 Google Drive (Apps Script)</option>' +
-    '<option value="ftp">📤 FTP сервер</option>' +
-    '<option value="email">📧 Email</option>' +
-    '<option value="cloud">☁️ MikroTik Cloud</option>' +
-    '</select></div>' +
+    mkSelect('bs-method', '💾 Метод збереження', [
+      { value:'local',  label:'💾 Локально (на роутері)' },
+      { value:'gdrive', label:'🟢 Google Drive (Apps Script)' },
+      { value:'ftp',    label:'📤 FTP сервер' },
+      { value:'email',  label:'📧 Email' },
+      { value:'cloud',  label:'☁️ MikroTik Cloud' },
+    ], 'local') +
 
     /* Google Drive */
     '<div id="bs-gdrive-block" style="display:none;background:#0d2a1a;border:1px solid #5fd0a533;border-radius:8px;padding:14px;gap:10px;flex-direction:column;">' +
     mkField('bs-gdrive-url', '🟢 Google Apps Script URL', 'text', 'https://script.google.com/macros/s/.../exec', '') +
-    '<div id="bs-gdrive-url-status" style="font-size:11px;margin-top:4px;"></div>' +
-    '<div style="font-size:11px;color:#5fd0a5;margin-top:4px;">ℹ️ RouterOS 7.1+ | Deployment: Все → Від мого імені</div>' +
+    '<div style="font-size:11px;color:#5fd0a5;">ℹ️ RouterOS 7.1+ | Deployment: Все → Від мого імені</div>' +
     '</div>' +
 
     /* FTP */
@@ -256,14 +243,13 @@ function initBackupScheduler() {
 
     /* Розклад */
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-    '<div><label style="font-size:11px;color:#8ea3b0;display:block;margin-bottom:5px;">📅 Інтервал</label>' +
-    '<select id="bs-interval" style="' + iStyle() + '">' +
-    '<option value="1h">Щогодини (1h)</option>' +
-    '<option value="12h">Кожні 12 год (12h)</option>' +
-    '<option value="1d" selected>Щодня (1d)</option>' +
-    '<option value="2d">Кожні 2 дні (2d)</option>' +
-    '<option value="7d">Щотижня (7d)</option>' +
-    '</select></div>' +
+    mkSelect('bs-interval', '📅 Інтервал', [
+      { value:'1h',  label:'Щогодини (1h)' },
+      { value:'12h', label:'Кожні 12 год (12h)' },
+      { value:'1d',  label:'Щодня (1d)' },
+      { value:'2d',  label:'Кожні 2 дні (2d)' },
+      { value:'7d',  label:'Щотижня (7d)' },
+    ], '1d') +
     mkField('bs-time', '⏰ Час запуску', 'text', '03:00:00', '03:00:00') +
     '</div>' +
 
@@ -411,36 +397,6 @@ function initBackupScheduler() {
     el.addEventListener('change', updatePreview);
   });
 
-  /* Live-валідація Google Drive URL */
-  var gdriveInput = document.getElementById('bs-gdrive-url');
-  if (gdriveInput) {
-    gdriveInput.addEventListener('input', function() {
-      var statusEl = document.getElementById('bs-gdrive-url-status');
-      if (!statusEl) return;
-      var val = this.value.trim();
-
-      if (!val) {
-        statusEl.textContent = '';
-        this.style.borderColor = '#2a3b48';
-        return;
-      }
-
-      var isValid = val.indexOf('script.google.com/macros/s/') !== -1 &&
-                    val.indexOf('/exec') !== -1 &&
-                    val.startsWith('https://');
-
-      if (isValid) {
-        statusEl.textContent = '✅ URL виглядає правильно';
-        statusEl.style.color = '#5fd0a5';
-        this.style.borderColor = '#5fd0a5';
-      } else {
-        statusEl.textContent = '❌ Невірний URL! Має бути: https://script.google.com/macros/s/.../exec';
-        statusEl.style.color = '#e0665a';
-        this.style.borderColor = '#e0665a';
-      }
-    });
-  }
-
   /* ── Копіювати ── */
   document.getElementById('bs-copy').addEventListener('click', function() {
     var text = generateSource(getOpts());
@@ -506,25 +462,6 @@ function initBackupScheduler() {
   document.getElementById('bs-dp-deploy').addEventListener('click', function() {
     var btn  = this;
     var opts = getOpts();
-
-    /* Перевірка URL перед Deploy */
-    if (opts.method === 'gdrive') {
-      var urlOk = opts.gdriveUrl &&
-        opts.gdriveUrl.indexOf('script.google.com/macros/s/') !== -1 &&
-        opts.gdriveUrl.indexOf('/exec') !== -1 &&
-        opts.gdriveUrl.startsWith('https://');
-
-      if (!urlOk) {
-        dpStatus('bs-dp-status',
-          '❌ Невірний Google Drive URL!<br>' +
-          '<small>Перейди на вкладку ⚙️ Налаштування і встав правильний URL:<br>' +
-          '<code style="color:#5fd0a5">https://script.google.com/macros/s/.../exec</code></small>',
-          'err'
-        );
-        return;
-      }
-    }
-
     var hdrs = getDeployHdrs();
     var sname = opts.name;
     var src   = generateSource(opts);
@@ -758,3 +695,8 @@ if (document.readyState === 'loading') {
 } else {
   initBackupScheduler();
 }
+"""
+
+with open('backup-scheduler.js', 'w', encoding='utf-8', newline='\n') as f:
+    f.write(content)
+print('backup-scheduler.js v3 OK!')

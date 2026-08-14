@@ -337,9 +337,9 @@ textarea.ta-valid   { border-color: #5fd0a5 !important; }
 
     <span style="color:var(--muted);padding:0 4px">│</span>
 
-    <button class="sec" id="pre-home">🏠 Дім</button>
-    <button class="sec" id="pre-office">🏢 Офіс</button>
-    <button class="sec" id="pre-lte">📶 LTE</button>
+    
+    
+    
 
     <button id="pwa-install-btn" class="sec" style="display:none;align-items:center;gap:6px;">
       📲 Встановити
@@ -3886,7 +3886,9 @@ el('btn-reset').addEventListener('click', function() {
 });
 
 ['home', 'office', 'lte'].forEach(function(key) {
-  el('pre-' + key).addEventListener('click', function() {
+  var preBtn = el('pre-' + key);
+if (!preBtn) return;
+preBtn.addEventListener('click', function() {
     const preset = PRESETS[key];
 
     if (!confirm('Завантажити пресет "' + preset._name + '"?\nПоточні дані будуть перезаписані.')) {

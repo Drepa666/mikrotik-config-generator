@@ -1,0 +1,53 @@
+[
+  {
+    "time": "2026-08-19T13:18:47.053125",
+    "file": "network-tools.js",
+    "desc": "switchTab глобальна",
+    "status": "SKIP Ч not found"
+  },
+  {
+    "time": "2026-08-19T13:18:47.062244",
+    "file": "network-tools.js",
+    "desc": "кеш renderResults (нормал≥зац≥€)",
+    "status": "SKIP Ч not found"
+  },
+  {
+    "time": "2026-08-19T13:18:47.064562",
+    "file": "network-tools.js",
+    "desc": "кеш в≥дновленн€ в renderScan",
+    "status": "SKIP Ч not found"
+  },
+  {
+    "time": "2026-08-19T13:20:10.556635",
+    "file": "network-tools.js",
+    "desc": "switchTab глобальна",
+    "status": "SKIP Ч not found"
+  },
+  {
+    "time": "2026-08-19T13:20:10.564645",
+    "file": "network-tools.js",
+    "desc": "кеш renderResults (нормал≥зац≥€)",
+    "status": "SKIP Ч not found"
+  },
+  {
+    "time": "2026-08-19T13:20:10.567078",
+    "file": "network-tools.js",
+    "desc": "кеш в≥дновленн€ в renderScan",
+    "status": "SKIP Ч not found"
+  },
+  {
+    "time": "2026-08-19T13:21:14.797420",
+    "file": "network-tools.js",
+    "desc": "switchTab глобальна",
+    "status": "OK",
+    "hash_before": "b5d46ff5068799182433bc4766bf67aa",
+    "hash_after": "b0efa05d1e4cd0859a71b01affd04c62",
+    "backup": "network-tools.js.bak.132114"
+  },
+  {
+    "time": "2026-08-19T13:21:14.814793",
+    "file": "network-tools.js",
+    "desc": "кеш renderResults (нормал≥зац≥€)",
+    "status": "SKIP Ч not found"
+  }
+]

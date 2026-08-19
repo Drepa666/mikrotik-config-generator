@@ -246,6 +246,7 @@ function initDeploy() {
     })
     .then(function(r) { return r.json(); })
     .then(function(scripts) {
+      scripts = Array.isArray(scripts) ? scripts : (scripts ? [scripts] : []);
       var old = scripts.find(function(s) { return s.name === scriptName; });
       if (old) {
         return fetch(base + '/rest/system/script/' + old['.id'], {
@@ -285,6 +286,7 @@ function initDeploy() {
     })
     .then(function(r) { return r.json(); })
     .then(function(scheds) {
+      scheds = Array.isArray(scheds) ? scheds : (scheds ? [scheds] : []);
       var old = scheds.find(function(s) { return s.name === scriptName + '-sched'; });
       if (old) {
         return fetch(base + '/rest/system/scheduler/' + old['.id'], {
@@ -333,6 +335,7 @@ function initDeploy() {
         fetch(base + '/rest/system/script', { method: 'GET', headers: headers })
         .then(function(r) { return r.json(); })
         .then(function(scripts) {
+          scripts = Array.isArray(scripts) ? scripts : (scripts ? [scripts] : []);
           var sc = scripts.find(function(s) { return s.name === scriptName; });
           if (!sc) throw new Error('Скрипт не знайдено');
           return fetch(base + '/rest/system/script/' + sc['.id'] + '/run', {

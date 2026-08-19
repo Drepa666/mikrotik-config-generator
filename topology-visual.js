@@ -595,6 +595,7 @@
       fetch(PROXY + '/rest/system/identity', { method:'GET', headers:hdrs }).then(function(r) { return r.json(); }),
     ])
     .then(function(results) {
+      results = Array.isArray(results) ? results : (results ? [results] : []);
       var ifaces    = results[0];
       var addresses = results[1];
       var arps      = results[2];

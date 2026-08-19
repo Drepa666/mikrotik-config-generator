@@ -217,6 +217,7 @@ function initStats() {
     fetch(PROXY + '/rest/system/resource', { method: 'GET', headers: hdrs })
     .then(function(r) { return r.json(); })
     .then(function(res) {
+      res = Array.isArray(res) ? res : (res ? [res] : []);
       var cpu  = parseInt(res['cpu-load']) || 0;
       var free = parseInt(res['free-memory']) || 0;
       var total= parseInt(res['total-memory']) || 1;
@@ -284,6 +285,7 @@ function initStats() {
     fetch(PROXY + '/rest/interface', { method: 'GET', headers: hdrs })
     .then(function(r) { return r.json(); })
     .then(function(ifaces) {
+      ifaces = Array.isArray(ifaces) ? ifaces : (ifaces ? [ifaces] : []);
       var now    = Date.now();
       var dt     = (now - prevTime) / 1000 || 1;
       prevTime   = now;
@@ -338,6 +340,7 @@ function initStats() {
     fetch(PROXY + '/rest/ip/dhcp-server/lease', { method: 'GET', headers: hdrs })
     .then(function(r) { return r.json(); })
     .then(function(leases) {
+      leases = Array.isArray(leases) ? leases : (leases ? [leases] : []);
       var el = document.getElementById('stats-dhcp');
       if (!el) return;
       var active = leases.filter(function(l) { return l.status === 'bound'; });
@@ -356,6 +359,7 @@ function initStats() {
     fetch(PROXY + '/rest/user/active', { method: 'GET', headers: hdrs })
     .then(function(r) { return r.json(); })
     .then(function(sessions) {
+      sessions = Array.isArray(sessions) ? sessions : (sessions ? [sessions] : []);
       var el = document.getElementById('stats-sessions');
       if (!el) return;
       el.innerHTML = '<div style="color:#4a6070;margin-bottom:6px;">Сесій: ' + sessions.length + '</div>';

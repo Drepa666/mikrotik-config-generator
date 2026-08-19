@@ -118,6 +118,10 @@ function generateRsc(opts) {
   lines.push('');
   lines.push(source);
   lines.push('');
+  lines.push('# --- Cleanup old (якщо існує) ---');
+  lines.push('/system script remove [find name="' + name + '"]');
+  lines.push('/system scheduler remove [find name="' + name + '-sched"]');
+  lines.push('');
   lines.push('# --- Scheduler ---');
   lines.push('/system scheduler add \\');
   lines.push('  name="' + name + '-sched" \\');
@@ -537,6 +541,7 @@ function initBackupScheduler() {
     fetch(PROXY_URL + '/rest/system/script', { method:'GET', headers:hdrs })
     .then(function(r) { return r.json(); })
     .then(function(list) {
+      list = Array.isArray(list) ? list : (list ? [list] : []);
       var old = list.find(function(s) { return s.name === sname; });
       if (old) return fetch(PROXY_URL + '/rest/system/script/' + old['.id'], { method:'DELETE', headers:hdrs });
     })
@@ -563,6 +568,7 @@ function initBackupScheduler() {
     })
     .then(function(r) { return r.json(); })
     .then(function(list) {
+      list = Array.isArray(list) ? list : (list ? [list] : []);
       var old = list.find(function(s) { return s.name === sname + '-sched'; });
       if (old) return fetch(PROXY_URL + '/rest/system/scheduler/' + old['.id'], { method:'DELETE', headers:hdrs });
     })
@@ -636,6 +642,7 @@ function initBackupScheduler() {
     fetch(PROXY_URL + '/rest/system/script', { method:'GET', headers:hdrs })
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(list) {
+      list = Array.isArray(list) ? list : (list ? [list] : []);
       var sc = list.find(function(s) { return s.name === sname; });
       if (!sc) throw new Error('Скрипт "' + sname + '" не знайдено! Спочатку зроби Deploy.');
       tsStatus('⏳ Запускаю скрипт... (~15 сек)', 'info');
@@ -665,6 +672,7 @@ function initBackupScheduler() {
     fetch(PROXY_URL + '/rest/log', { method:'GET', headers:hdrs })
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(logs) {
+      logs = Array.isArray(logs) ? logs : (logs ? [logs] : []);
       var keywords = ['backup','Backup','Google Drive','FTP','Email','export','FAILED','done'];
       var filtered = logs.filter(function(l) {
         return keywords.some(function(k) { return (l.message||'').indexOf(k) !== -1; });
@@ -704,6 +712,7 @@ function initBackupScheduler() {
     fetch(PROXY_URL + '/rest/file', { method:'GET', headers:hdrs })
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(files) {
+      files = Array.isArray(files) ? files : (files ? [files] : []);
       var bkps = files.filter(function(f) {
         return (f.name||'').indexOf(prefix) !== -1;
       });

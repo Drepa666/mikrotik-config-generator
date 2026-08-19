@@ -377,6 +377,7 @@ function initTerminal() {
     fetch(PROXY + '/rest/ip/service', { method:'GET', headers:hdrs })
     .then(function(r) { return r.json(); })
     .then(function(services) {
+      services = Array.isArray(services) ? services : (services ? [services] : []);
       var promises = ports.map(function(item) {
         var svc = services.find(function(s) { return s.name === item.svc; });
         if (!svc) return Promise.resolve();
@@ -607,6 +608,7 @@ function initTerminal() {
     fetch(PROXY + '/rest/ip/service', { method:'GET', headers:getHeaders() })
     .then(function(r) { return r.json(); })
     .then(function(services) {
+      services = Array.isArray(services) ? services : (services ? [services] : []);
       /* Дедублікація по імені */
       var seen = {};
       services = services.filter(function(svc) {
@@ -1146,6 +1148,7 @@ function initTerminal() {
     fetch(PROXY + '/rest/system/scheduler', { method:'GET', headers:getHeaders() })
     .then(function(r) { return r.json(); })
     .then(function(scheds) {
+      scheds = Array.isArray(scheds) ? scheds : (scheds ? [scheds] : []);
       var list = document.getElementById('tm-sched-list');
       list.innerHTML = '';
 
@@ -1222,6 +1225,7 @@ function initTerminal() {
           fetch(PROXY + '/rest/system/script', { method:'GET', headers:getHeaders() })
           .then(function(r) { return r.json(); })
           .then(function(scripts) {
+            scripts = Array.isArray(scripts) ? scripts : (scripts ? [scripts] : []);
             var sc = scripts.find(function(s) { return s.name === scriptName; });
             if (!sc) throw new Error('Скрипт "' + scriptName + '" не знайдено');
             return fetch(PROXY + '/rest/system/script/' + sc['.id'] + '/run', {
@@ -1279,6 +1283,7 @@ function initTerminal() {
     fetch(PROXY + '/rest/system/script', { method:'GET', headers:getHeaders() })
     .then(function(r) { return r.json(); })
     .then(function(scripts) {
+      scripts = Array.isArray(scripts) ? scripts : (scripts ? [scripts] : []);
       var list = document.getElementById('tm-scripts-list');
       list.innerHTML = '';
 

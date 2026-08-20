@@ -375,7 +375,7 @@ function tmplInit() {
   btn.textContent = '📚 Шаблони';
   btn.title = 'Бібліотека готових конфігурацій';
   btn.style.cssText = [
-    'position:fixed', 'bottom:24px', 'left:264px',
+    'display:none', 'position:fixed', 'bottom:24px', 'left:264px',
     'background:#2a3b48', 'color:#e6edf3',
     'border:1px solid #3a5060', 'border-radius:50px',
     'padding:10px 20px', 'font-size:13px', 'font-weight:700',

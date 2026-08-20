@@ -8,6 +8,7 @@
 /* ── Стилі ── */
 var WIZARD_CSS = [
   '#wizard-btn{',
+    'display:none !important;',
     'position:fixed;bottom:24px;left:24px;',
     'background:#5fd0a5;color:#082018;',
     'border:none;border-radius:50px;',
@@ -624,12 +625,15 @@ function wizardInit() {
   document.head.appendChild(style);
 
   /* Кнопка відкриття */
+  /* wizard-btn об'єднано в меню */
   var btn = document.createElement('button');
   btn.id = 'wizard-btn';
   btn.textContent = '🧙 Майстер';
   btn.title = 'Покроковий майстер налаштування';
+  btn.style.display = 'none';
   btn.addEventListener('click', wzOpen);
   document.body.appendChild(btn);
+  window.wzOpen = wzOpen;
 
   /* Overlay */
   var overlay = document.createElement('div');

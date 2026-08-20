@@ -665,7 +665,7 @@ function renderPlugins() {
 function autoStart() {
   var state = loadState();
   BUILTIN_PLUGINS.forEach(function(plugin) {
-    if (state[plugin.id] === true && plugin.init) {
+    if (state[plugin.id] === true && plugin.init && plugin.id !== 'ping-monitor') {
       try {
         plugin.init(createPluginAPI(plugin));
         console.log('[plugins] Auto-started: ' + plugin.id);

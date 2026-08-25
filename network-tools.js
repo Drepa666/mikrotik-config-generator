@@ -75,6 +75,56 @@ document.body.appendChild(modal);
    ДОПОМІЖНІ
 ════════════════════════════════════════ */
 function getHeaders() {
+  /* Зберігаємо credentials в localStorage */
+  var ipEl   = document.getElementById('nt-ip');
+  var userEl = document.getElementById('nt-user');
+  var passEl = document.getElementById('nt-pass');
+  if (ipEl && ipEl.value)   localStorage.setItem('nt-ip',   ipEl.value);
+  if (userEl && userEl.value) localStorage.setItem('nt-user', userEl.value);
+  if (passEl && passEl.value) localStorage.setItem('nt-pass', passEl.value);
+  /* Зберігаємо credentials в localStorage */
+  var ipEl   = document.getElementById('nt-ip');
+  var userEl = document.getElementById('nt-user');
+  var passEl = document.getElementById('nt-pass');
+  if (ipEl && ipEl.value)   localStorage.setItem('nt-ip',   ipEl.value);
+  if (userEl && userEl.value) localStorage.setItem('nt-user', userEl.value);
+  if (passEl && passEl.value) localStorage.setItem('nt-pass', passEl.value);
+  /* Відновлюємо збережені credentials */
+  (function() {
+    var fields = {
+      'nt-ip':   '192.168.88.1',
+      'nt-user': 'admin',
+      'nt-pass': ''
+    };
+    Object.keys(fields).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      var saved = localStorage.getItem(id);
+      if (saved !== null) el.value = saved;
+      else if (fields[id]) el.value = fields[id];
+      el.addEventListener('input', function() {
+        localStorage.setItem(id, el.value);
+      });
+    });
+  })();
+  /* Відновлюємо збережені credentials */
+  (function() {
+    var fields = {
+      'nt-ip':   '192.168.88.1',
+      'nt-user': 'admin',
+      'nt-pass': ''
+    };
+    Object.keys(fields).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      var saved = localStorage.getItem(id);
+      if (saved !== null) el.value = saved;
+      else if (fields[id]) el.value = fields[id];
+      el.addEventListener('input', function() {
+        localStorage.setItem(id, el.value);
+      });
+    });
+  })();
   var ip   = document.getElementById('nt-ip').value.trim();
   var user = document.getElementById('nt-user').value.trim();
   var pass = document.getElementById('nt-pass').value;

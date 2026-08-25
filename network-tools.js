@@ -75,13 +75,26 @@ document.body.appendChild(modal);
    ДОПОМІЖНІ
 ════════════════════════════════════════ */
 function getHeaders() {
-  /* Зберігаємо credentials в localStorage */
   var ipEl   = document.getElementById('nt-ip');
   var userEl = document.getElementById('nt-user');
   var passEl = document.getElementById('nt-pass');
-  if (ipEl && ipEl.value)   localStorage.setItem('nt-ip',   ipEl.value);
-  if (userEl && userEl.value) localStorage.setItem('nt-user', userEl.value);
-  if (passEl && passEl.value) localStorage.setItem('nt-pass', passEl.value);
+
+  /* Відновлюємо з localStorage якщо поля порожні */
+  var ip   = (ipEl   && ipEl.value.trim())   || localStorage.getItem('nt-ip')   || '192.168.88.1';
+  var user = (userEl && userEl.value.trim()) || localStorage.getItem('nt-user') || 'admin';
+  var pass = (passEl && passEl.value)        || localStorage.getItem('nt-pass') || '';
+
+  /* Зберігаємо */
+  if (ip)   localStorage.setItem('nt-ip',   ip);
+  if (user) localStorage.setItem('nt-user', user);
+  if (pass) localStorage.setItem('nt-pass', pass);
+
+  /* Заповнюємо поля якщо порожні */
+  if (ipEl   && !ipEl.value)   ipEl.value   = ip;
+  if (userEl && !userEl.value) userEl.value = user;
+  if (passEl && !passEl.value) passEl.value = pass;
+
+  console.log('[nt] getHeaders ip=' + ip + ' user=' + user + ' pass_len=' + pass.length);
   /* Зберігаємо credentials в localStorage */
   var ipEl   = document.getElementById('nt-ip');
   var userEl = document.getElementById('nt-user');

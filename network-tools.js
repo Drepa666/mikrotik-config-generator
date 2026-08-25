@@ -714,6 +714,9 @@ function renderPing() {
       var hdrs = getHeaders();
       var startTime = Date.now();
 
+      /* Ініціалізуємо якщо ще немає */
+      if (!pingResults[ip]) pingResults[ip] = { history: [] };
+
       fetch(PROXY + '/rest/tool/ping', {
         method: 'POST',
         headers: hdrs,
@@ -755,6 +758,7 @@ function renderPing() {
         renderHosts();
       })
       .catch(function(e) {
+        if (!pingResults[ip]) pingResults[ip] = { history: [] };
         pingResults[ip].status = 'error';
         pingResults[ip].error  = e.message.includes('502') ? 'proxy недоступний' :
                                   e.message.includes('401') ? 'невірний пароль' :

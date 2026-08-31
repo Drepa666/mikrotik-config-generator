@@ -185,19 +185,32 @@ function updateSecurityScore() {
   /* Рахуємо бали */
   var totalPoints  = SEC_RULES.reduce(function(s, r) { return s + r.points; }, 0);
   var earnedPoints = 0;
-  var passed = [];
-  var failed = [];
+  var totalPoints  = 0;
+  var failed  = [];
+  var passed  = [];
+  var partial = [];
 
-  SEC_RULES.forEach(function(rule) {
-    if (rule.check()) {
-      earnedPoints += rule.points;
-      passed.push(rule);
-    } else {
-      failed.push(rule);
-    }
+  RULES.forEach(function(rule) {
+    totalPoints += rule.points;
+    var earned = 0;
+    try { earned = Math.min(rule.check() || 0, rule.points); } catch(e) {}
+    earnedPoints += earned;
+    var item = {
+      id:      rule.id,
+      label:   rule.label,
+      tip:     rule.tip,
+      points:  rule.points,
+      earned:  earned,
+      passed:  earned >= rule.points,
+      partial: earned > 0 && earned < rule.points,
+    };
+    if (item.passed)       passed.push(item);
+    else if (item.partial) partial.push(item);
+    else                   failed.push(item);
   });
 
-  var score = Math.round((earnedPoints / totalPoints) * 100);
+  var score = totalPoints > 0 ? Math.round(earnedPoints / totalPoints * 100) : 0;;
+
   var color = scoreColor(score);
   var label = scoreLabel(score);
 
@@ -269,7 +282,6 @@ function updateSecurityScore() {
 
     details.innerHTML = html;
   }
-}
 
 /* ── Ініціалізація ── */
 function secScoreInit() {

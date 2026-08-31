@@ -17,7 +17,7 @@ var registry = {
 
 /* ── Вбудовані плагіни ── */
 var BUILTIN_PLUGINS = [
-  {
+{
     id:          'ping-monitor',
     name:        '🏓 Ping Monitor',
     description: 'Пінгує список хостів і показує RTT в реальному часі',
@@ -455,6 +455,36 @@ var BUILTIN_PLUGINS = [
       });
     },
   },
+  {
+    id:          'wireguard',
+    name:        'WireGuard VPN',
+    description: 'Генерація ключів, .conf файлів та QR кодів для клієнтів',
+    version:     '1.1.0',
+    author:      'MikroTik Generator',
+    category:    'tools',
+    builtin:     true,
+    enabled:     false,
+    icon:        '🔒',
+    init: function(api) {
+      /* FAB прихований за замовчуванням */
+      var fab = document.getElementById('wg-fab');
+      if (fab) fab.style.display = 'none';
+
+      api.onEnable(function() {
+        var f = document.getElementById('wg-fab');
+        if (f) f.style.display = 'flex';
+        localStorage.setItem('wg-enabled', '1');
+      });
+      api.onDisable(function() {
+        var f = document.getElementById('wg-fab');
+        var m = document.getElementById('wg-modal');
+        if (f) f.style.display = 'none';
+        if (m) m.style.display = 'none';
+        localStorage.setItem('wg-enabled', '0');
+      });
+    },
+  },
+
 ];
 
 /* ════════════════════════════════════════
@@ -504,6 +534,12 @@ function createPluginAPI(plugin) {
       n.textContent = msg;
       document.body.appendChild(n);
       setTimeout(function() { n.remove(); }, 3000);
+    },
+    onEnable: function(cb) {
+      plugin._onEnableCb = cb;
+    },
+    onDisable: function(cb) {
+      plugin._onDisableCb = cb;
     },
   };
 }
@@ -644,10 +680,16 @@ function renderPlugins() {
             console.error('[plugin] Error:', e);
           }
         }
+        if (plugin && plugin._onEnableCb) {
+          try { plugin._onEnableCb(); } catch(e) { console.error('[plugin onEnable]', e); }
+        }
         if (window.auditLog) window.auditLog.add('Плагін увімкнено: ' + (plugin ? plugin.name : id), '', 'general');
       } else {
         state[id] = false;
         saveState(state);
+        if (plugin && plugin._onDisableCb) {
+          try { plugin._onDisableCb(); } catch(e) { console.error('[plugin onDisable]', e); }
+        }
         if (plugin && plugin.destroy) {
           try { plugin.destroy(); } catch(e) {}
         }

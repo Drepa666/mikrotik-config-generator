@@ -455,6 +455,27 @@ var BUILTIN_PLUGINS = [
       });
     },
   },
+    {
+    id:          'port-map',
+    name:        'Port Map',
+    description: 'Карта портів по моделі роутера: Ethernet, SFP, Wi-Fi, LTE, POE',
+    version:     '1.0.0',
+    author:      'MikroTik Generator',
+    category:    'tools',
+    builtin:     true,
+    enabled:     false,
+    icon:        '🔌',
+    init: function(api) {
+      api.onEnable(function() {
+        localStorage.setItem('portmap-enabled', '1');
+      });
+      api.onDisable(function() {
+        var m = document.getElementById('portmap-modal');
+        if (m) m.style.display = 'none';
+        localStorage.setItem('portmap-enabled', '0');
+      });
+    },
+  },
   {
     id:          'wireguard',
     name:        'WireGuard VPN',
@@ -663,7 +684,23 @@ function renderPlugins() {
     list.appendChild(card);
   });
 
-  /* Toggle обробники */
+  /* Конвертує plugin-id в GlobalName: wireguard -> WireGuardPlugin */
+function toGlobalName(id) {
+  /* Таблиця відповідності id -> глобальна змінна */
+  var MAP = {
+    'wireguard':  'WireGuardPlugin',
+    'port-map':   'PortMapPlugin',
+    'vlan-wizard':'VlanWizardPlugin',
+    'validator':  'ValidatorPlugin',
+  };
+  if (MAP[id]) return MAP[id];
+  /* Fallback — camelCase + Plugin */
+  return id.split('-').map(function(w) {
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }).join('') + 'Plugin';
+}
+
+/* Toggle обробники */
   list.querySelectorAll('.pl-toggle').forEach(function(chk) {
     chk.addEventListener('change', function() {
       var id     = this.getAttribute('data-id');
@@ -683,12 +720,22 @@ function renderPlugins() {
         if (plugin && plugin._onEnableCb) {
           try { plugin._onEnableCb(); } catch(e) { console.error('[plugin onEnable]', e); }
         }
+        /* Викликаємо глобальне API плагіну */
+        var globalApi = window[toGlobalName(id)];
+        if (globalApi && globalApi.enable) {
+          try { globalApi.enable(); } catch(e) {}
+        }
         if (window.auditLog) window.auditLog.add('Плагін увімкнено: ' + (plugin ? plugin.name : id), '', 'general');
       } else {
         state[id] = false;
         saveState(state);
         if (plugin && plugin._onDisableCb) {
           try { plugin._onDisableCb(); } catch(e) { console.error('[plugin onDisable]', e); }
+        }
+        /* Викликаємо глобальне API плагіну */
+        var globalApi2 = window[toGlobalName(id)];
+        if (globalApi2 && globalApi2.disable) {
+          try { globalApi2.disable(); } catch(e) {}
         }
         if (plugin && plugin.destroy) {
           try { plugin.destroy(); } catch(e) {}

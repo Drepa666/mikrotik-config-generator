@@ -373,7 +373,7 @@
       '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">' +
 
       /* Дім */
-      '<div onclick="window.applyMasterTemplate(0)" ' +
+      '<div ' +
       'style="background:#0d1a24;border:1px solid #2a3b48;border-radius:10px;padding:16px;cursor:pointer;" ' +
       'onmouseenter="this.style.borderColor=\'#5fd0a5\'" ' +
       'onmouseleave="this.style.borderColor=\'#2a3b48\'">' +
@@ -383,7 +383,7 @@
       '</div>' +
 
       /* Офіс */
-      '<div onclick="window.applyMasterTemplate(1)" ' +
+      '<div ' +
       'style="background:#0d1a24;border:1px solid #2a3b48;border-radius:10px;padding:16px;cursor:pointer;" ' +
       'onmouseenter="this.style.borderColor=\'#5b9bd5\'" ' +
       'onmouseleave="this.style.borderColor=\'#2a3b48\'">' +
@@ -393,7 +393,7 @@
       '</div>' +
 
       /* LTE */
-      '<div onclick="window.applyMasterTemplate(2)" ' +
+      '<div ' +
       'style="background:#0d1a24;border:1px solid #2a3b48;border-radius:10px;padding:16px;cursor:pointer;" ' +
       'onmouseenter="this.style.borderColor=\'#9b87f5\'" ' +
       'onmouseleave="this.style.borderColor=\'#2a3b48\'">' +
@@ -462,7 +462,7 @@
       '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:10px;">' +
       window._TEMPLATES.map(function (t, i) {
         return (
-          '<div onclick="window.applyMasterTemplate(' + i + ')" ' +
+          '<div ' +
           'style="background:#060d14;border:1px solid #2a3b48;border-left:3px solid ' + t.color + ';' +
           'border-radius:10px;padding:14px;cursor:pointer;transition:all .2s;" ' +
           'onmouseenter="this.style.background=\'#0d1a24\';this.style.transform=\'translateY(-2px)\'" ' +
@@ -483,12 +483,19 @@
     modal.appendChild(box);
     document.body.appendChild(modal);
 
-    /* Закрити вікно */
-    document.getElementById('master-close-btn').addEventListener('click', function () {
-      modal.style.display = 'none';
-    });
+    /* Закрити вікно — event delegation */
     modal.addEventListener('click', function (e) {
-      if (e.target === modal) modal.style.display = 'none';
+      var t = e.target;
+      /* Клік на кнопку Закрити або її дочірній елемент */
+      if (t.id === 'master-close-btn' ||
+          t.closest('#master-close-btn')) {
+        modal.style.display = 'none';
+        return;
+      }
+      /* Клік на фон (сам modal) */
+      if (t === modal) {
+        modal.style.display = 'none';
+      }
     });
 
     /* Запустити майстер */
@@ -615,4 +622,26 @@
     setTimeout(init, 800);
   }
 
+})();
+
+/* ══ Close button ══ */
+(function() {
+  var _obs = new MutationObserver(function() {
+    var btn = document.getElementById('master-close-btn');
+    if (!btn || btn._ok) return;
+    btn._ok = true;
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var all = document.querySelectorAll(
+        '#merged-modal,#topo-modal,#nettools-modal,#audit-modal,' +
+        '#plugins-modal,#analyzer-modal,#deploy-modal,' +
+        '#terminal-modal,#mass-modal,#backup-sched-modal,' +
+        '#passgen-modal,#ver-modal,#qr-wifi-modal,' +
+        '#changelog-modal,#dashboard-modal,#cs-modal,' +
+        '#diffapply-modal,#stats-modal'
+      );
+      all.forEach(function(m) { m.style.display = 'none'; });
+    });
+  });
+  _obs.observe(document.body, { childList: true, subtree: true });
 })();

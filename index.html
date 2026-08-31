@@ -1937,6 +1937,24 @@ function genStaticDns() {
     }
   });
 
+
+  /* ── RB5009 специфіка ── */
+  if (modelKey === 'rb5009' || modelKey === 'rb5009-outdoor') {
+    lines.push('# INFO: RB5009 — ether8 це 2.5G порт, ether1-7 гігабіт');
+    lines.push('# Рекомендується ether8 для uplink якщо провайдер дає > 1Gbps');
+  }
+
+  /* ── RB4011 IPsec offload ── */
+  if (modelKey === 'rb4011' || modelKey === 'rb4011-wifi') {
+    lines.push('# INFO: RB4011 має апаратне прискорення IPsec');
+    lines.push('/ip settings set max-neighbor-entries=8192');
+  }
+
+  /* ── L009 SFP+ ── */
+  if (modelKey === 'l009-rm' || modelKey === 'l009-wifi6') {
+    lines.push('# INFO: L009 — sfp-sfpplus1 це SFP+ (10G) порт');
+    lines.push('# ether2-8 гігабіт, ether1=WAN за замовчуванням');
+  }
   return lines;
 }
 
@@ -2842,7 +2860,62 @@ function render() {
     }
   }
 
-  lines.push.apply(lines, genCapsman());
+  
+  /* ── Wi-Fi 7 (hAP be3, RouterOS 7.15+) ── */
+  if (model.wifi === 'wifi7') {
+    lines.push('');
+    lines.push('# --- Wi-Fi 7 (RouterOS 7.15+) ---');
+    var w7 = '/interface wifi';
+    if (el('wifienable').checked) {
+      if (el('band5').checked) {
+        lines.push(w7 + ' set wifi1 disabled=no' +
+          ' configuration.ssid="' + q(ssid) + '"' +
+          ' configuration.mode=' + (model.mode === 'station' ? 'station' : 'ap') +
+          ' security.authentication-types=wpa2-psk,wpa3-psk' +
+          ' security.passphrase="' + q(password) + '"');
+        if (!model.single)
+          lines.push(rosEnsure(
+            '/interface bridge port add bridge=bridge-lan interface=wifi1',
+            'Bridge port already exists: wifi1'));
+      }
+      if (el('band24').checked) {
+        lines.push(w7 + ' set wifi2 disabled=no' +
+          ' configuration.ssid="' + q(ssid) + '"' +
+          ' configuration.mode=' + (model.mode === 'station' ? 'station' : 'ap') +
+          ' security.authentication-types=wpa2-psk,wpa3-psk' +
+          ' security.passphrase="' + q(password) + '"');
+        if (!model.single)
+          lines.push(rosEnsure(
+            '/interface bridge port add bridge=bridge-lan interface=wifi2',
+            'Bridge port already exists: wifi2'));
+      }
+    }
+  }
+
+  /* ── Station mode підказка (SXT, LHG) ── */
+  if (model.mode === 'station') {
+    lines.push('');
+    lines.push('# --- Station mode (CPE/Bridge) ---');
+    lines.push('# INFO: ' + model.label + ' налаштовано як Station (клієнт)');
+    lines.push('# Вкажи SSID базової станції в полі SSID вище');
+  }
+
+
+  /* ── Firewall mangle (QoS/DSCP) ── */
+  if (el('qosenable') && el('qosenable').checked) {
+    lines.push('');
+    lines.push('# --- QoS Mangle ---');
+    lines.push('/ip firewall mangle add chain=forward action=mark-connection' +
+      ' new-connection-mark=bulk-conn passthrough=yes' +
+      ' comment="QoS bulk connection"');
+    lines.push('/ip firewall mangle add chain=forward action=mark-packet' +
+      ' connection-mark=bulk-conn new-packet-mark=bulk passthrough=no');
+    lines.push('/queue type add name=pcq-download kind=pcq pcq-rate=0' +
+      ' pcq-classifier=dst-address');
+    lines.push('/queue type add name=pcq-upload kind=pcq pcq-rate=0' +
+      ' pcq-classifier=src-address');
+  }
+lines.push.apply(lines, genCapsman());
 
   if (el('guestenable').checked && !model.single) {
     const vlan = lineValue(el('guestvlan').value, '20');
@@ -6264,8 +6337,11 @@ function highlightRos(rawText) {
 <button id="btn-audit-fab" title="Audit Log" onclick="document.getElementById('audit-modal').style.display='block';" style="position:fixed;bottom:166px;right:16px;background:#16212c;border:2px solid #e0665a;color:#e0665a;border-radius:50%;width:42px;height:42px;font-size:18px;cursor:pointer;z-index:10000;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(224,102,90,.4);">&#128274;</button>
 <script src="topology-visual.js"></script>
 <script src="plugins.js"></script>
+<script src="fab-manager.js"></script>
 <script src="terminal-plus.js"></script>
 <script src="network-tools.js"></script>
+<script src="wireguard.js"></script>
+<script src="port-map.js"></script>
 
 <script src="scan-cache.js"></script>
 <button id="btn-nettools-fab" title="Мережеві інструменти" onclick="openNetTools()" style="position:fixed;bottom:358px;right:16px;background:#16212c;border:2px solid #5fd0a5;color:#5fd0a5;border-radius:50%;width:42px;height:42px;font-size:18px;cursor:pointer;z-index:10000;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(95,208,165,.4);">&#128295;</button>
@@ -6282,6 +6358,10 @@ function openNetTools() {
 </script>
 <script src="models-extended.js"></script>
 <script src="ui-overrides.js"></script>
-<script src="sw.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+</script>
 </body>
-</html>
+</html>

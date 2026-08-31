@@ -1,17 +1,19 @@
 # MikroTik Config Generator
 
-[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live-5fd0a5?logo=github)](https://drepa666.github.io/mikrotik-config-generator/)
-[![RouterOS](https://img.shields.io/badge/RouterOS-6.x%20|%207.x%20|%207.13%2B-blue)](https://mikrotik.com)
-[![PWA](https://img.shields.io/badge/PWA-Offline%20Ready-orange)](https://drepa666.github.io/mikrotik-config-generator/)
-[![Tests](https://img.shields.io/badge/Unit%20Tests-53%2F53-5fd0a5)](https://drepa666.github.io/mikrotik-config-generator/test.html)
+![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live-brightgreen)
+![RouterOS](https://img.shields.io/badge/RouterOS-6.x%20%7C%207.x%20%7C%207.13%2B-blue)
+![PWA](https://img.shields.io/badge/PWA-Offline%20Ready-orange)
+![Unit Tests](https://img.shields.io/badge/Unit%20Tests-53%2F53-success)
 
 > Генератор конфігурації RouterOS — один HTML-файл, нульові залежності, працює офлайн.
 
 ## Demo
 
-**https://drepa666.github.io/mikrotik-config-generator/**
+🔗 [https://drepa666.github.io/mikrotik-config-generator/](https://drepa666.github.io/mikrotik-config-generator/)
 
-## Можливості
+---
+
+## ⚡ Можливості
 
 | Функція | Опис |
 |---|---|
@@ -20,56 +22,33 @@
 | Diff viewer | LCS алгоритм порівняння .rsc файлів |
 | Валідація | Realtime перевірка 20+ полів форми |
 | Highlighting | Syntax highlighting RouterOS команд |
-| PWA | Офлайн режим, встановлюється як застосунок |
-| Безпека | API ключ не в localStorage, екранування q() |
+| Офлайн | PWA — працює без інтернету |
+| Профілі | Збереження/завантаження конфігурацій |
+| Теми | Світла/темна тема |
 
-## Структура
+---
 
-    mikrotik-config-generator/
-     ├── index.html            - UI + логіка генерації
-     ├── core.js               - утиліти (isIPv4, isCIDR, q, calcNet)
-     ├── validators.js         - inline валідація форми
-     ├── sw.js                 - Service Worker (PWA офлайн)
-     ├── manifest.webmanifest  - PWA маніфест
-     ├── test.html             - Unit тести
-     ├── icon-192.png
-     └── icon-512.png
+## 🆕 Нові можливості (Patch 41)
 
-## Швидкий старт
-
-    git clone https://github.com/Drepa666/mikrotik-config-generator.git
-    cd mikrotik-config-generator
-    python -m http.server 8080
-
-## RouterOS підтримка
-
-| Версія | Wi-Fi API | WireGuard | OpenVPN GCM |
-|---|---|---|---|
-| 7.13+ | /interface wifi | Yes | Yes |
-| 7.1-7.12 | /interface wifiwave2 | Yes | No |
-| 6.x | /interface wireless | No | No |
-
-## Безпека
-
-- q() — екранує \ $ " % newline перед вставкою в .rsc
-- isMac() — валідація MAC перед вставкою
-- distance — обмежено 1-255 (RouterOS ліміт)
-- API ключ не зберігається в localStorage
-- confirm() перед експортом профілів з паролями
-
-## Unit тести
-
-    http://localhost:8080/test.html
-
-| Suite | Тестів |
+| Функція | Опис |
 |---|---|
-| q() екранування | 13 |
-| isIPv4() | 10 |
-| isCIDR() | 9 |
-| isPort() | 7 |
-| isMac() | 7 |
-| calcNet() | 7 |
+| 🖥️ Роутер | Панель керування роутером прямо з браузера |
+| 🔒 SSH термінал | Повноцінний термінал як у Winbox |
+| ⚙️ Сервіси | Вмикання/вимикання сервісів одним кліком |
+| 🔌 Протоколи | Вибір протоколу та порту вручну з чекбоксами |
+| 📅 Scheduler | Керування розкладом задач |
+| 📜 Скрипти | Запуск/видалення скриптів на роутері |
+| ⏰ Backup Scheduler | Автобекап на Google Drive за розкладом |
+| 🚀 One-Click Deploy | Deploy скриптів на роутер через REST API |
+| 🔄 Auto-reconnect | SSH connection pool + keepalive кожні 30s |
+| ⬆️⬇️ Історія команд | Навігація стрілками по виконаних командах |
+| Tab autocomplete | Автодоповнення команд терміналу |
+| ⏹️ Stop | Зупинка команди вручну |
 
-## Ліцензія
+---
 
-MIT License
+## 🚀 Запуск
+
+```cmd
+cd C:\Users\bondarenko_ay\Desktop\Mikrotik
+python proxy.py

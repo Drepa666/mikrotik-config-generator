@@ -75,27 +75,28 @@ function collectDashboardData() {
 }
 
 function calcSecurityScore(d) {
+  /* Якщо є security-core.js — використовуємо його */
+  if (window.calcSecurityScore && window.calcSecurityScore !== calcSecurityScore) {
+    return window.calcSecurityScore();
+  }
+  /* Fallback — стара логіка з захистом від undefined */
+  if (!d || typeof d !== 'object') d = {};
   var score = 0;
   var max   = 0;
-
-  function check(val, pts) {
-    max += pts;
-    if (val) score += pts;
-  }
-
-  check(d.changepass && d.adminpass.length >= 8, 20);
-  check(d.basicfw,         20);
-  check(d.macprotect,      10);
-  check(d.disableservices, 10);
-  check(d.dnsprotect,      10);
-  check(d.ntpenable,        5);
-  check(d.backupenable,     5);
-  check(d.disableipv6,      5);
-  check(d.ipneighbor,       5);
-  check(d.disablesvcports,  5);
-  check(d.fasttrack,        5);
-
-  return Math.round((score / max) * 100);
+  function check(val, pts) { max += pts; if (val) score += pts; }
+  check(d.changepass && d.adminpass && d.adminpass.length >= 8, 20);
+  check(d.firewall,  20);
+  check(!d.mac,      10);
+  check(d.services,  10);
+  check(d.dns,       10);
+  check(d.ntp,        5);
+  check(d.backup,     5);
+  check(d.ipv6,       5);
+  check(d.neighbor,   5);
+  check(d.svcports,   5);
+  check(d.fasttrack,  5);
+  if (max === 0) return { total: 0, max: 100, pct: 0 };
+  return { total: score, max: max, pct: Math.round(score/max*100) };
 }
 
 /* ══════════════════════════════════════════════

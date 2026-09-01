@@ -4,18 +4,14 @@
 (function() {
   'use strict';
 
-  /* ── Curve25519 pure JS (спрощена реалізація) ── */
-  function clamp(k) {
-    k[0]  &= 248;
-    k[31] &= 127;
-    k[31] |= 64;
-    return k;
-  }
-
-  function generatePrivateKey() {
-    var key = new Uint8Array(32);
-    crypto.getRandomValues(key);
-    return clamp(key);
+  /* ── Базові утиліти (мають бути ПЕРШИМИ) ── */
+  function uint8ToBase64(arr) {
+    var binary = '';
+    var bytes = arr instanceof Uint8Array ? arr : new Uint8Array(arr);
+    for (var i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
   }
 
   function generatePsk() {
@@ -24,75 +20,80 @@
     return uint8ToBase64(arr);
   }
 
-  function uint8ToBase64(arr) {
-    var binary = '';
-    for (var i = 0; i < arr.length; i++) {
-      binary += String.fromCharCode(arr[i]);
-    }
-    return btoa(binary);
+
+
+  /* ── Curve25519 через X25519 Web Crypto API ── */
+
+  /* Конвертація: PKCS8 → raw 32 байти приватного ключа */
+  async function pkcs8ToRaw(pkcs8Buf) {
+    /* X25519 PKCS8: останні 32 байти = raw private key */
+    var arr = new Uint8Array(pkcs8Buf);
+    return arr.slice(arr.length - 32);
   }
 
-  /* Curve25519 scalar multiplication — RFC 7748 */
-  function curve25519(k, u) {
-    var x1, x2, x3, z2, z3, tmp0, tmp1;
-    var a24 = 121665;
-    var swap = 0;
-
-    /* Конвертуємо в числа */
-    function decodeLe(b) {
-      var n = new Array(16);
-      for (var i = 0; i < 16; i++) {
-        n[i] = (b[2*i] | (b[2*i+1] << 8));
-      }
-      return n;
-    }
-
-    function encodeLe(n) {
-      var b = new Uint8Array(32);
-      var carry;
-      for (var i = 0; i < 16; i++) {
-        b[2*i]   = n[i] & 0xff;
-        b[2*i+1] = n[i] >> 8;
-      }
-      return b;
-    }
-
-    /* Спрощена версія — генеруємо публічний ключ через SHA-256 як заглушку */
-    /* В реальному WG потрібна повна реалізація */
-    return null;
-  }
-
-  /* Генерація ключів через SHA-256 деривацію (сумісно з усіма браузерами) */
   async function generateKeyPair() {
-    /* Генеруємо приватний ключ */
-    var privBytes = generatePrivateKey();
-    var privB64   = uint8ToBase64(privBytes);
+    /* Спочатку пробуємо X25519 (WireGuard-сумісний Curve25519) */
+    try {
+      var kp = await crypto.subtle.generateKey(
+        { name: 'X25519' },
+        true,
+        ['deriveKey', 'deriveBits']
+      );
+      var privPkcs8 = await crypto.subtle.exportKey('pkcs8', kp.privateKey);
+      var pubRaw    = await crypto.subtle.exportKey('raw',   kp.publicKey);
 
-    /* Публічний ключ через HKDF + SHA-256 */
-    var privKey = await crypto.subtle.importKey(
-      'raw', privBytes,
-      { name: 'HKDF' },
-      false,
-      ['deriveBits']
-    );
+      /* Clamp приватний ключ як WireGuard вимагає */
+      var privRaw = await pkcs8ToRaw(privPkcs8);
+      privRaw[0]  &= 248;
+      privRaw[31] &= 127;
+      privRaw[31] |= 64;
 
-    var pubBits = await crypto.subtle.deriveBits(
-      {
-        name: 'HKDF',
-        hash: 'SHA-256',
-        salt: new TextEncoder().encode('WireGuard public key'),
-        info: new TextEncoder().encode('curve25519'),
-      },
-      privKey,
-      256
-    );
+      return {
+        privateKey: uint8ToBase64(privRaw),
+        publicKey:  uint8ToBase64(new Uint8Array(pubRaw)),
+        method:     'X25519',
+      };
+    } catch (e1) {
+      console.warn('[WG] X25519 не підтримується, використовуємо fallback:', e1.message);
+    }
 
-    var pubB64 = uint8ToBase64(new Uint8Array(pubBits));
+    /* Fallback: ECDH P-256 (не Curve25519 але для тестування) */
+    try {
+      var kp2 = await crypto.subtle.generateKey(
+        { name: 'ECDH', namedCurve: 'P-256' },
+        true,
+        ['deriveKey']
+      );
+      var pub2  = await crypto.subtle.exportKey('raw',   kp2.publicKey);
+      var priv2 = await crypto.subtle.exportKey('pkcs8', kp2.privateKey);
+      var priv2arr = new Uint8Array(priv2);
 
-    return { privateKey: privB64, publicKey: pubB64 };
+      return {
+        privateKey: uint8ToBase64(priv2arr.slice(priv2arr.length - 32)),
+        publicKey:  uint8ToBase64(new Uint8Array(pub2).slice(1, 33)),
+        method:     'P-256-fallback',
+      };
+    } catch (e2) {
+      console.warn('[WG] P-256 fallback не вдався:', e2.message);
+    }
+
+    /* Остаточний fallback: random bytes (тільки для UI демо) */
+    var priv3 = new Uint8Array(32);
+    var pub3  = new Uint8Array(32);
+    crypto.getRandomValues(priv3);
+    crypto.getRandomValues(pub3);
+    priv3[0]  &= 248;
+    priv3[31] &= 127;
+    priv3[31] |= 64;
+
+    return {
+      privateKey: uint8ToBase64(priv3),
+      publicKey:  uint8ToBase64(pub3),
+      method:     'random-fallback',
+    };
   }
 
-  /* ── Мова інтерфейсу ── */
+    /* ── Мова інтерфейсу ── */
   function getLang() {
     return (window.MT_LANG || document.documentElement.lang || 'uk').slice(0,2);
   }
@@ -331,6 +332,27 @@
 
       try {
         var serverKeys = await generateKeyPair();
+
+        /* Показуємо метод генерації */
+        var methodDiv = document.getElementById('wg-method-info');
+        if (!methodDiv) {
+          methodDiv = document.createElement('div');
+          methodDiv.id = 'wg-method-info';
+          methodDiv.style.cssText =
+            'padding:8px 12px;border-radius:6px;' +
+            'font-size:11px;margin-bottom:12px;font-family:monospace';
+          document.getElementById('wg-result').before(methodDiv);
+        }
+        if (serverKeys.method === 'X25519') {
+          methodDiv.style.cssText += ';background:#0d2a1a;border:1px solid #5fd0a5;color:#5fd0a5';
+          methodDiv.textContent = '✅ Curve25519 (X25519) — WireGuard-сумісні ключі';
+        } else if (serverKeys.method === 'P-256-fallback') {
+          methodDiv.style.cssText += ';background:#2a1a0d;border:1px solid #e6b35a;color:#e6b35a';
+          methodDiv.textContent = '⚠️ P-256 fallback — оновіть браузер для справжніх WG ключів';
+        } else {
+          methodDiv.style.cssText += ';background:#2a0d0d;border:1px solid #e05252;color:#e05252';
+          methodDiv.textContent = '❌ Random fallback — ці ключі НЕ працюватимуть в WireGuard!';
+        }
         var cfg = {
           serverPriv: serverKeys.privateKey,
           serverPub:  serverKeys.publicKey,

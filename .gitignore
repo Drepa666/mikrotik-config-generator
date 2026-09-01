@@ -18,4 +18,11 @@ __pycache__/
 # OS файли
 .DS_Store
 Thumbs.db
+# Тимчасові файли
+backups/
+*.py
+!auto_backup.py
+!restore.py
+!check_js_syntax.py
 desktop.ini
+

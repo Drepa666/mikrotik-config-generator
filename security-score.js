@@ -8,93 +8,114 @@ var SEC_RULES = [
   {
     id: 'password',
     label: 'Пароль admin змінено',
+    tip: 'Увімкніть "Змінити пароль admin" і введіть пароль у розділі "Загальне"',
     points: 20,
     check: function() {
       var cb = document.getElementById('changepass');
       var pw = document.getElementById('adminpass');
       if (cb && pw) return cb.checked && pw.value.trim().length > 0;
       return false;
-    },
-    tip: 'Увімкніть "Змінити пароль admin" і введіть пароль у розділі "Загальне"'
+    }
   },
   {
     id: 'firewall',
     label: 'Базовий Firewall увімкнено',
+    tip: 'Увімкніть "Базовий Firewall" у розділі "Firewall"',
     points: 20,
     check: function() {
-      var cb = document.getElementById('basicfw');
-      if (cb) return cb.checked;
-      return false;
-    },
-    tip: 'Увімкніть "Базовий фаєрвол (defconf)" у розділі "Фаєрвол та сервіси"'
+      var el = document.getElementById('basicfw');
+      return el ? el.checked : false;
+    }
   },
   {
     id: 'services',
     label: 'Небезпечні сервіси вимкнено',
+    tip: 'Увімкніть "Вимкнути telnet, ftp, www, api" у розділі "Безпека"',
     points: 15,
     check: function() {
-      var cb = document.getElementById('disableservices');
-      if (cb) return cb.checked;
-      return false;
-    },
-    tip: 'Увімкніть "Вимкнути telnet, ftp, www, api"'
+      var el = document.getElementById('disableservices');
+      return el ? el.checked : false;
+    }
   },
   {
     id: 'mac_protect',
-    label: 'MAC-доступ обмежено до LAN',
-    points: 15,
-    check: function() {
-      var cb = document.getElementById('macprotect');
-      if (cb) return cb.checked;
-      return false;
-    },
-    tip: 'Увімкніть "Захист MAC (Winbox/Telnet тільки з LAN)"'
-  },
-  {
-    id: 'ntp',
-    label: 'NTP налаштовано',
+    label: 'MAC захист увімкнено',
+    tip: 'Увімкніть "MAC захист" у розділі "MAC"',
     points: 10,
     check: function() {
-      var cb = document.getElementById('ntpenable');
-      if (cb) return cb.checked;
-      return false;
-    },
-    tip: 'Увімкніть "NTP-клієнт" у розділі "NTP та моніторинг"'
+      var el = document.getElementById('macprotect');
+      return el ? el.checked : false;
+    }
   },
   {
     id: 'dns_protect',
-    label: 'DNS захищено від WAN',
+    label: 'DNS захист увімкнено',
+    tip: 'Увімкніть "DNS захист" у розділі "DNS"',
     points: 10,
     check: function() {
-      var cb = document.getElementById('dnsprotect');
-      if (cb) return cb.checked;
-      var out = document.getElementById('output');
-      if (out) return (out.textContent || '').indexOf('block DNS UDP from WAN') !== -1;
-      return false;
-    },
-    tip: 'Увімкніть "Захист DNS від WAN (блок порту 53)"'
+      var el = document.getElementById('dnsprotect');
+      return el ? el.checked : false;
+    }
+  },
+  {
+    id: 'svcports',
+    label: 'Порти сервісів змінено',
+    tip: 'Увімкніть "Змінити порти сервісів" у розділі "Безпека"',
+    points: 10,
+    check: function() {
+      var el = document.getElementById('disablesvcports');
+      return el ? el.checked : false;
+    }
+  },
+  {
+    id: 'neighbor',
+    label: 'IP Neighbor вимкнено',
+    tip: 'Увімкніть "Вимкнути IP Neighbor" щоб приховати топологію мережі',
+    points: 5,
+    check: function() {
+      var el = document.getElementById('ipneighbor');
+      return el ? el.checked : false;
+    }
+  },
+  {
+    id: 'fasttrack',
+    label: 'FastTrack увімкнено',
+    tip: 'Увімкніть "FastTrack" для прискорення forwarding',
+    points: 5,
+    check: function() {
+      var el = document.getElementById('fasttrack');
+      return el ? el.checked : false;
+    }
+  },
+  {
+    id: 'ntp',
+    label: 'NTP синхронізація увімкнена',
+    tip: 'Увімкніть "NTP" у розділі "Загальне" для синхронізації часу',
+    points: 5,
+    check: function() {
+      var el = document.getElementById('ntpenable');
+      return el ? el.checked : false;
+    }
   },
   {
     id: 'backup',
-    label: 'Резервна копія перед змінами',
+    label: 'Автобекап увімкнено',
+    tip: 'Увімкніть "Backup Scheduler" для автоматичного резервного копіювання',
     points: 5,
     check: function() {
-      var cb = document.getElementById('backupenable');
-      if (cb) return cb.checked;
-      return false;
-    },
-    tip: 'Увімкніть "Резервна копія перед змінами" у розділі "Загальне"'
+      var el = document.getElementById('backupenable');
+      return el ? el.checked : false;
+    }
   },
   {
     id: 'ipv6',
     label: 'IPv6 вимкнено (якщо не потрібен)',
+    tip: 'Увімкніть "Вимкнути IPv6" якщо не використовуєте',
     points: 5,
     check: function() {
-      var cb = document.getElementById('disableipv6');
-      if (cb) return cb.checked;
-      return false;
-    },
-    tip: 'Увімкніть "Вимкнути IPv6" якщо не використовуєте'
+      var el = document.getElementById('disableipv6');
+      return el ? el.checked : false;
+    }
   },
 ];
 
@@ -183,17 +204,16 @@ function updateSecurityScore() {
   if (!panel) return;
 
   /* Рахуємо бали */
-  var totalPoints  = SEC_RULES.reduce(function(s, r) { return s + r.points; }, 0);
   var earnedPoints = 0;
   var totalPoints  = 0;
   var failed  = [];
   var passed  = [];
   var partial = [];
 
-  RULES.forEach(function(rule) {
+  SEC_RULES.forEach(function(rule) {
     totalPoints += rule.points;
     var earned = 0;
-    try { earned = Math.min(rule.check() || 0, rule.points); } catch(e) {}
+    try { earned = rule.check() ? rule.points : 0; } catch(e) {}
     earnedPoints += earned;
     var item = {
       id:      rule.id,
@@ -209,7 +229,7 @@ function updateSecurityScore() {
     else                   failed.push(item);
   });
 
-  var score = totalPoints > 0 ? Math.round(earnedPoints / totalPoints * 100) : 0;;
+  var score = totalPoints > 0 ? Math.round(earnedPoints / totalPoints * 100) : 0;
 
   var color = scoreColor(score);
   var label = scoreLabel(score);
@@ -284,6 +304,7 @@ function updateSecurityScore() {
   }
 
 /* ── Ініціалізація ── */
+}
 function secScoreInit() {
   if (typeof window.render !== 'function') {
     setTimeout(secScoreInit, 200);
@@ -317,6 +338,21 @@ function secScoreInit() {
       setTimeout(updateSecurityScore, 50);
     });
   });
+
+  /* Оновлення через setInterval — найнадійніший спосіб */
+  setInterval(updateSecurityScore, 1000);
+
+  /* Також вішаємо події напряму на всі чекбокси та inputs */
+  function bindInputs() {
+    document.querySelectorAll('input[type="checkbox"], input[type="text"], input[type="password"]').forEach(function(el) {
+      if (el._ssBound) return;
+      el._ssBound = true;
+      el.addEventListener('change', function() { setTimeout(updateSecurityScore, 50); });
+      el.addEventListener('input',  function() { setTimeout(updateSecurityScore, 50); });
+    });
+  }
+  bindInputs();
+  setInterval(bindInputs, 2000);
 
   /* Перший запуск */
   setTimeout(updateSecurityScore, 600);

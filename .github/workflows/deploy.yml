@@ -1,0 +1,21 @@
+name: Deploy to main
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: JS syntax check ALL
+        run: |
+          FAILED=0
+          for f in *.js; do
+            node --check "$f" 2>&1 || FAILED=1
+          done
+          exit $FAILED
+
+      - name: Success notify
+        run: echo "✅ Deploy OK — всі файли перевірено"

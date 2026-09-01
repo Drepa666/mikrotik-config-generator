@@ -1476,10 +1476,7 @@ const AI_COMPAT = {
     url: 'https://api.x.ai/v1/chat/completions',
     model: 'grok-2-latest'
   },
-  groq: {
-    url: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama-3.3-70b-versatile'
-  },
+  groq:    {url:'https://api.groq.com/openai/v1/chat/completions',model:'openai/gpt-oss-120b'},
   deepseek: {
     url: 'https://api.deepseek.com/chat/completions',
     model: 'deepseek-chat'
@@ -6363,5 +6360,6 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js');
 }
 </script>
+<script src="electron-bridge.js"></script>
 </body>
 </html>

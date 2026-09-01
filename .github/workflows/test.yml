@@ -11,12 +11,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: JS syntax check
         run: |
-          echo "=== Перевірка JS файлів ==="
           FAILED=0
           for f in *.js; do
-            node --check "$f" 2>&1 && echo "✅ OK: $f" || { echo "❌ FAIL: $f"; FAILED=1; }
+            node --check "$f" 2>&1 && echo "✅ $f" || { echo "❌ $f"; FAILED=1; }
           done
           exit $FAILED
 

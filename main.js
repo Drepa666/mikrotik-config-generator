@@ -6,10 +6,29 @@ const fs   = require('fs');
 
 let mainWindow = null;
 
+function getIndexPath() {
+  /* Шукаємо index.html в кількох місцях */
+  var candidates = [
+    path.join(__dirname, 'index.html'),
+    path.join(process.resourcesPath, 'app', 'index.html'),
+    path.join(process.resourcesPath, 'app.asar', 'index.html'),
+    path.join(app.getAppPath(), 'index.html'),
+  ];
+  for (var i = 0; i < candidates.length; i++) {
+    try {
+      if (fs.existsSync(candidates[i])) {
+        console.log('[Electron] index.html знайдено: ' + candidates[i]);
+        return candidates[i];
+      }
+    } catch(e) {}
+  }
+  console.error('[Electron] index.html НЕ знайдено! Шляхи:');
+  candidates.forEach(function(p) { console.error('  ' + p); });
+  return candidates[0];
+}
+
 function createWindow() {
-  const indexPath = path.join(app.getAppPath(), 'index.html');
-  console.log('[Electron] index.html path:', indexPath);
-  console.log('[Electron] exists:', fs.existsSync(indexPath));
+  var indexPath = getIndexPath();
 
   mainWindow = new BrowserWindow({
     width:     1280,
@@ -17,11 +36,11 @@ function createWindow() {
     minWidth:  900,
     minHeight: 600,
     title:     'MikroTik Config Generator',
-    icon:      path.join(app.getAppPath(), 'icon-512.png'),
+    icon:      path.join(__dirname, 'icon-512.png'),
     webPreferences: {
       nodeIntegration:  false,
       contextIsolation: true,
-      preload:          path.join(app.getAppPath(), 'preload.js'),
+      preload:          path.join(__dirname, 'preload.js'),
     },
     backgroundColor: '#0d1821',
     show: false,
@@ -29,6 +48,8 @@ function createWindow() {
 
   mainWindow.loadFile(indexPath).catch(function(err) {
     console.error('[Electron] loadFile error:', err);
+    /* Запасний варіант через URL */
+    mainWindow.loadURL('file://' + indexPath);
   });
 
   mainWindow.once('ready-to-show', function() {
@@ -38,10 +59,7 @@ function createWindow() {
 
   mainWindow.webContents.on('did-fail-load', function(e, code, desc, url) {
     console.error('[Electron] did-fail-load:', code, desc, url);
-    /* Показуємо помилку у вікні */
-    mainWindow.webContents.executeJavaScript(
-      'document.body.innerHTML = "<h1 style=color:red>Load error: ' + code + '</h1><p>' + url + '</p>"'
-    );
+    mainWindow.webContents.loadURL('data:text/html,<h1 style="color:red;font-family:sans-serif">Помилка завантаження ' + code + '</h1><p>' + url + '</p>');
     mainWindow.show();
   });
 

@@ -1,0 +1,46 @@
+{
+  "name": "mikrotik-config-generator",
+  "version": "3.0.0",
+  "description": "MikroTik Configuration Generator",
+  "author": "MikroTik Generator Team",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev":   "electron . --dev",
+    "build": "electron-builder build --win"
+  },
+  "build": {
+    "appId":       "com.mikrotik.config-generator",
+    "productName": "MikroTik Config Generator",
+    "asar":        false,
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon":   "icon-512.png"
+    },
+    "nsis": {
+      "oneClick":                          false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut":             true,
+      "createStartMenuShortcut":           true,
+      "language":                          "1058",
+      "menuCategory":                      "MikroTik",
+      "license":                           "LICENSE.txt"
+    },
+    "files": [
+      "**/*",
+      "!backups/**",
+      "!dist/**",
+      "!*.py",
+      "!*.md",
+      "!.github/**",
+      "!node_modules/.cache/**"
+    ]
+  },
+  "devDependencies": {
+    "electron":         "^44.0.0",
+    "electron-builder": "^26.0.0"
+  }
+}

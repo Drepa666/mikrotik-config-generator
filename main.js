@@ -1,10 +1,10 @@
 'use strict';
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
-const path   = require('path');
-const fs     = require('fs');
-const https  = require('https');
-const http   = require('http');
+const path  = require('path');
+const fs    = require('fs');
+const https = require('https');
+const http  = require('http');
 
 let mainWindow = null;
 
@@ -12,23 +12,32 @@ function getIndexPath() {
   var candidates = [
     path.join(__dirname, 'index.html'),
     path.join(process.resourcesPath, 'app', 'index.html'),
-    path.join(process.resourcesPath, 'app.asar', 'index.html'),
     path.join(app.getAppPath(), 'index.html'),
   ];
   for (var i = 0; i < candidates.length; i++) {
     try {
       if (fs.existsSync(candidates[i])) {
-        console.log('[Electron] index.html знайдено: ' + candidates[i]);
+        console.log('[Electron] Знайдено: ' + candidates[i]);
         return candidates[i];
       }
     } catch(e) {}
   }
-  console.error('[Electron] index.html НЕ знайдено!');
+  console.error('[Electron] index.html не знайдено!');
+  candidates.forEach(function(p) { console.error('  ' + p); });
   return candidates[0];
+}
+
+function pathToFileURL(filePath) {
+  /* Конвертуємо Windows шлях в file:// URL з кодуванням пробілів */
+  var normalized = filePath.replace(/\\/g, '/');
+  if (!normalized.startsWith('/')) normalized = '/' + normalized;
+  return 'file://' + encodeURI(normalized);
 }
 
 function createWindow() {
   var indexPath = getIndexPath();
+  var indexURL  = pathToFileURL(indexPath);
+  console.log('[Electron] Завантажуємо URL: ' + indexURL);
 
   mainWindow = new BrowserWindow({
     width:     1280,
@@ -46,20 +55,25 @@ function createWindow() {
     show: false,
   });
 
-  mainWindow.loadFile(indexPath).catch(function(err) {
-    console.error('[Electron] loadFile error:', err);
-    mainWindow.loadURL('file://' + indexPath);
+  mainWindow.loadURL(indexURL).catch(function(err) {
+    console.error('[Electron] loadURL error:', err);
   });
 
   mainWindow.once('ready-to-show', function() {
     mainWindow.show();
-    console.log('[Electron] Window ready');
+    console.log('[Electron] Window ready!');
   });
 
   mainWindow.webContents.on('did-fail-load', function(e, code, desc, url) {
     console.error('[Electron] did-fail-load:', code, desc, url);
     mainWindow.webContents.loadURL(
-      'data:text/html,<h1 style="color:red;font-family:sans-serif">Помилка ' + code + '</h1><p>' + url + '</p>'
+      'data:text/html;charset=utf-8,' + encodeURIComponent(
+        '<html><body style="background:#0d1821;color:#e05252;font-family:sans-serif;padding:40px">' +
+        '<h1>Помилка завантаження ' + code + '</h1>' +
+        '<p>Шлях: ' + url + '</p>' +
+        '<p>Перевстанови додаток або запусти з папки проекту</p>' +
+        '</body></html>'
+      )
     );
     mainWindow.show();
   });
@@ -86,7 +100,7 @@ app.on('window-all-closed', function() {
 });
 
 /* ══════════════════════════════════════════════════════
-   IPC — файлові діалоги
+   IPC — Файлові діалоги
    ══════════════════════════════════════════════════════ */
 
 ipcMain.handle('save-file', async function(event, options) {
@@ -132,11 +146,10 @@ ipcMain.handle('show-in-folder', function(event, filePath) {
 });
 
 /* ══════════════════════════════════════════════════════
-   IPC — AI запити напряму з main process (без CORS!)
+   IPC — AI запити напряму (без CORS!)
    ══════════════════════════════════════════════════════ */
 
 ipcMain.handle('ai-request', async function(event, options) {
-
   var provider = options.provider || 'groq';
   var key      = options.key      || '';
   var model    = options.model    || '';
@@ -144,30 +157,12 @@ ipcMain.handle('ai-request', async function(event, options) {
   var maxTok   = options.maxTok   || 1024;
 
   var CONFIGS = {
-    groq:      {
-      url:   'https://api.groq.com/openai/v1/chat/completions',
-      model: 'openai/gpt-oss-120b',
-    },
-    openai:    {
-      url:   'https://api.openai.com/v1/chat/completions',
-      model: 'gpt-4o-mini',
-    },
-    grok:      {
-      url:   'https://api.x.ai/v1/chat/completions',
-      model: 'grok-2-latest',
-    },
-    deepseek:  {
-      url:   'https://api.deepseek.com/chat/completions',
-      model: 'deepseek-chat',
-    },
-    anthropic: {
-      url:   'https://api.anthropic.com/v1/messages',
-      model: 'claude-haiku-20240307',
-    },
-    gemini:    {
-      url:   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
-      model: '',
-    },
+    groq:      { url: 'https://api.groq.com/openai/v1/chat/completions',     model: 'openai/gpt-oss-120b'    },
+    openai:    { url: 'https://api.openai.com/v1/chat/completions',           model: 'gpt-4o-mini'            },
+    grok:      { url: 'https://api.x.ai/v1/chat/completions',                 model: 'grok-2-latest'          },
+    deepseek:  { url: 'https://api.deepseek.com/chat/completions',            model: 'deepseek-chat'          },
+    anthropic: { url: 'https://api.anthropic.com/v1/messages',                model: 'claude-haiku-20240307'  },
+    gemini:    { url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', model: '' },
   };
 
   var cfg = CONFIGS[provider];
@@ -177,28 +172,20 @@ ipcMain.handle('ai-request', async function(event, options) {
 
   return new Promise(function(resolve) {
     try {
-      var bodyObj  = {};
-      var headers  = { 'Content-Type': 'application/json' };
-      var urlStr   = cfg.url;
+      var bodyObj = {};
+      var headers = { 'Content-Type': 'application/json' };
+      var urlStr  = cfg.url;
 
       if (provider === 'anthropic') {
         headers['x-api-key']         = key;
         headers['anthropic-version'] = '2023-06-01';
-        bodyObj = {
-          model:      finalModel,
-          max_tokens: maxTok,
-          messages:   [{ role: 'user', content: prompt }],
-        };
+        bodyObj = { model: finalModel, max_tokens: maxTok, messages: [{ role: 'user', content: prompt }] };
       } else if (provider === 'gemini') {
         urlStr  = cfg.url + '?key=' + key;
         bodyObj = { contents: [{ parts: [{ text: prompt }] }] };
       } else {
         headers['Authorization'] = 'Bearer ' + key;
-        bodyObj = {
-          model:      finalModel,
-          max_tokens: maxTok,
-          messages:   [{ role: 'user', content: prompt }],
-        };
+        bodyObj = { model: finalModel, max_tokens: maxTok, messages: [{ role: 'user', content: prompt }] };
       }
 
       var bodyStr = JSON.stringify(bodyObj);
@@ -208,59 +195,37 @@ ipcMain.handle('ai-request', async function(event, options) {
         hostname: urlObj.hostname,
         path:     urlObj.pathname + urlObj.search,
         method:   'POST',
-        headers:  Object.assign({}, headers, {
-          'Content-Length': Buffer.byteLength(bodyStr),
-        }),
+        headers:  Object.assign({}, headers, { 'Content-Length': Buffer.byteLength(bodyStr) }),
       };
 
       var lib = urlObj.protocol === 'https:' ? https : http;
-
       var req = lib.request(reqOptions, function(res) {
         var data = '';
         res.on('data', function(chunk) { data += chunk; });
         res.on('end', function() {
           try {
             var json = JSON.parse(data);
-
             if (res.statusCode !== 200) {
-              var errMsg = (json.error && json.error.message) || 'HTTP ' + res.statusCode;
-              return resolve({ ok: false, error: errMsg });
+              return resolve({ ok: false, error: (json.error && json.error.message) || 'HTTP ' + res.statusCode });
             }
-
             var text = '';
-
             if (provider === 'anthropic') {
-              text = (json.content || [])
-                .map(function(b) { return b.text || ''; })
-                .join('');
+              text = (json.content || []).map(function(b) { return b.text || ''; }).join('');
             } else if (provider === 'gemini') {
               var cand = (json.candidates || [])[0];
-              text = ((cand && cand.content && cand.content.parts) || [])
-                .map(function(p) { return p.text || ''; })
-                .join('');
+              text = ((cand && cand.content && cand.content.parts) || []).map(function(p) { return p.text || ''; }).join('');
             } else {
-              text = ((json.choices || [])[0] || {}).message
-                ? json.choices[0].message.content
-                : '';
+              text = ((json.choices || [])[0] || {}).message ? json.choices[0].message.content : '';
             }
-
             resolve({ ok: true, text: text.trim() });
-
           } catch(e) {
-            resolve({ ok: false, error: 'JSON parse: ' + e.message + ' | ' + data.slice(0, 200) });
+            resolve({ ok: false, error: 'JSON parse: ' + e.message });
           }
         });
       });
 
-      req.on('error', function(e) {
-        resolve({ ok: false, error: 'Network: ' + e.message });
-      });
-
-      req.setTimeout(30000, function() {
-        req.destroy();
-        resolve({ ok: false, error: 'Timeout 30s' });
-      });
-
+      req.on('error', function(e) { resolve({ ok: false, error: 'Network: ' + e.message }); });
+      req.setTimeout(30000, function() { req.destroy(); resolve({ ok: false, error: 'Timeout 30s' }); });
       req.write(bodyStr);
       req.end();
 

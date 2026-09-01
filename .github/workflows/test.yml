@@ -1,0 +1,25 @@
+name: Test
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Check JS syntax
+        run: |
+          for f in *.js; do
+            node --check "$f" && echo "OK: $f" || echo "FAIL: $f"
+          done
+      - name: Check index.html
+        run: |
+          python3 -c "
+          with open('index.html') as f:
+            c = f.read()
+          assert '</html>' in c, 'No closing html tag'
+          print('HTML OK')
+          "

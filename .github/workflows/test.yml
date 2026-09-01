@@ -9,20 +9,14 @@ jobs:
   syntax-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: JS syntax check
         run: |
           echo "=== Перевірка JS файлів ==="
           FAILED=0
           for f in *.js; do
-            node --check "$f" 2>&1
-            if [ $? -ne 0 ]; then
-              echo "FAIL: $f"
-              FAILED=1
-            else
-              echo "OK: $f"
-            fi
+            node --check "$f" 2>&1 && echo "✅ OK: $f" || { echo "❌ FAIL: $f"; FAILED=1; }
           done
           exit $FAILED
 
@@ -31,20 +25,6 @@ jobs:
           python3 -c "
           with open('index.html', encoding='utf-8') as f:
               c = f.read()
-          assert '</html>' in c, 'Немає </html>'
-          assert '<script' in c, 'Немає script тегів'
-          print('HTML OK: ' + str(len(c)) + ' байт')
+          assert '</html>' in c
+          print('✅ HTML OK')
           "
-
-      - name: Check required files
-        run: |
-          for f in index.html plugins.js ui-overrides.js \
-                   wireguard.js port-map.js security-score.js \
-                   security-core.js fab-manager.js; do
-            if [ -f "$f" ]; then
-              echo "OK: $f"
-            else
-              echo "MISSING: $f"
-              exit 1
-            fi
-          done

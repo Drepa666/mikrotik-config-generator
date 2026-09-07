@@ -5,13 +5,13 @@
   "author": "MikroTik Generator Team",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "dev":   "electron . --dev",
-    "build": "electron-builder build --win"
+    "start":   "electron .",
+    "dev":     "node dev.js",
+    "build":   "electron-builder build --win"
   },
   "build": {
     "appId":       "com.mikrotik.config-generator",
-    "productName": "MikroTik Config Generator",
+    "productName": "MikroTikConfigGenerator",
     "asar":        false,
     "directories": {
       "output": "dist"
@@ -21,13 +21,14 @@
       "icon":   "icon-512.png"
     },
     "nsis": {
-      "oneClick":                          false,
+      "oneClick":                           false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut":             true,
-      "createStartMenuShortcut":           true,
-      "language":                          "1058",
-      "menuCategory":                      "MikroTik",
-      "license":                           "LICENSE.txt"
+      "createDesktopShortcut":              true,
+      "createStartMenuShortcut":            true,
+      "shortcutName":                       "MikroTik Config Generator",
+      "language":                           "1058",
+      "menuCategory":                       "MikroTik",
+      "license":                            "LICENSE.txt"
     },
     "files": [
       "**/*",

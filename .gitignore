@@ -1,28 +1,17 @@
-# Бекапи
-*.backup*.html
-index.backup*.html
-sw.backup*.js
-generators.backup*.js
-test.backup*.html
-
-# Патч-файли
-patch*.py
-fix_*.py
-
-# Тимчасові файли
-*.bak
-*.tmp
-__pycache__/
-*.pyc
-
-# OS файли
-.DS_Store
-Thumbs.db
-# Тимчасові файли
+node_modules/
+dist/
 backups/
 *.py
-!auto_backup.py
-!restore.py
-!check_js_syntax.py
-desktop.ini
-
+*.log
+.env
+*.backup*.html
+test_*.py
+fix_*.py
+find_*.py
+check_*.py
+patch_*.py
+add_*.py
+remove_*.py
+debug_*.py
+kill_*.py
+dev_*.py

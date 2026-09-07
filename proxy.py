@@ -12,6 +12,11 @@ import time
 
 WEB_PORT   = 8080
 PROXY_PORT = 8888
+
+import sys as _sys
+ELECTRON_MODE = '--electron' in _sys.argv
+if ELECTRON_MODE:
+    print('[proxy] Electron режим — веб-сервер 8080 вимкнено')
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 
 SSL_CTX = ssl.create_default_context()
@@ -224,19 +229,27 @@ def main():
     proxy_thread.start()
     print('Proxy сервер -> http://localhost:{}'.format(PROXY_PORT))
 
-    browser_thread = threading.Thread(
-        target=open_browser, daemon=True)
-    browser_thread.start()
+    if not ELECTRON_MODE:
+        browser_thread = threading.Thread(
+            target=open_browser, daemon=True)
+        browser_thread.start()
 
-    web_srv = http.server.ThreadingHTTPServer(
-        ('0.0.0.0', WEB_PORT), StaticHandler)
-    print('HTTP сервер  -> http://localhost:{}'.format(WEB_PORT))
+        web_srv = http.server.ThreadingHTTPServer(
+            ('0.0.0.0', WEB_PORT), StaticHandler)
+        print('HTTP сервер  -> http://localhost:{}'.format(WEB_PORT))
 
-    try:
-        web_srv.serve_forever()
-    except KeyboardInterrupt:
-        print('\n[proxy] Зупинено.')
-        web_srv.shutdown()
+        try:
+            web_srv.serve_forever()
+        except KeyboardInterrupt:
+            print('\n[proxy] Зупинено.')
+            web_srv.shutdown()
+    else:
+        print('[proxy] Electron режим — тільки proxy на порту {}'.format(PROXY_PORT))
+        try:
+            proxy_srv.serve_forever()
+        except KeyboardInterrupt:
+            print('\n[proxy] Зупинено.')
+            proxy_srv.shutdown()
         proxy_srv.shutdown()
 
 

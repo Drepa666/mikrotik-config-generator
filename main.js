@@ -1,43 +1,179 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
-const path  = require('path');
-const fs    = require('fs');
-const https = require('https');
-const http  = require('http');
+const { app, BrowserWindow, ipcMain, dialog, shell, session } = require('electron');
+const path   = require('path');
+const fs     = require('fs');
+const https  = require('https');
+const http   = require('http');
+const net    = require('net');
+const { spawn, execSync } = require('child_process');
 
-let mainWindow = null;
+let mainWindow   = null;
+let proxyProcess = null;
 
-function getIndexPath() {
-  var candidates = [
-    path.join(__dirname, 'index.html'),
-    path.join(process.resourcesPath, 'app', 'index.html'),
-    path.join(app.getAppPath(), 'index.html'),
-  ];
-  for (var i = 0; i < candidates.length; i++) {
-    try {
-      if (fs.existsSync(candidates[i])) {
-        console.log('[Electron] Знайдено: ' + candidates[i]);
-        return candidates[i];
-      }
-    } catch(e) {}
+/* ══════════════════════════════════════════════════════
+   Перевіряємо чи порт вільний
+   ══════════════════════════════════════════════════════ */
+function isPortFree(port, callback) {
+  var server = net.createServer();
+  server.once('error', function() { callback(false); });
+  server.once('listening', function() { server.close(); callback(true); });
+  server.listen(port, '127.0.0.1');
+}
+
+/* ══════════════════════════════════════════════════════
+   Вбиваємо старий proxy якщо є
+   ══════════════════════════════════════════════════════ */
+function killExistingProxy(callback) {
+  try {
+    if (process.platform === 'win32') {
+      execSync(
+        'for /f "tokens=5" %a in (\'netstat -aon ^| findstr :8888\') do taskkill /F /PID %a',
+        { shell: true, stdio: 'ignore' }
+      );
+      console.log('[Proxy] Старий proxy на 8888 зупинено');
+    } else {
+      execSync('pkill -f proxy.py', { stdio: 'ignore' });
+    }
+  } catch(e) {
+    console.log('[Proxy] Старих процесів не знайдено');
   }
-  console.error('[Electron] index.html не знайдено!');
-  candidates.forEach(function(p) { console.error('  ' + p); });
-  return candidates[0];
+  /* Чекаємо 800ms щоб порт звільнився */
+  setTimeout(callback, 800);
 }
 
-function pathToFileURL(filePath) {
-  /* Конвертуємо Windows шлях в file:// URL з кодуванням пробілів */
-  var normalized = filePath.replace(/\\/g, '/');
-  if (!normalized.startsWith('/')) normalized = '/' + normalized;
-  return 'file://' + encodeURI(normalized);
+/* ══════════════════════════════════════════════════════
+   Запуск proxy.py з --electron параметром
+   ══════════════════════════════════════════════════════ */
+function startProxy(callback) {
+  var proxyPath = path.join(__dirname, 'proxy.py');
+
+  if (!fs.existsSync(proxyPath)) {
+    console.log('[Proxy] proxy.py не знайдено — пропускаємо');
+    if (callback) callback();
+    return;
+  }
+
+  killExistingProxy(function() {
+    isPortFree(8888, function(free) {
+      if (!free) {
+        console.warn('[Proxy] Порт 8888 ще зайнятий — пробуємо через 1s...');
+        setTimeout(function() { launchProxy(callback); }, 1000);
+      } else {
+        launchProxy(callback);
+      }
+    });
+  });
 }
 
+function launchProxy(callback) {
+  var proxyPath  = path.join(__dirname, 'proxy.py');
+  var pythonCmd  = process.platform === 'win32' ? 'python' : 'python3';
+
+  console.log('[Proxy] Запускаємо: ' + pythonCmd + ' ' + proxyPath + ' --electron');
+
+  proxyProcess = spawn(pythonCmd, [proxyPath, '--electron'], {
+    stdio:    ['ignore', 'pipe', 'pipe'],
+    detached: false,
+  });
+
+  var callbackCalled = false;
+  function done() {
+    if (!callbackCalled) {
+      callbackCalled = true;
+      if (callback) callback();
+    }
+  }
+
+  proxyProcess.stdout.on('data', function(data) {
+    var msg = data.toString().trim();
+    console.log('[Proxy] ' + msg);
+    /* Коли proxy готовий — створюємо вікно */
+    if (
+      msg.indexOf('8888') !== -1 ||
+      msg.indexOf('Proxy сервер') !== -1 ||
+      msg.indexOf('Electron') !== -1
+    ) {
+      done();
+    }
+  });
+
+  proxyProcess.stderr.on('data', function(data) {
+    console.error('[Proxy ERR] ' + data.toString().trim());
+  });
+
+  proxyProcess.on('close', function(code) {
+    console.log('[Proxy] Зупинено з кодом: ' + code);
+    proxyProcess = null;
+    done();
+  });
+
+  proxyProcess.on('error', function(err) {
+    console.error('[Proxy] Помилка запуску:', err.message);
+    proxyProcess = null;
+    done();
+  });
+
+  /* Запасний таймер — 4 секунди максимум */
+  setTimeout(done, 4000);
+
+  console.log('[Proxy] PID: ' + (proxyProcess.pid || 'невідомо'));
+}
+
+/* ══════════════════════════════════════════════════════
+   Зупинка proxy
+   ══════════════════════════════════════════════════════ */
+function stopProxy() {
+  if (proxyProcess) {
+    console.log('[Proxy] Зупиняємо...');
+    try {
+      if (process.platform === 'win32') {
+        execSync('taskkill /F /T /PID ' + proxyProcess.pid, { stdio: 'ignore' });
+      } else {
+        proxyProcess.kill('SIGTERM');
+      }
+    } catch(e) {
+      console.error('[Proxy] Помилка зупинки:', e.message);
+    }
+    proxyProcess = null;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   App Ready
+   ══════════════════════════════════════════════════════ */
+app.whenReady().then(function() {
+
+  /* Очищаємо Service Worker кеш */
+  session.defaultSession.clearStorageData({
+    storages: ['serviceworkers', 'cachestorage'],
+  }).then(function() {
+    console.log('[Electron] SW кеш очищено!');
+  }).catch(function(err) {
+    console.error('[Electron] Помилка очищення:', err);
+  });
+
+  /* Запускаємо proxy і чекаємо готовності */
+  startProxy(function() {
+    console.log('[Electron] Proxy готовий — створюємо вікно');
+    createWindow();
+  });
+
+  app.on('activate', function() {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+/* ══════════════════════════════════════════════════════
+   Створення вікна
+   ══════════════════════════════════════════════════════ */
 function createWindow() {
-  var indexPath = getIndexPath();
-  var indexURL  = pathToFileURL(indexPath);
-  console.log('[Electron] Завантажуємо URL: ' + indexURL);
+  var appDir    = __dirname;
+  var indexPath = path.join(appDir, 'index.html');
+
+  console.log('[Electron] appDir:    ' + appDir);
+  console.log('[Electron] indexPath: ' + indexPath);
+  console.log('[Electron] exists:    ' + fs.existsSync(indexPath));
 
   mainWindow = new BrowserWindow({
     width:     1280,
@@ -45,18 +181,32 @@ function createWindow() {
     minWidth:  900,
     minHeight: 600,
     title:     'MikroTik Config Generator',
-    icon:      path.join(__dirname, 'icon-512.png'),
+    icon:      path.join(appDir, 'icon-512.png'),
     webPreferences: {
       nodeIntegration:  false,
       contextIsolation: true,
-      preload:          path.join(__dirname, 'preload.js'),
+      preload:          path.join(appDir, 'preload.js'),
     },
     backgroundColor: '#0d1821',
     show: false,
   });
 
-  mainWindow.loadURL(indexURL).catch(function(err) {
-    console.error('[Electron] loadURL error:', err);
+  /* Дозволяємо PrintScreen */
+  mainWindow.setContentProtection(false);
+
+  /* Блокуємо Service Worker */
+  mainWindow.webContents.session.webRequest.onBeforeRequest(
+    { urls: ['*://*/sw.js', 'file://*/sw.js'] },
+    function(details, callback) {
+      console.log('[Electron] Блокуємо SW:', details.url);
+      callback({ cancel: true });
+    }
+  );
+
+  mainWindow.loadFile(indexPath).then(function() {
+    console.log('[Electron] loadFile OK!');
+  }).catch(function(err) {
+    console.error('[Electron] loadFile error:', err);
   });
 
   mainWindow.once('ready-to-show', function() {
@@ -64,17 +214,23 @@ function createWindow() {
     console.log('[Electron] Window ready!');
   });
 
-  mainWindow.webContents.on('did-fail-load', function(e, code, desc, url) {
-    console.error('[Electron] did-fail-load:', code, desc, url);
-    mainWindow.webContents.loadURL(
-      'data:text/html;charset=utf-8,' + encodeURIComponent(
-        '<html><body style="background:#0d1821;color:#e05252;font-family:sans-serif;padding:40px">' +
-        '<h1>Помилка завантаження ' + code + '</h1>' +
-        '<p>Шлях: ' + url + '</p>' +
-        '<p>Перевстанови додаток або запусти з папки проекту</p>' +
-        '</body></html>'
-      )
+  mainWindow.webContents.on('did-finish-load', function() {
+    console.log('[Electron] did-finish-load OK!');
+    /* Знімаємо реєстрацію Service Worker */
+    mainWindow.webContents.executeJavaScript(
+      'if (navigator.serviceWorker) {' +
+      '  navigator.serviceWorker.getRegistrations().then(function(regs) {' +
+      '    regs.forEach(function(r) {' +
+      '      r.unregister();' +
+      '      console.log("[SW] Unregistered:", r.scope);' +
+      '    });' +
+      '  });' +
+      '}'
     );
+  });
+
+  mainWindow.webContents.on('did-fail-load', function(e, code, desc, failedURL) {
+    console.error('[Electron] did-fail-load:', code, desc, failedURL);
     mainWindow.show();
   });
 
@@ -88,15 +244,13 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(function() {
-  createWindow();
-  app.on('activate', function() {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+app.on('window-all-closed', function() {
+  stopProxy();
+  if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('window-all-closed', function() {
-  if (process.platform !== 'darwin') app.quit();
+app.on('before-quit', function() {
+  stopProxy();
 });
 
 /* ══════════════════════════════════════════════════════
@@ -145,6 +299,19 @@ ipcMain.handle('show-in-folder', function(event, filePath) {
   shell.showItemInFolder(filePath);
 });
 
+ipcMain.handle('proxy-status', function() {
+  return {
+    running: proxyProcess !== null,
+    pid:     proxyProcess ? proxyProcess.pid : null,
+  };
+});
+
+ipcMain.handle('proxy-restart', function() {
+  stopProxy();
+  setTimeout(function() { startProxy(null); }, 500);
+  return { ok: true };
+});
+
 /* ══════════════════════════════════════════════════════
    IPC — AI запити напряму (без CORS!)
    ══════════════════════════════════════════════════════ */
@@ -157,12 +324,12 @@ ipcMain.handle('ai-request', async function(event, options) {
   var maxTok   = options.maxTok   || 1024;
 
   var CONFIGS = {
-    groq:      { url: 'https://api.groq.com/openai/v1/chat/completions',     model: 'openai/gpt-oss-120b'    },
-    openai:    { url: 'https://api.openai.com/v1/chat/completions',           model: 'gpt-4o-mini'            },
-    grok:      { url: 'https://api.x.ai/v1/chat/completions',                 model: 'grok-2-latest'          },
-    deepseek:  { url: 'https://api.deepseek.com/chat/completions',            model: 'deepseek-chat'          },
-    anthropic: { url: 'https://api.anthropic.com/v1/messages',                model: 'claude-haiku-20240307'  },
-    gemini:    { url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', model: '' },
+    groq:      { url: 'https://api.groq.com/openai/v1/chat/completions',                                          model: 'openai/gpt-oss-120b'   },
+    openai:    { url: 'https://api.openai.com/v1/chat/completions',                                               model: 'gpt-4o-mini'           },
+    grok:      { url: 'https://api.x.ai/v1/chat/completions',                                                     model: 'grok-2-latest'         },
+    deepseek:  { url: 'https://api.deepseek.com/chat/completions',                                                model: 'deepseek-chat'         },
+    anthropic: { url: 'https://api.anthropic.com/v1/messages',                                                    model: 'claude-haiku-20240307' },
+    gemini:    { url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', model: ''                      },
   };
 
   var cfg = CONFIGS[provider];

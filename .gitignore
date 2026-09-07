@@ -1,7 +1,6 @@
 node_modules/
 dist/
 backups/
-*.py
 *.log
 .env
 *.backup*.html
@@ -15,3 +14,6 @@ remove_*.py
 debug_*.py
 kill_*.py
 dev_*.py
+*.exe
+*.dmg
+*.AppImage

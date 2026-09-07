@@ -1,9 +1,32 @@
+# Залежності
 node_modules/
+
+# Збірка
 dist/
+build/
+out/
+
+# Виконувані файли
+*.exe
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.snap
+
+# Бекапи
 backups/
-*.log
-.env
 *.backup*.html
+
+# Логи
+*.log
+npm-debug.log*
+
+# Середовище
+.env
+.env.local
+
+# Python тимчасові файли
 test_*.py
 fix_*.py
 find_*.py
@@ -13,7 +36,18 @@ add_*.py
 remove_*.py
 debug_*.py
 kill_*.py
-dev_*.py
-*.exe
-*.dmg
-*.AppImage
+diagnose_*.py
+view_*.py
+__pycache__/
+*.pyc
+
+# OS файли
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

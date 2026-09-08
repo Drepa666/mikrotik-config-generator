@@ -316,6 +316,13 @@ textarea.ta-invalid { border-color: #e0665a !important; box-shadow: 0 0 0 2px rg
 textarea.ta-valid   { border-color: #5fd0a5 !important; }
 
 </style>
+
+<style id="hide-duplicates-css">
+  /* Приховуємо FAB кнопки — є в Router Manager */
+  #btn-audit-fab,
+  #audit-modal,
+  #btn-nettools-fab { display: none !important; }
+</style>
 </head>
 
 <body>
@@ -6361,5 +6368,36 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 <script src="electron-bridge.js"></script>
+<script src="subnet-validator.js"></script>
+<script src="router-manager.js"></script>
+<script src="router-manager-crud.js"></script>
+<script src="tab-completion.js"></script>
+
+<script id="hide-duplicates-js">
+(function() {
+  function hideByText() {
+    var HIDE_TEXTS = ['Роутер', 'Статистика'];
+    var btns = document.querySelectorAll('button, a.btn, .btn');
+    btns.forEach(function(btn) {
+      if (btn.id === 'btn-router-manager') return;
+      var text = btn.textContent.trim();
+      HIDE_TEXTS.forEach(function(t) {
+        if (text === t || text.endsWith(t)) {
+          btn.style.setProperty('display', 'none', 'important');
+          console.log('[Hide] Прихована кнопка:', text, btn.id);
+        }
+      });
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', hideByText);
+  } else {
+    hideByText();
+  }
+  setTimeout(hideByText, 1000);
+  setTimeout(hideByText, 2000);
+})();
+</script>
+
 </body>
 </html>

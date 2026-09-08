@@ -429,6 +429,7 @@
      ══════════════════════════════════════════════════════════ */
   var MENU = [
     { id: 'dashboard', icon: '📊', label: 'Dashboard' },
+    { id: 'traffic',   icon: '📈', label: 'Traffic Monitor' },
     { id: 'terminal',  icon: '🖥️', label: 'Terminal (SSH)' },
     { id: 'sep1' },
     { id: 'interfaces', icon: '🌐', label: 'Interfaces' },
@@ -601,31 +602,24 @@
     var menu = state.activeMenu;
     console.log('[RM] renderContent menu:', menu, 'router:', state.activeRouter);
 
-    if (menu === 'dashboard')     { renderDashboard(); return; }
+    if (menu === 'dashboard') {
+      if (window.rmSectionDashboard) { window.rmSectionDashboard(); return; }
+      renderDashboard(); return;
+    }
     if (menu === 'terminal')      { renderTerminal();   return; }
-    if (window.rmSectionInterfaces && menu === 'interfaces') { window.rmSectionInterfaces(); return; }
-    if (menu === 'interfaces_old')    { if(window.rmCrudInterfaces) window.rmCrudInterfaces(); else renderInterfaces(); return; }
-    if (window.rmSectionIPAddresses && menu === 'ip-addresses') { window.rmSectionIPAddresses(); return; }
-    if (menu === 'ip-addresses_old')  { if(window.rmCrudIPAddresses) window.rmCrudIPAddresses(); else renderTable('IP Addresses','/ip/address',['address','network','interface','dynamic']); return; }
-    if (window.rmSectionRoutes && menu === 'ip-routes') { window.rmSectionRoutes(); return; }
-    if (menu === 'ip-routes_old')     { if(window.rmCrudRoutes) window.rmCrudRoutes(); else renderTable('Routes','/ip/route',['dst-address','gateway','distance','active']); return; }
-    if (window.rmSectionDHCP && menu === 'ip-dhcp') { window.rmSectionDHCP(); return; }
-    if (menu === 'ip-dhcp_old')       { if(window.rmCrudDHCP) window.rmCrudDHCP(); else renderTable('DHCP Leases','/ip/dhcp-server/lease',['address','mac-address','host-name','status','expires-after']); return; }
+    if (menu === 'interfaces')    { if(window.rmCrudInterfaces) window.rmCrudInterfaces(); else renderInterfaces(); return; }
+    if (menu === 'ip-addresses')  { if(window.rmCrudIPAddresses) window.rmCrudIPAddresses(); else renderTable('IP Addresses','/ip/address',['address','network','interface','dynamic']); return; }
+    if (menu === 'ip-routes')     { if(window.rmCrudRoutes) window.rmCrudRoutes(); else renderTable('Routes','/ip/route',['dst-address','gateway','distance','active']); return; }
+    if (menu === 'ip-dhcp')       { if(window.rmCrudDHCP) window.rmCrudDHCP(); else renderTable('DHCP Leases','/ip/dhcp-server/lease',['address','mac-address','host-name','status','expires-after']); return; }
     if (menu === 'ip-dns')        { renderDNS(); return; }
     if (menu === 'ip-arp')        { if(window.rmCrudARP) window.rmCrudARP(); else renderTable('ARP Table','/ip/arp',['address','mac-address','interface','dynamic']); return; }
-    if (window.rmSectionFirewall && menu === 'fw-filter') { window.rmSectionFirewall('filter'); return; }
-    if (menu === 'fw-filter_old')     { if(window.rmCrudFWFilter) window.rmCrudFWFilter(); else renderTable('Firewall Filter','/ip/firewall/filter',['chain','action','src-address','dst-address','protocol','comment']); return; }
-    if (window.rmSectionFirewall && menu === 'fw-nat') { window.rmSectionFirewall('nat'); return; }
-    if (menu === 'fw-nat_old')        { if(window.rmCrudFWNAT) window.rmCrudFWNAT(); else renderTable('NAT Rules','/ip/firewall/nat',['chain','action','src-address','dst-port','comment']); return; }
-    if (window.rmSectionFirewall && menu === 'fw-mangle') { window.rmSectionFirewall('mangle'); return; }
-    if (menu === 'fw-mangle_old')     { if(window.rmCrudFWMangle) window.rmCrudFWMangle(); else renderTable('Mangle','/ip/firewall/mangle',['chain','action','passthrough','comment']); return; }
+    if (menu === 'fw-filter')     { if(window.rmCrudFWFilter) window.rmCrudFWFilter(); else renderTable('Firewall Filter','/ip/firewall/filter',['chain','action','src-address','dst-address','protocol','comment']); return; }
+    if (menu === 'fw-nat')        { if(window.rmCrudFWNAT) window.rmCrudFWNAT(); else renderTable('NAT Rules','/ip/firewall/nat',['chain','action','src-address','dst-port','comment']); return; }
+    if (menu === 'fw-mangle')     { if(window.rmCrudFWMangle) window.rmCrudFWMangle(); else renderTable('Mangle','/ip/firewall/mangle',['chain','action','passthrough','comment']); return; }
     if (menu === 'fw-conntrack')  { renderTable('Connections', '/ip/firewall/connection', ['src-address','dst-address','protocol','state']); return; }
-    if (window.rmSectionWireless && menu === 'wl-interfaces') { window.rmSectionWireless(); return; }
-    if (menu === 'wl-interfaces_old') { if(window.rmCrudWireless) window.rmCrudWireless(); else renderTable('Wireless Interfaces','/interface/wireless',['name','ssid','band','frequency','running']); return; }
-    if (window.rmSectionWireless && menu === 'wl-clients') { window.rmSectionWireless(); return; }
-    if (menu === 'wl-clients_old')    { renderTable('Wireless Clients', '/interface/wireless/registration-table', ['interface','mac-address','signal-strength','tx-rate','rx-rate','uptime']); return; }
-    if (window.rmSectionSystem && menu === 'sys-resources') { window.rmSectionSystem(); return; }
-    if (menu === 'sys-resources_old') { renderResources(); return; }
+    if (menu === 'wl-interfaces') { if(window.rmCrudWireless) window.rmCrudWireless(); else renderTable('Wireless Interfaces','/interface/wireless',['name','ssid','band','frequency','running']); return; }
+    if (menu === 'wl-clients')    { renderTable('Wireless Clients', '/interface/wireless/registration-table', ['interface','mac-address','signal-strength','tx-rate','rx-rate','uptime']); return; }
+    if (menu === 'sys-resources') { renderResources(); return; }
     if (menu === 'sys-scheduler') { if(window.rmCrudScheduler) window.rmCrudScheduler(); else renderTable('Scheduler','/system/scheduler',['name','interval','on-event','next-run']); return; }
     if (menu === 'sys-scripts')   { renderScripts(); return; }
     if (menu === 'sys-logs')      { renderLogs(); return; }
@@ -633,10 +627,8 @@
     if (menu === 'sys-backup')    { renderBackup(); return; }
     if (menu === 'sys-reboot')    { renderReboot(); return; }
     if (menu === 'romon')         { renderRoMON(); return; }
-    if (window.rmSectionQueues && menu === 'queues-simple') { window.rmSectionQueues(); return; }
-    if (menu === 'queues-simple_old') { if(window.rmCrudQueues)    window.rmCrudQueues();    else cont.innerHTML='<div style="color:#8ea3b0;padding:20px;">Queues Simple</div>'; return; }
-    if (window.rmSectionPPP && menu === 'ppp-secrets') { window.rmSectionPPP(); return; }
-    if (menu === 'ppp-secrets_old')   { if(window.rmCrudPPP)       window.rmCrudPPP();       else cont.innerHTML='<div style="color:#8ea3b0;padding:20px;">PPP Secrets</div>'; return; }
+    if (menu === 'queues-simple') { if(window.rmCrudQueues)    window.rmCrudQueues();    else cont.innerHTML='<div style="color:#8ea3b0;padding:20px;">Queues Simple</div>'; return; }
+    if (menu === 'ppp-secrets')   { if(window.rmCrudPPP)       window.rmCrudPPP();       else cont.innerHTML='<div style="color:#8ea3b0;padding:20px;">PPP Secrets</div>'; return; }
     if (menu === 'vlan-list')     { if(window.rmCrudVLAN)      window.rmCrudVLAN();      else cont.innerHTML='<div style="color:#8ea3b0;padding:20px;">VLANs</div>'; return; }
     if (menu === 'bridge-ports')  { if(window.rmCrudBridge)    window.rmCrudBridge();    else cont.innerHTML='<div style="color:#8ea3b0;padding:20px;">Bridge Ports</div>'; return; }
     if (menu === 'wg-peers')      { if(window.rmCrudWGPeers)   window.rmCrudWGPeers();   else cont.innerHTML='<div style="color:#8ea3b0;padding:20px;">WG Peers</div>'; return; }
@@ -1570,13 +1562,6 @@
   };
 
   window.__rmGetState = function() { return state; };
-
-  /* Навігація для cross-links */
-  window.__rmSetMenu = function(menu) {
-    state.activeMenu = menu;
-    renderSidebar();
-    renderContent();
-  };
 
   window.RouterManager = {
     open:      openManager,

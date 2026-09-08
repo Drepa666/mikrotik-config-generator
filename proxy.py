@@ -1,256 +1,285 @@
-#!/usr/bin/env python3
-import http.server
+"""
+MikroTik Config Generator — Proxy Server v4
+Підтримує: REST API proxy, SSH exec, статичні файли
+Режими: звичайний (8080+8888) та --electron (тільки 8888)
+Платформи: Windows, macOS, Linux
+"""
+
+import os
+import sys
+import json
 import threading
+import http.server
 import urllib.request
 import urllib.error
-import base64
-import json
-import ssl
-import os
-import webbrowser
 import time
 
+# ── Порти ──────────────────────────────────────────────────
 WEB_PORT   = 8080
 PROXY_PORT = 8888
 
-import sys as _sys
-ELECTRON_MODE = '--electron' in _sys.argv
+# ── Режим Electron ─────────────────────────────────────────
+ELECTRON_MODE = '--electron' in sys.argv
 if ELECTRON_MODE:
     print('[proxy] Electron режим — веб-сервер 8080 вимкнено')
-BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 
-SSL_CTX = ssl.create_default_context()
-SSL_CTX.check_hostname = False
-SSL_CTX.verify_mode    = ssl.CERT_NONE
+# ── Базова директорія ──────────────────────────────────────
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-CORS = (
-    'Content-Type,Authorization,'
-    'X-Router-IP,X-Router-User,X-Router-Pass,'
-    'X-Router-Port,X-Router-Proto,X-Router-Host,'
-    'x-router-ip,x-router-user,x-router-pass,'
-    'x-router-port,x-router-proto,x-router-host'
-)
-
-MIME = {
-    '.html': 'text/html; charset=utf-8',
-    '.js':   'application/javascript; charset=utf-8',
-    '.css':  'text/css; charset=utf-8',
-    '.json': 'application/json',
-    '.png':  'image/png',
-    '.ico':  'image/x-icon',
-    '.txt':  'text/plain; charset=utf-8',
-    '.webmanifest': 'application/manifest+json',
-}
+# ── SSH підтримка ──────────────────────────────────────────
+try:
+    import paramiko
+    SSH_OK = True
+except ImportError:
+    SSH_OK = False
+    print('[proxy] paramiko не знайдено — SSH exec недоступний')
+    print('[proxy] Встановити: python -m pip install paramiko')
 
 
-class StaticHandler(http.server.BaseHTTPRequestHandler):
-
-    def log_message(self, fmt, *args):
-        pass
-
-    def _cors(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods',
-                         'GET,POST,PUT,PATCH,DELETE,OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', CORS)
-
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self._cors()
-        self.send_header('Content-Length', '0')
-        self.end_headers()
-
-    def do_GET(self):
-        path = self.path.split('?')[0]
-        if path in ('/', ''):
-            path = '/index.html'
-        safe  = path.lstrip('/').replace('..', '')
-        fpath = os.path.join(BASE_DIR, safe)
-        if not os.path.isfile(fpath):
-            self.send_response(404)
-            self._cors()
-            self.end_headers()
-            self.wfile.write(b'404 Not found')
-            return
-        ext  = os.path.splitext(fpath)[1].lower()
-        mime = MIME.get(ext, 'application/octet-stream')
-        with open(fpath, 'rb') as f:
-            data = f.read()
-        self.send_response(200)
-        self.send_header('Content-Type', mime)
-        self.send_header('Content-Length', str(len(data)))
-        self._cors()
-        self.end_headers()
-        self.wfile.write(data)
+# ══════════════════════════════════════════════════════════════
+#  CORS хелпер
+# ══════════════════════════════════════════════════════════════
+def send_json(handler, data, status=200):
+    body = json.dumps(data, ensure_ascii=False).encode('utf-8')
+    handler.send_response(status)
+    handler.send_header('Content-Type',  'application/json; charset=utf-8')
+    handler.send_header('Content-Length', str(len(body)))
+    handler.send_header('Access-Control-Allow-Origin',  '*')
+    handler.send_header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
+    handler.send_header('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-router-ip,x-router-port,x-router-user,x-router-pass')
+    handler.end_headers()
+    handler.wfile.write(body)
 
 
+# ══════════════════════════════════════════════════════════════
+#  SSH виконання команд
+# ══════════════════════════════════════════════════════════════
+def ssh_exec(host, port, username, password, command, timeout=15):
+    if not SSH_OK:
+        return {'ok': False, 'error': 'paramiko не встановлено. Виконай: python -m pip install paramiko'}
+
+    try:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(
+            hostname=host,
+            port=int(port),
+            username=username,
+            password=password,
+            timeout=10,
+            look_for_keys=False,
+            allow_agent=False,
+        )
+        stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
+        out = stdout.read().decode('utf-8', errors='replace')
+        err = stderr.read().decode('utf-8', errors='replace')
+        client.close()
+        return {'ok': True, 'output': out, 'error': err}
+    except paramiko.AuthenticationException:
+        return {'ok': False, 'error': 'Невірний логін або пароль SSH'}
+    except paramiko.NoValidConnectionsError:
+        return {'ok': False, 'error': 'SSH: неможливо підключитись до ' + host + ':' + str(port)}
+    except Exception as e:
+        return {'ok': False, 'error': 'SSH помилка: ' + str(e)}
+
+
+# ══════════════════════════════════════════════════════════════
+#  Proxy Handler — обробник запитів на порту 8888
+# ══════════════════════════════════════════════════════════════
 class ProxyHandler(http.server.BaseHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
-        msg = fmt % args
-        if '200' in msg or '304' in msg:
-            return
-        print('[proxy]', msg)
-
-    def _cors(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods',
-                         'GET,POST,PUT,PATCH,DELETE,OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', CORS)
+        # Тихий режим — виводимо тільки помилки
+        if args and len(args) >= 2 and str(args[1]) not in ('200', '204'):
+            print('[proxy] ' + fmt % args)
 
     def do_OPTIONS(self):
-        self.send_response(200)
-        self._cors()
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin',  '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-router-ip,x-router-port,x-router-user,x-router-pass')
         self.send_header('Content-Length', '0')
         self.end_headers()
 
     def do_GET(self):
-        self._proxy('GET')
+        self._handle('GET')
 
     def do_POST(self):
-        self._proxy('POST')
+        self._handle('POST')
 
     def do_PUT(self):
-        self._proxy('PUT')
+        self._handle('PUT')
 
     def do_PATCH(self):
-        self._proxy('PATCH')
+        self._handle('PATCH')
 
     def do_DELETE(self):
-        self._proxy('DELETE')
+        self._handle('DELETE')
 
-    def _proxy(self, method):
-        ip = (self.headers.get('X-Router-Host') or
-              self.headers.get('x-router-host') or
-              self.headers.get('X-Router-IP')   or
-              self.headers.get('x-router-ip')   or '192.168.88.1')
-        port = (self.headers.get('X-Router-Port') or
-                self.headers.get('x-router-port') or '80')
+    def _read_body(self):
+        length = int(self.headers.get('Content-Length', 0) or 0)
+        if length > 0:
+            return self.rfile.read(length)
+        return b''
 
-        # SSH exec — не підтримується через HTTP proxy
-        # Повертаємо зрозумілу помилку замість 501
-        if self.path == '/ssh/exec':
-            rb = json.dumps({
-                'error': 'SSH exec не підтримується через HTTP proxy. '
-                         'Використовуй REST API або SSH напряму.'
-            }).encode()
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Content-Length', str(len(rb)))
-            self._cors()
-            self.end_headers()
-            self.wfile.write(rb)
+    def _handle(self, method):
+        path = self.path.split('?')[0]
+
+        # ── Health check ────────────────────────────────────
+        if path == '/health' or path == '/ping':
+            send_json(self, {'ok': True, 'ssh': SSH_OK, 'electron': ELECTRON_MODE})
             return
 
-        target = 'http://{}:{}{}'.format(ip, port, self.path)
+        # ── SSH exec endpoint ────────────────────────────────
+        if path == '/ssh/exec':
+            body_bytes = self._read_body()
+            try:
+                body = json.loads(body_bytes) if body_bytes else {}
+            except Exception:
+                send_json(self, {'ok': False, 'error': 'Невалідний JSON'}, 400)
+                return
 
-        body = b''
-        cl = int(self.headers.get('Content-Length', 0) or 0)
-        if cl > 0:
-            body = self.rfile.read(cl)
+            host     = body.get('host')     or self.headers.get('x-router-ip')   or '192.168.88.1'
+            port     = body.get('port')     or self.headers.get('x-router-port')  or 22
+            username = body.get('username') or self.headers.get('x-router-user')  or 'admin'
+            password = body.get('password') or self.headers.get('x-router-pass')  or ''
+            command  = body.get('command',  '')
 
-        auth = (self.headers.get('Authorization') or
-                self.headers.get('authorization') or '')
+            if not command:
+                send_json(self, {'ok': False, 'error': 'Команда не вказана'}, 400)
+                return
 
-        fwd = {
-            'Content-Type': self.headers.get(
-                'Content-Type', 'application/json'),
-            'Accept': 'application/json',
+            result = ssh_exec(host, int(port), username, password, command)
+            send_json(self, result, 200 if result['ok'] else 500)
+            return
+
+        # ── REST API proxy до роутера ────────────────────────
+        router_ip   = self.headers.get('x-router-ip')   or '192.168.88.1'
+        router_port = self.headers.get('x-router-port') or '80'
+        auth        = self.headers.get('Authorization')  or ''
+
+        target = 'http://{}:{}{}'.format(router_ip, router_port, self.path)
+
+        body_bytes = self._read_body()
+
+        fwd_headers = {
+            'Content-Type': self.headers.get('Content-Type', 'application/json'),
         }
         if auth:
-            fwd['Authorization'] = auth
-
-        print('[proxy] {} {}  auth={}'.format(
-            method, target,
-            auth[:25] if auth else 'NONE'))
+            fwd_headers['Authorization'] = auth
 
         try:
             req = urllib.request.Request(
-                target, data=body or None,
-                headers=fwd, method=method)
-            with urllib.request.urlopen(
-                req, context=SSL_CTX, timeout=15
-            ) as r:
-                rb   = r.read()
-                code = r.status
-                ct   = r.headers.get(
-                    'Content-Type', 'application/json')
-            self.send_response(code)
-            self.send_header('Content-Type', ct)
-            self.send_header('Content-Length', str(len(rb)))
-            self._cors()
+                target,
+                data=body_bytes or None,
+                headers=fwd_headers,
+                method=method,
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data    = resp.read()
+                status  = resp.status
+                ctype   = resp.headers.get('Content-Type', 'application/json')
+
+            self.send_response(status)
+            self.send_header('Content-Type',   ctype)
+            self.send_header('Content-Length', str(len(data)))
+            self.send_header('Access-Control-Allow-Origin',  '*')
+            self.send_header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-router-ip,x-router-port,x-router-user,x-router-pass')
             self.end_headers()
-            self.wfile.write(rb)
+            self.wfile.write(data)
 
         except urllib.error.HTTPError as e:
-            rb = e.read()
+            err_body = e.read()
             self.send_response(e.code)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Content-Length', str(len(rb)))
-            self._cors()
+            self.send_header('Content-Type',   'application/json')
+            self.send_header('Content-Length', str(len(err_body)))
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(rb)
+            self.wfile.write(err_body)
 
         except Exception as e:
-            rb = json.dumps({'error': str(e)}).encode()
+            msg = json.dumps({'error': str(e), 'target': target}).encode()
             self.send_response(502)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Content-Length', str(len(rb)))
-            self._cors()
+            self.send_header('Content-Type',   'application/json')
+            self.send_header('Content-Length', str(len(msg)))
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(rb)
+            self.wfile.write(msg)
 
 
+# ══════════════════════════════════════════════════════════════
+#  Static Handler — обробник статичних файлів на порту 8080
+# ══════════════════════════════════════════════════════════════
+class StaticHandler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=BASE_DIR, **kwargs)
+
+    def log_message(self, fmt, *args):
+        pass  # тихий режим
+
+
+# ══════════════════════════════════════════════════════════════
+#  Відкрити браузер після запуску
+# ══════════════════════════════════════════════════════════════
 def open_browser():
-    time.sleep(2)
+    time.sleep(1.5)
+    import webbrowser
     webbrowser.open('http://localhost:{}'.format(WEB_PORT))
 
 
+# ══════════════════════════════════════════════════════════════
+#  Головна функція
+# ══════════════════════════════════════════════════════════════
 def main():
-    try:
-        import paramiko
-        ssh_ok = True
-    except ImportError:
-        ssh_ok = False
-
-    print('=' * 50)
-    print('MikroTik Config Generator v3')
-    print('=' * 50)
-    print('Web UI  -> http://localhost:{}'.format(WEB_PORT))
-    print('Proxy   -> http://localhost:{}'.format(PROXY_PORT))
-    print('SSH OK  -> {}'.format(ssh_ok))
-    print('Ctrl+C щоб зупинити')
-    print('=' * 50)
-
-    proxy_srv = http.server.ThreadingHTTPServer(
-        ('0.0.0.0', PROXY_PORT), ProxyHandler)
-    proxy_thread = threading.Thread(
-        target=proxy_srv.serve_forever, daemon=True)
-    proxy_thread.start()
-    print('Proxy сервер -> http://localhost:{}'.format(PROXY_PORT))
-
+    print('=' * 52)
+    print('  MikroTik Config Generator v4')
+    print('=' * 52)
     if not ELECTRON_MODE:
-        browser_thread = threading.Thread(
-            target=open_browser, daemon=True)
-        browser_thread.start()
+        print('  Web UI  -> http://localhost:{}'.format(WEB_PORT))
+    print('  Proxy   -> http://localhost:{}'.format(PROXY_PORT))
+    print('  SSH     -> {}'.format('OK (paramiko)' if SSH_OK else 'НЕДОСТУПНИЙ'))
+    print('  Ctrl+C щоб зупинити')
+    print('=' * 52)
 
-        web_srv = http.server.ThreadingHTTPServer(
-            ('0.0.0.0', WEB_PORT), StaticHandler)
-        print('HTTP сервер  -> http://localhost:{}'.format(WEB_PORT))
+    # Запускаємо proxy сервер (порт 8888) — завжди
+    proxy_server = http.server.ThreadingHTTPServer(
+        ('127.0.0.1', PROXY_PORT),
+        ProxyHandler,
+    )
+    proxy_thread = threading.Thread(
+        target=proxy_server.serve_forever,
+        daemon=True,
+    )
+    proxy_thread.start()
+    print('[proxy] Proxy сервер -> http://localhost:{}'.format(PROXY_PORT))
 
-        try:
-            web_srv.serve_forever()
-        except KeyboardInterrupt:
-            print('\n[proxy] Зупинено.')
-            web_srv.shutdown()
-    else:
+    # В Electron режимі — тільки proxy, без веб-сервера
+    if ELECTRON_MODE:
         print('[proxy] Electron режим — тільки proxy на порту {}'.format(PROXY_PORT))
         try:
-            proxy_srv.serve_forever()
+            proxy_server.serve_forever()
         except KeyboardInterrupt:
             print('\n[proxy] Зупинено.')
-            proxy_srv.shutdown()
-        proxy_srv.shutdown()
+            proxy_server.shutdown()
+        return
+
+    # Звичайний режим — веб-сервер + автовідкриття браузера
+    browser_thread = threading.Thread(target=open_browser, daemon=True)
+    browser_thread.start()
+
+    web_server = http.server.ThreadingHTTPServer(
+        ('127.0.0.1', WEB_PORT),
+        StaticHandler,
+    )
+    print('[proxy] HTTP сервер  -> http://localhost:{}'.format(WEB_PORT))
+
+    try:
+        web_server.serve_forever()
+    except KeyboardInterrupt:
+        print('\n[proxy] Зупинено.')
+        web_server.shutdown()
+        proxy_server.shutdown()
 
 
 if __name__ == '__main__':

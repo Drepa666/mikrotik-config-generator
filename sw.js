@@ -1,31 +1,89 @@
 /* ============================================================
-   MikroTik Config Generator — Service Worker
-   Версія: 1.1.0 — виправлено file:// для Electron
+   MikroTik Config Generator — Service Worker v3.0 FINAL
+   ВИПРАВЛЕНО: file:// для Electron — НЕ кешуємо, НЕ падаємо
    ============================================================ */
 'use strict';
-df373077ba0a50caae866a8cd14c5b3fbfe380d1
 
-self.addEventListener('install', function() {
-  self.skipWaiting();
+const CACHE_NAME = 'mt-config-v3';
+
+const API_HOSTS = [
+  'api.openai.com',
+  'api.anthropic.com',
+  'api.x.ai',
+  'api.groq.com',
+  'api.deepseek.com',
+  'generativelanguage.googleapis.com'
+];
+
+/* ── INSTALL — без precache щоб не падати на file:// ── */
+self.addEventListener('install', function(event) {
+  console.log('[SW v3] Install');
+  /* НЕ викликаємо cache.addAll — це падає в Electron */
+  event.waitUntil(self.skipWaiting());
 });
 
-self.addEventListener('activate', function(e) {
-  e.waitUntil(
-    caches.keys().then(function(k) {
-      return Promise.all(k.map(function(n) { return caches.delete(n); }));
-    }).then(function() { return self.clients.claim(); })
+/* ── ACTIVATE ── */
+self.addEventListener('activate', function(event) {
+  event.waitUntil(
+    caches.keys()
+      .then(function(keys) {
+        return Promise.all(
+          keys
+            .filter(function(k) { return k !== CACHE_NAME; })
+            .map(function(k) { return caches.delete(k); })
+        );
+      })
+      .then(function() { return self.clients.claim(); })
   );
 });
 
-self.addEventListener('fetch', function(e) {
-  if (e.request.method !== 'GET') return;
-  var url = e.request.url;
-  /* Не кешуємо JS, proxy та REST */
-  if (url.indexOf('.js') > -1) return;
-  if (url.indexOf('localhost:8888') > -1) return;
-  if (url.indexOf('/rest/') > -1) return;
-  if (url.indexOf('/ssh/') > -1) return;
-  e.respondWith(fetch(e.request).catch(function() {
-    return caches.match(e.request);
-  }));
+/* ── FETCH ── */
+self.addEventListener('fetch', function(event) {
+  if (event.request.method !== 'GET') return;
+
+  var url;
+  try { url = new URL(event.request.url); } catch(e) { return; }
+
+  /* ✅ ГОЛОВНИЙ ЗАХИСТ — пропускаємо все що не http/https */
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
+  /* Пропускаємо AI API */
+  if (API_HOSTS.some(function(h) { return url.hostname === h; })) return;
+
+  /* Пропускаємо localhost proxy */
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return;
+
+  event.respondWith(
+    caches.match(event.request)
+      .then(function(cached) {
+        if (cached) {
+          /* Фонове оновлення */
+          fetch(event.request)
+            .then(function(r) {
+              if (r && r.status === 200 && r.type === 'basic') {
+                caches.open(CACHE_NAME)
+                  .then(function(c) { c.put(event.request, r.clone()); });
+              }
+            })
+            .catch(function() {});
+          return cached;
+        }
+
+        return fetch(event.request)
+          .then(function(r) {
+            if (!r || r.status !== 200 || r.type !== 'basic') return r;
+            var clone = r.clone();
+            caches.open(CACHE_NAME)
+              .then(function(c) { c.put(event.request, clone); });
+            return r;
+          })
+          .catch(function() { return caches.match('./'); });
+      })
+  );
+});
+
+self.addEventListener('message', function(event) {
+  if (!event.data) return;
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data === 'CACHE_CLEAR') caches.delete(CACHE_NAME);
 });

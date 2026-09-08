@@ -1,0 +1,13 @@
+# -*- coding: utf-8 -*-
+with open('index.html', 'r', encoding='utf-8') as f:
+    c = f.read()
+
+c = c.replace(
+    '<!-- rm-ux.js DISABLED temporarily -->',
+    '<script src="rm-ux.js"></script>'
+)
+
+with open('index.html', 'w', encoding='utf-8') as f:
+    f.write(c)
+
+print('OK: rm-ux.js увімкнено!')

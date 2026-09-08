@@ -494,6 +494,16 @@
     { id: 'addr-list',icon: '🚫', label: 'Address Lists' },
     { id: 'dhcp-srv', icon: '📡', label: 'DHCP Server' },
     { id: 'dns-static',icon: '📋', label: 'DNS Static' },
+    { id: 'sep-extra' },
+    { id: 'capsman',       icon: '📡', label: 'CAPsMAN' },
+    { id: 'notifications', icon: '🔔', label: 'Notifications' },
+    { id: 'sep-extra2' },
+    { id: 'ipv6',          icon: '🌐', label: 'IPv6' },
+    { id: 'wireguard',     icon: '🔐', label: 'WireGuard' },
+    { id: 'certificates',  icon: '🏅', label: 'Certificates' },
+    { id: 'netwatch',      icon: '👁', label: 'Netwatch' },
+    { id: 'snmp',          icon: '📊', label: 'SNMP' },
+    { id: 'logging',       icon: '📋', label: 'Logging' },
   ];
 
   function renderSidebar() {
@@ -641,6 +651,14 @@
     if (menu === 'traffic') {
       if (window.rmSectionTraffic) { window.rmSectionTraffic(); return; }
     }
+    if (menu === 'capsman')       { if(window.rmSectionCAPsMAN)       window.rmSectionCAPsMAN();       return; }
+    if (menu === 'notifications') { if(window.rmSectionNotifications) window.rmSectionNotifications(); return; }
+    if (menu === 'ipv6')          { if(window.rmSectionIPv6)           window.rmSectionIPv6();          return; }
+    if (menu === 'wireguard')     { if(window.rmSectionWireGuard)     window.rmSectionWireGuard();     return; }
+    if (menu === 'certificates')  { if(window.rmSectionCertificates)  window.rmSectionCertificates();  return; }
+    if (menu === 'netwatch')      { if(window.rmSectionNetwatch)      window.rmSectionNetwatch();      return; }
+    if (menu === 'snmp')          { if(window.rmSectionSNMP)          window.rmSectionSNMP();          return; }
+    if (menu === 'logging')       { if(window.rmSectionLogging)       window.rmSectionLogging();       return; }
     cont.innerHTML = '<div class="rm-no-router"><div class="rm-no-icon">🚧</div><div>Секція в розробці</div></div>';
   }
 

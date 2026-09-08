@@ -638,6 +638,9 @@
     if (menu === 'dns-static')    { if(window.rmCrudDNSStatic) window.rmCrudDNSStatic(); else cont.innerHTML='<div style="color:#8ea3b0;padding:20px;">DNS Static</div>'; return; }
     if (menu === 'neighbors')     { renderNeighbors(); return; }
 
+    if (menu === 'traffic') {
+      if (window.rmSectionTraffic) { window.rmSectionTraffic(); return; }
+    }
     cont.innerHTML = '<div class="rm-no-router"><div class="rm-no-icon">🚧</div><div>Секція в розробці</div></div>';
   }
 

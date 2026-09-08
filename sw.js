@@ -1,5 +1,5 @@
 'use strict';
-const CACHE_NAME = 'mt-config-v3631';
+const CACHE_NAME = 'mt-config-v4151';
 
 self.addEventListener('install', function() {
   self.skipWaiting();

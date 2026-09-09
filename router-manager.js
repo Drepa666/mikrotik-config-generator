@@ -494,6 +494,8 @@
     { id: 'addr-list',icon: '🚫', label: 'Address Lists' },
     { id: 'dhcp-srv', icon: '📡', label: 'DHCP Server' },
     { id: 'dns-static',icon: '📋', label: 'DNS Static' },
+    { id: 'sep-plugins' },
+    { id: 'plugins', icon: '🧩', label: 'Plugins' },
     { id: 'sep-extra' },
     { id: 'capsman',       icon: '📡', label: 'CAPsMAN' },
     { id: 'notifications', icon: '🔔', label: 'Notifications' },
@@ -659,6 +661,11 @@
     if (menu === 'netwatch')      { if(window.rmSectionNetwatch)      window.rmSectionNetwatch();      return; }
     if (menu === 'snmp')          { if(window.rmSectionSNMP)          window.rmSectionSNMP();          return; }
     if (menu === 'logging')       { if(window.rmSectionLogging)       window.rmSectionLogging();       return; }
+    if (menu === 'plugins')      { if(window.rmSectionPlugins)     window.rmSectionPlugins();     return; }
+    if (menu === 'ip-scanner')   { if(window.rmPluginIPScanner)    window.rmPluginIPScanner();    return; }
+    if (menu === 'port-scanner') { if(window.rmPluginPortScanner)  window.rmPluginPortScanner();  return; }
+    if (menu === 'arp-table')    { if(window.rmPluginARPTable)     window.rmPluginARPTable();     return; }
+    if (menu === 'ping-tool')    { if(window.rmPluginPingTool)     window.rmPluginPingTool();     return; }
     cont.innerHTML = '<div class="rm-no-router"><div class="rm-no-icon">🚧</div><div>Секція в розробці</div></div>';
   }
 

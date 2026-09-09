@@ -642,7 +642,12 @@ function isEnabled(id) {
   return loadState()[id] === true;
 }
 
-function renderPlugins() {
+/* ── Scanner Plugins ── */
+  if (typeof window._addScannerPlugins === "function") {
+    window._addScannerPlugins(BUILTIN_PLUGINS);
+  }
+
+  function renderPlugins() {
   var list     = document.getElementById('pl-list');
   if (!list) return;
   var filtered = BUILTIN_PLUGINS.filter(function(p) {
@@ -681,6 +686,37 @@ function renderPlugins() {
       '</label>' +
       '</div>';
 
+    /* Delete button */
+    (function(pid, pname) {
+      var btn = document.createElement('button');
+      btn.textContent = '🗑';
+      btn.title = 'Видалити ' + pname + ' зі списку';
+      btn.style.cssText = (
+        'padding:2px 6px;background:transparent;border:1px solid #6b2020;' +
+        'color:#a05050;border-radius:4px;font-size:11px;cursor:pointer;' +
+        'margin-left:6px;flex-shrink:0;'
+      );
+      btn.addEventListener('mouseenter', function() {
+        btn.style.borderColor = '#e05252';
+        btn.style.color = '#e05252';
+      });
+      btn.addEventListener('mouseleave', function() {
+        btn.style.borderColor = '#6b2020';
+        btn.style.color = '#a05050';
+      });
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (!confirm('Видалити "' + pname + '" зі списку плагінів?')) return;
+        try {
+          var d = JSON.parse(localStorage.getItem('mt-plugins-deleted') || '[]');
+          if (d.indexOf(pid) < 0) { d.push(pid); }
+          localStorage.setItem('mt-plugins-deleted', JSON.stringify(d));
+        } catch(ex) {}
+        var cardEl = btn.closest('[style*="border-radius:8px"]') || btn.parentNode;
+        if (cardEl && cardEl.parentNode) { cardEl.parentNode.removeChild(cardEl); }
+      });
+      card.appendChild(btn);
+    }(plugin.id, plugin.name));
     list.appendChild(card);
   });
 

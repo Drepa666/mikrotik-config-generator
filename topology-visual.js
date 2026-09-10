@@ -572,51 +572,95 @@
      ЗАВАНТАЖЕННЯ З РОУТЕРА
   ════════════════════════════════════════ */
   function loadFromRouter() {
-    var ip   = document.getElementById('topo-ip').value.trim();
-    var user = document.getElementById('topo-user').value.trim();
-    var pass = document.getElementById('topo-pass').value;
-    var btn  = document.getElementById('topo-load-btn');
+    var ipEl   = document.getElementById('topo-ip');
+    var userEl = document.getElementById('topo-user');
+    var passEl = document.getElementById('topo-pass');
+    var btn    = document.getElementById('topo-load-btn');
 
-    btn.textContent = '\u23F3 Завантаження...';
-    btn.disabled = true;
-    setStatus('\uD83D\uDD04 Завантажую дані з роутера...');
+    var ip   = ipEl   ? ipEl.value.trim()   : '';
+    var user = userEl ? userEl.value.trim() : 'admin';
+    var pass = passEl ? passEl.value.trim() : '';
+
+    if (!ip) { setStatus('Введи IP роутера!'); return; }
+
+    if (btn) { btn.textContent = 'Завантаження...'; btn.disabled = true; }
+    setStatus('Підключення до ' + ip + '...');
 
     var hdrs = {
       'Content-Type':   'application/json',
-      'Authorization':  'Basic ' + btoa(user + ':' + pass),
-      'X-Router-Host':  ip,
+      'X-Router-IP':    ip,
+      'X-Router-User':  user,
+      'X-Router-Pass':  pass,
       'X-Router-Port':  '80',
       'X-Router-Proto': 'http',
     };
 
-    /* Завантажуємо паралельно: інтерфейси + ARP + DHCP leases + neighbors */
+    /* Безпечний fetch — завжди резолвиться, ніколи не падає */
+    function safeFetch(url, defaultVal) {
+      return fetch(PROXY + url, { method: 'GET', headers: hdrs })
+        .then(function(r) {
+          if (!r.ok) {
+            console.warn('[Topo] ' + url + ' -> ' + r.status);
+            return defaultVal;
+          }
+          return r.json().catch(function() { return defaultVal; });
+        })
+        .catch(function(e) {
+          console.warn('[Topo] ' + url + ' failed:', e.message);
+          return defaultVal;
+        });
+    }
+
+    /* Promise.allSettled — не падає якщо один запит не вдався */
     Promise.all([
-      fetch(PROXY + '/rest/interface', { method:'GET', headers:hdrs }).then(function(r) { return r.json(); }),
-      fetch(PROXY + '/rest/ip/address', { method:'GET', headers:hdrs }).then(function(r) { return r.json(); }),
-      fetch(PROXY + '/rest/ip/arp', { method:'GET', headers:hdrs }).then(function(r) { return r.json(); }),
-      fetch(PROXY + '/rest/ip/dhcp-server/lease', { method:'GET', headers:hdrs }).then(function(r) { return r.json(); }),
-      fetch(PROXY + '/rest/ip/neighbor', { method:'GET', headers:hdrs }).then(function(r) { return r.json(); }).catch(function() { return []; }),
-      fetch(PROXY + '/rest/system/identity', { method:'GET', headers:hdrs }).then(function(r) { return r.json(); }),
-    ])
-    .then(function(results) {
-      results = Array.isArray(results) ? results : (results ? [results] : []);
-      var ifaces    = results[0];
-      var addresses = results[1];
-      var arps      = results[2];
-      var leases    = results[3];
-      var neighbors = results[4];
-      var identity  = results[5];
+      safeFetch('/rest/interface',           []),
+      safeFetch('/rest/ip/address',          []),
+      safeFetch('/rest/ip/arp',              []),
+      safeFetch('/rest/ip/dhcp-server/lease',[]),
+      safeFetch('/rest/ip/neighbor',         []),
+      safeFetch('/rest/system/identity',     {}),
+    ]).then(function(results) {
+      var ifaces    = Array.isArray(results[0]) ? results[0] : [];
+      var addresses = Array.isArray(results[1]) ? results[1] : [];
+      var arps      = Array.isArray(results[2]) ? results[2] : [];
+      var leases    = Array.isArray(results[3]) ? results[3] : [];
+      var neighbors = Array.isArray(results[4]) ? results[4] : [];
+      var identity  = (!Array.isArray(results[5]) && results[5]) ? results[5] : {};
+
+      if (btn) { btn.textContent = 'Завантажити'; btn.disabled = false; }
+
+      /* Якщо нічого не отримали — роутер недоступний */
+      if (!ifaces.length && !addresses.length) {
+        setStatus('Роутер ' + ip + ' недоступний (перевір підключення та пароль)');
+        /* REST недоступний — показуємо базовий вузол */
+        setStatus('REST API недоступний — перевір підключення до ' + ip);
+        var basicData = {
+          nodes: [
+            { id: 'cloud-internet', type: 'cloud',  label: 'Internet', x: 600, y: 80  },
+            { id: 'router-main',    type: 'router', label: ip, ip: ip, x: 600, y: 380 }
+          ],
+          edges: [{ from: 'cloud-internet', to: 'router-main', label: 'ether1', active: false }]
+        };
+        try { localStorage.setItem('mt-topology', JSON.stringify(basicData)); } catch(e) {}
+        if (typeof window._topoLoadSaved === 'function') window._topoLoadSaved();
+        return;
+      }
 
       buildTopology(ifaces, addresses, arps, leases, neighbors, identity, ip);
 
-      btn.textContent = '\uD83D\uDD04 Завантажити';
-      btn.disabled    = false;
-      setStatus('\u2705 Топологію завантажено! Вузлів: ' + nodes.length + ', з\'єднань: ' + edges.length);
+      /* Зберігаємо в localStorage що маємо зараз */
+      try {
+        localStorage.setItem('mt-topology', JSON.stringify({
+          nodes: nodes.slice(),
+          edges: edges.slice()
+        }));
+      } catch(e) {}
+
+      setStatus('Завантажено: ' + nodes.length + ' вузлів, ' + edges.length + ' зєднань');
     })
     .catch(function(err) {
-      btn.textContent = '\uD83D\uDD04 Завантажити';
-      btn.disabled    = false;
-      setStatus('\u274C Помилка: ' + err.message);
+      if (btn) { btn.textContent = 'Завантажити'; btn.disabled = false; }
+      setStatus('Помилка: ' + (err.message || err));
     });
   }
 
@@ -627,139 +671,109 @@
     nodes = [];
     edges = [];
 
-    var W = canvas.width;
-    var H = canvas.height;
-
-    /* Роутер — центр */
-    var routerNode = {
-      id:    'router',
-      type:  'router',
-      label: (identity && identity.name) ? identity.name : 'MikroTik',
-      x:     W / 2 / scale - panX / scale,
-      y:     H / 2 / scale - panY / scale,
-      ip:    routerIp,
-    };
-    nodes.push(routerNode);
-
-    /* Інтернет над роутером */
-    var wanIface = ifaces.find(function(i) { return i.name === 'ether1' || i.type === 'ether' && (i.name.includes('wan') || i.name === 'ether1'); });
-    var cloudNode = {
-      id:    'internet',
-      type:  'cloud',
+    /* ── Internet ── */
+    nodes.push({
+      id: 'cloud-internet', type: 'cloud',
       label: 'Internet',
-      x:     routerNode.x,
-      y:     routerNode.y - 200,
-    };
-    nodes.push(cloudNode);
-    edges.push({
-      from:   'internet',
-      to:     'router',
-      label:  wanIface ? wanIface.name : 'WAN',
-      active: wanIface ? (wanIface.running === 'true' || wanIface.running === true) : true,
+      x: 500, y: 80,
     });
 
-    /* LAN інтерфейси */
-    var lanIfaces = ifaces.filter(function(i) {
-      return i.name !== 'ether1' && !i.name.includes('lo') && !i.name.includes('sit');
+    /* ── Router ── */
+    var routerName = (identity && identity.name) ? identity.name : (routerIp || 'MikroTik');
+    nodes.push({
+      id: 'router-main', type: 'router',
+      label: routerName,
+      ip: routerIp, mac: '', iface: '',
+      note: 'RouterOS | IP: ' + routerIp,
+      x: 500, y: 280,
     });
 
-    /* IP адреси по інтерфейсах */
-    var ifaceIpMap = {};
-    addresses.forEach(function(a) {
-      ifaceIpMap[a.interface] = a.address ? a.address.split('/')[0] : '';
-    });
+    /* ── WAN → Internet ── */
+    var wanIface = 'ether1';
+    if (Array.isArray(ifaces)) {
+      ifaces.forEach(function(f) {
+        if (f.name === 'ether1' || (f.comment && f.comment.toLowerCase().includes('wan'))) {
+          wanIface = f.name;
+        }
+      });
+    }
+    edges.push({ from: 'cloud-internet', to: 'router-main', label: wanIface, active: true });
 
-    /* Клієнти з DHCP leases */
-    var clients = leases.filter(function(l) { return l.status === 'bound'; });
+    /* ── LAN interfaces (тільки ті що мають IP) ── */
+    var ifaceNodes = {};
+    var col = 0;
+    if (Array.isArray(addresses)) {
+      addresses.forEach(function(addr) {
+        if (!addr.address || !addr.interface) return;
+        var iface = addr.interface;
+        if (iface === wanIface || iface === 'lo') return;
+        if (ifaceNodes[iface]) return;
 
-    /* Розміщуємо клієнтів по колу навколо роутера */
-    var radius  = 180;
-    var count   = Math.max(clients.length + lanIfaces.length, 1);
-    var angleStep = (Math.PI * 2) / count;
-    var angleOffset = Math.PI / 2; /* починаємо знизу */
+        var nodeId = 'iface-' + iface.replace(/[^a-z0-9]/gi, '-');
+        var ip     = addr.address.split('/')[0];
+        var type   = iface.includes('wlan') || iface.includes('wifi') ? 'ap' : 'switch';
 
-    /* Додаємо LAN bridge/switch вузол якщо є */
-    var bridgeIface = ifaces.find(function(i) { return i.name === 'bridge' || i.name === 'bridge-lan'; });
-    if (bridgeIface) {
-      var switchNode = {
-        id:    'bridge-switch',
-        type:  'switch',
-        label: bridgeIface.name,
-        x:     routerNode.x,
-        y:     routerNode.y + 140,
-        iface: bridgeIface.name,
-        ip:    ifaceIpMap[bridgeIface.name] || '',
-        status: bridgeIface.running === 'true' || bridgeIface.running === true,
-      };
-      nodes.push(switchNode);
-      edges.push({
-        from: 'router',
-        to:   'bridge-switch',
-        label: 'LAN',
-        active: switchNode.status,
+        ifaceNodes[iface] = nodeId;
+        nodes.push({
+          id: nodeId, type: type,
+          label: iface,
+          ip: ip, mac: '', iface: iface,
+          note: 'IP: ' + addr.address,
+          x: 180 + col * 220, y: 460,
+        });
+        edges.push({
+          from: 'router-main', to: nodeId,
+          label: iface.includes('bridge') ? 'LAN' : iface,
+          active: true,
+        });
+        col++;
       });
     }
 
-    /* Клієнти */
-    clients.slice(0, 20).forEach(function(lease, idx) {
-      var angle = angleOffset + idx * angleStep;
-      var cx    = routerNode.x + Math.cos(angle) * radius * 1.5;
-      var cy    = routerNode.y + Math.sin(angle) * radius * 1.5 + 100;
+    /* ── Neighbors — сусідні пристрої ── */
+    if (Array.isArray(neighbors)) {
+      neighbors.forEach(function(nb, ni) {
+        var nbIp   = nb.address || nb['address4'] || '';
+        var nbName = nb.identity || nb['system-name'] || nbIp;
+        if (!nbName && !nbIp) return;
 
-      /* Визначаємо тип пристрою по hostname */
-      var hostname = (lease['host-name'] || '').toLowerCase();
-      var devType  = 'unknown';
-      if (hostname.includes('phone') || hostname.includes('android') || hostname.includes('iphone')) devType = 'phone';
-      else if (hostname.includes('laptop') || hostname.includes('macbook')) devType = 'laptop';
-      else if (hostname.includes('pc') || hostname.includes('desktop') || hostname.includes('comp')) devType = 'pc';
-      else if (hostname.includes('srv') || hostname.includes('server')) devType = 'server';
-      else devType = 'pc';
+        var nodeId   = 'nb-' + (nbIp || nbName).replace(/[^a-z0-9]/gi, '-');
+        var platform = (nb.platform || '').toLowerCase();
+        var type     = platform.includes('mikrotik') ? 'router' : 'switch';
 
-      var clientNode = {
-        id:    'client-' + idx,
-        type:  devType,
-        label: lease['host-name'] || 'Client ' + (idx+1),
-        x:     cx,
-        y:     cy,
-        ip:    lease.address || '',
-        mac:   lease['mac-address'] || '',
-        status: true,
-      };
-      nodes.push(clientNode);
+        if (nodes.find(function(n) { return n.id === nodeId; })) return;
 
-      edges.push({
-        from:   bridgeIface ? 'bridge-switch' : 'router',
-        to:     clientNode.id,
-        active: true,
+        nodes.push({
+          id: nodeId, type: type,
+          label: nbName || nbIp,
+          ip: nbIp, mac: nb['mac-address'] || '',
+          iface: nb.interface || '',
+          note: 'Neighbor | ' + (nb.platform || 'Unknown') + ' | ' + nbIp,
+          x: 820 + ni * 200, y: 280,
+        });
+        edges.push({
+          from: 'router-main', to: nodeId,
+          label: nb.interface || wanIface,
+          active: true,
+        });
       });
-    });
+    }
 
-    /* Сусіди (IP Neighbor — інші MikroTik/свічі) */
-    neighbors.slice(0, 5).forEach(function(nb, idx) {
-      var exists = nodes.some(function(n) { return n.ip === nb.address; });
-      if (exists) return;
-
-      var angle = -Math.PI / 4 + idx * 0.5;
-      var nx    = routerNode.x + Math.cos(angle) * 280;
-      var ny    = routerNode.y + Math.sin(angle) * 280;
-
-      var nbNode = {
-        id:    'neighbor-' + idx,
-        type:  nb['system-caps'] && nb['system-caps'].includes('bridge') ? 'switch' : 'router',
-        label: nb.identity || nb['system-description'] || 'Neighbor',
-        x:     nx,
-        y:     ny,
-        ip:    nb.address || '',
-        iface: nb.interface || '',
-      };
-      nodes.push(nbNode);
-      edges.push({ from:'router', to:nbNode.id, label: nb.interface||'', active:true });
-    });
+    /* Зберігаємо в localStorage для подальшого merge */
+    try {
+      localStorage.setItem('mt-topology', JSON.stringify({
+        nodes: nodes.slice(),
+        edges: edges.slice(),
+        _wanIface:   wanIface,
+        _ifaceNodes: ifaceNodes,
+        _routerIp:   routerIp,
+      }));
+    } catch(e) {}
 
     updateCount();
-    autoLayout(false);
     fitToScreen();
     draw();
+    setStatus('Завантажено: ' + nodes.length + ' вузлів — для деталей натисни "Глибокий скан"');
   }
 
   /* ════════════════════════════════════════
@@ -813,6 +827,7 @@
      FIT TO SCREEN
   ════════════════════════════════════════ */
   function fitToScreen() {
+  window._topoFitScreen = fitToScreen;
     if (!nodes.length) return;
 
     var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -856,8 +871,9 @@
 
         var hdrs = {
           'Content-Type':   'application/json',
-          'Authorization':  'Basic ' + btoa(user + ':' + pass),
-          'X-Router-Host':  ip,
+          'X-Router-IP':    ip,
+          'X-Router-User':  user,
+          'X-Router-Pass':  pass,
           'X-Router-Port':  '80',
           'X-Router-Proto': 'http',
         };
@@ -866,6 +882,7 @@
         fetch(PROXY + '/rest/interface', { method:'GET', headers:hdrs })
         .then(function(r) { return r.json(); })
         .then(function(ifaces) {
+          if (!Array.isArray(ifaces)) return;
           ifaces.forEach(function(iface) {
             var running = iface.running === 'true' || iface.running === true;
             edges.forEach(function(e) {
@@ -1012,7 +1029,8 @@
   fab.addEventListener('mouseenter', function() { fab.style.background = '#1c2a37'; });
   fab.addEventListener('mouseleave', function() { fab.style.background = '#16212c'; });
   fab.addEventListener('click', function() {
-    modal.style.display = 'flex';
+    modal.style.display = 'flex'
+    setTimeout(function() { if (typeof window._topoExtInject === 'function') window._topoExtInject(); }, 150);;
     setTimeout(function() {
       resizeCanvas();
       loadSaved();

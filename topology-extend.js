@@ -3,6 +3,134 @@
 
   var SAVE_KEY = 'mt-topo-saves';
 
+  /* ══════════════════════════════════════════════════
+     MAC VENDOR LOOKUP
+  ══════════════════════════════════════════════════ */
+  var MAC_OUI = {
+    'A8:2B:DD': 'Intel',
+    'D4:CA:6D': 'MikroTik',
+    'E4:8D:8C': 'MikroTik',
+    '4C:5E:0C': 'MikroTik',
+    '74:4D:28': 'MikroTik',
+    'B8:69:F4': 'MikroTik',
+    '2C:C8:1B': 'MikroTik',
+    '00:50:7F': 'MikroTik',
+    '3C:22:FB': 'Apple',
+    'CC:2D:E0': 'Apple',
+    'AC:DE:48': 'Apple',
+    'F0:18:98': 'Apple',
+    'B8:27:EB': 'Raspberry Pi',
+    'DC:A6:32': 'Raspberry Pi',
+    '00:50:56': 'VMware',
+    '08:00:27': 'VirtualBox',
+    '00:1A:11': 'Google',
+    'F4:F5:D8': 'Google',
+    '18:FE:34': 'Espressif(ESP)',
+    '24:6F:28': 'Espressif(ESP)',
+    '00:0C:29': 'VMware',
+    '00:1C:42': 'Parallels',
+    '28:D2:44': 'SAMSUNG',
+    '8C:77:12': 'SAMSUNG',
+    'FC:00:12': 'SAMSUNG',
+    '00:17:88': 'Philips Hue',
+    'EC:FA:BC': 'TP-Link',
+    '50:C7:BF': 'TP-Link',
+    'C4:E9:84': 'TP-Link',
+    '54:AF:97': 'TP-Link',
+    '18:D6:C7': 'TP-Link',
+    'AC:84:C9': 'Ubiquiti',
+    'FC:EC:DA': 'Ubiquiti',
+    '78:8A:20': 'Ubiquiti',
+    '00:27:22': 'Ubiquiti',
+    '44:D9:E7': 'Ubiquiti',
+    '68:72:51': 'Cisco',
+    '00:1B:54': 'Cisco',
+    'B4:E9:B0': 'Cisco',
+    '00:23:EA': 'Cisco',
+    '70:DB:98': 'Cisco',
+    '18:8B:9D': 'Huawei',
+    'AC:85:3D': 'Huawei',
+    '00:18:82': 'Huawei',
+    '28:6E:D4': 'Huawei',
+    '00:E0:FC': 'Huawei',
+    '10:BF:48': 'Zyxel',
+    '00:13:49': 'Zyxel',
+    'CC:5D:4E': 'Zyxel',
+  };
+
+  var _vendorCache = {};
+
+  function getMacVendor(mac) {
+    if (!mac) return '';
+    var clean = mac.toUpperCase().replace(/-/g, ':');
+    var oui3  = clean.slice(0, 8);
+    var oui2  = clean.slice(0, 5);
+
+    if (_vendorCache[oui3]) return _vendorCache[oui3];
+    if (MAC_OUI[oui3]) { _vendorCache[oui3] = MAC_OUI[oui3]; return MAC_OUI[oui3]; }
+
+    /* API lookup через proxy щоб уникнути CORS в Electron */
+    fetch('http://localhost:8888/macvendor/' + oui3.replace(/:/g,'%3A'))
+      .then(function(r) { return r.text(); })
+      .then(function(vendor) {
+        vendor = (vendor || '').trim();
+        if (vendor && !vendor.includes('error') && !vendor.includes('{')) {
+          _vendorCache[oui3] = vendor;
+          if (window._topoNodes) {
+            window._topoNodes.forEach(function(n) {
+              if (n.mac && n.mac.toUpperCase().slice(0,8) === oui3) {
+                n.vendor = vendor;
+                n.note   = updateNoteVendor(n.note, vendor);
+              }
+            });
+            if (typeof window._topoDraw === 'function') window._topoDraw();
+          }
+        }
+      })
+      .catch(function() { /* proxy недоступний — ігноруємо */ });
+
+    return '';
+  }
+
+  function updateNoteVendor(note, vendor) {
+    if (!note) return 'Vendor: ' + vendor;
+    if (note.includes('Vendor:')) return note;
+    return note + ' | Vendor: ' + vendor;
+  }
+
+  function enrichNodeWithVendor(node) {
+    if (!node.mac) return node;
+    var vendor = getMacVendor(node.mac);
+    if (vendor) {
+      node.vendor = vendor;
+      node.note   = updateNoteVendor(node.note, vendor);
+      /* Додаємо vendor до label якщо не дублюється */
+      if (node.label && !node.label.includes(vendor)) {
+        node.label = node.label + ' [' + vendor + ']';
+      }
+    }
+    return node;
+  }
+
+  /* Збагачуємо всі вузли асинхронно */
+  function enrichAllVendors(nodes) {
+    if (!nodes || !nodes.length) return;
+    var withMac = nodes.filter(function(n) { return n.mac; });
+    if (!withMac.length) return;
+
+    /* Спочатку локальний OUI */
+    withMac.forEach(function(n) { enrichNodeWithVendor(n); });
+    if (typeof window._topoDraw === 'function') window._topoDraw();
+
+    /* Потім API для невідомих */
+    var unknown = withMac.filter(function(n) { return !n.vendor; });
+    unknown.forEach(function(n, i) {
+      setTimeout(function() { getMacVendor(n.mac); }, i * 500);
+    });
+  }
+
+
+
   /* ── Збереження ── */
   function getSaves() {
     try { return JSON.parse(localStorage.getItem(SAVE_KEY) || '{}'); } catch(e) { return {}; }
@@ -118,42 +246,127 @@
 
   /* ── Встановити стан топології ── */
   function topoSetState(data) {
-    if (!data || !data.nodes || !data.nodes.length) return;
-
-    /* Зберігаємо в localStorage */
-    try { localStorage.setItem('mt-topology', JSON.stringify(data)); } catch(e) {}
-
-    /* Спосіб 1: пряме встановлення через window._topoNodes (найнадійніший) */
-    if (window._topoNodes !== undefined && window._topoEdges !== undefined) {
-      /* Очищаємо існуючі масиви */
-      window._topoNodes.length = 0;
-      window._topoEdges.length = 0;
-      /* Додаємо нові дані */
-      data.nodes.forEach(function(n) { window._topoNodes.push(n); });
-      (data.edges || []).forEach(function(e) { window._topoEdges.push(e); });
-      /* Перемальовуємо */
-      if (typeof window._topoDraw === 'function') {
-        window._topoDraw();
+    if (!data || !data.nodes || !data.nodes.length) {
+      console.warn('[TopoExt] topoSetState: немає даних!');
+      return;
+    }
+    /* Якщо _topoLoadSaved вже є — відразу викликаємо */
+    if (typeof window._topoLoadSaved === 'function') {
+      _doSetState(data);
+      return;
+    }
+    /* Чекаємо поки topology-visual.js завантажиться */
+    var attempts = 0;
+    var timer = setInterval(function() {
+      attempts++;
+      if (typeof window._topoLoadSaved === 'function') {
+        clearInterval(timer);
+        _doSetState(data);
       }
-      /* Авто-розміщення */
-      setTimeout(function() {
-        if (typeof window._topoAutoLayout === 'function') {
-          window._topoAutoLayout(true);
+      if (attempts > 30) {
+        clearInterval(timer);
+        console.error('[TopoExt] timeout: _topoLoadSaved timeout');
+      }
+    }, 100);
+  }
+
+
+  /* ══════════════════════════════════════════════════
+     MERGE TOPOLOGY — обєднання статичних і живих даних
+  ══════════════════════════════════════════════════ */
+  function mergeTopologyData(existing, incoming) {
+    var result = {
+      nodes: existing.nodes ? existing.nodes.slice() : [],
+      edges: existing.edges ? existing.edges.slice() : [],
+    };
+
+    var existingIds = {};
+    result.nodes.forEach(function(n) { existingIds[n.id] = n; });
+
+    var existingIPs = {};
+    result.nodes.forEach(function(n) { if (n.ip) existingIPs[n.ip] = n; });
+
+    /* Додаємо нові вузли — якщо IP вже є, збагачуємо існуючий */
+    (incoming.nodes || []).forEach(function(newNode) {
+      /* Пошук по ID */
+      if (existingIds[newNode.id]) {
+        var ex = existingIds[newNode.id];
+        /* Збагачуємо: MAC, IP, note */
+        if (newNode.mac  && !ex.mac)  ex.mac  = newNode.mac;
+        if (newNode.ip   && !ex.ip)   ex.ip   = newNode.ip;
+        if (newNode.note && !ex.note) ex.note  = newNode.note;
+        if (newNode.vendor)            ex.vendor = newNode.vendor;
+        return;
+      }
+      /* Пошук по IP */
+      if (newNode.ip && existingIPs[newNode.ip]) {
+        var exIp = existingIPs[newNode.ip];
+        if (newNode.mac    && !exIp.mac)    exIp.mac    = newNode.mac;
+        if (newNode.note   && !exIp.note)   exIp.note   = newNode.note;
+        if (newNode.vendor && !exIp.vendor) exIp.vendor = newNode.vendor;
+        /* Оновлюємо label якщо є hostname */
+        if (newNode.label && newNode.label !== newNode.ip && exIp.label === exIp.ip) {
+          exIp.label = newNode.label;
         }
-      }, 100);
-      showToast('Завантажено ' + data.nodes.length + ' вузлів, ' + (data.edges || []).length + ' зєднань');
+        return;
+      }
+      /* Новий вузол — додаємо */
+      result.nodes.push(newNode);
+      existingIds[newNode.id] = newNode;
+      if (newNode.ip) existingIPs[newNode.ip] = newNode;
+    });
+
+    /* Додаємо нові edges без дублів */
+    var edgeKeys = {};
+    result.edges.forEach(function(e) {
+      edgeKeys[e.from + '->' + e.to] = true;
+    });
+    (incoming.edges || []).forEach(function(e) {
+      var key = e.from + '->' + e.to;
+      if (!edgeKeys[key]) {
+        edgeKeys[key] = true;
+        result.edges.push(e);
+      }
+    });
+
+    return result;
+  }
+
+  function _doSetState(data) {
+    if (!data || !data.nodes || !data.nodes.length) {
+      console.warn('[TopoExt] _doSetState: немає даних');
+      return;
+    }
+    console.log('[TopoExt] _doSetState:', data.nodes.length, 'nodes,', (data.edges||[]).length, 'edges');
+
+    /* Зберігаємо в localStorage — єдиний надійний спосіб передати дані в closure */
+    try {
+      localStorage.setItem('mt-topology', JSON.stringify({
+        nodes: data.nodes,
+        edges: data.edges || []
+      }));
+    } catch(e) {
+      console.error('[TopoExt] localStorage error:', e);
       return;
     }
 
-    /* Спосіб 2: через _topoLoadSaved (запасний) */
+    /* Викликаємо _topoLoadSaved — вона робить:
+       nodes = data.nodes (пряме перепризначення closure змінної)
+       edges = data.edges
+       fitToScreen()
+       draw()
+    */
     if (typeof window._topoLoadSaved === 'function') {
       window._topoLoadSaved();
-      showToast('Завантажено ' + data.nodes.length + ' вузлів');
-      return;
+      console.log('[TopoExt] _topoLoadSaved викликано OK');
+      showToast('Завантажено ' + data.nodes.length + ' вузлів, ' + (data.edges||[]).length + ' зєднань');
+    } else {
+      console.error('[TopoExt] _topoLoadSaved недоступна!');
+      showToast('Помилка: _topoLoadSaved не знайдено');
     }
+  }
 
-    /* Спосіб 3: показуємо підказку */
-    showToast('Збережено ' + data.nodes.length + ' вузлів - натисни "Авто"');
+  function topoSetState_REPLACED(data) {
   }
 
   function showToast(msg) {
@@ -295,290 +508,423 @@
   }
 
   function deepScan(ip, user, pass, parentId, depth, onProg, onDone) {
-    if (depth > 3 || scanVisited[ip]) { onDone && onDone(); return; }
+    if (depth > 2 || scanVisited[ip]) { onDone && onDone(); return; }
     scanVisited[ip] = true;
     onProg && onProg('Сканую ' + ip + '...');
-    var nodeId = 'rt-' + ip.replace(/\./g, '-');
-    if (depth === 0) { scanResults = { nodes: [], edges: [] }; }
-    scanResults.nodes.push({ id: nodeId, type: 'router', label: ip, ip: ip, x: 200 + depth * 200, y: 200 + Math.random() * 200 });
-    if (parentId) scanResults.edges.push({ from: parentId, to: nodeId, label: '', active: true });
-    Promise.all([
-      restCall(ip, user, pass, '/ip/neighbor').catch(function() { return []; }),
-      restCall(ip, user, pass, '/system/identity').catch(function() { return {}; }),
-      restCall(ip, user, pass, '/ip/arp').catch(function() { return []; }),
-      restCall(ip, user, pass, '/ip/dhcp-server/lease').catch(function() { return []; }),
-      restCall(ip, user, pass, '/caps-man/registration-table').catch(function() { return []; }),
-    ]).then(function(res) {
-      var neighbors = res[0];
-      var identity  = res[1];
-      var arps      = res[2];
-      var leases    = res[3];
-      var capsman   = res[4];
 
-      /* Оновлюємо назву роутера */
-      var node = scanResults.nodes.find(function(n) { return n.id === nodeId; });
-      if (node && identity && identity.name) {
-        node.label = identity.name;
-        node.note  = 'IP: ' + ip;
+    if (depth === 0) {
+      scanResults = { nodes: [], edges: [] };
+    }
+
+    var PROXY = 'http://localhost:8888';
+    var hdrs = {
+      'Content-Type':  'application/json',
+      'X-Router-IP':   ip,
+      'X-Router-User': user,
+      'X-Router-Pass': pass,
+      'X-Router-Port': '80',
+    };
+
+    function sf(url, def) {
+      return fetch(PROXY + url, { method:'GET', headers:hdrs })
+        .then(function(r) { return r.ok ? r.json() : def; })
+        .catch(function()  { return def; });
+    }
+
+    Promise.all([
+      sf('/rest/system/identity',      {}),
+      sf('/rest/ip/arp',               []),
+      sf('/rest/ip/dhcp-server/lease', []),
+      sf('/rest/ip/neighbor',          []),
+      sf('/rest/ip/address',           []),
+    ]).then(function(res) {
+      var identity  = (!Array.isArray(res[0]) && res[0]) ? res[0] : {};
+      var arps      = Array.isArray(res[1]) ? res[1] : [];
+      var leases    = Array.isArray(res[2]) ? res[2] : [];
+      var neighbors = Array.isArray(res[3]) ? res[3] : [];
+      var addresses = Array.isArray(res[4]) ? res[4] : [];
+
+      /* ── Читаємо існуючу топологію з localStorage ── */
+      var existNodes   = [];
+      var existEdges   = [];
+      var ifaceNodes   = {};
+      var routerNodeId = 'router-main';
+
+      try {
+        var saved = JSON.parse(localStorage.getItem('mt-topology') || '{}');
+        existNodes   = saved.nodes    || [];
+        existEdges   = saved.edges    || [];
+        ifaceNodes   = saved._ifaceNodes || {};
+      } catch(ex) {}
+
+      /* Якщо existNodes порожній — беремо з canvas */
+      if (!existNodes.length && window._topoNodes) {
+        existNodes = window._topoNodes.slice();
+        existEdges = window._topoEdges ? window._topoEdges.slice() : [];
       }
 
-      /* Мапи hostname з DHCP leases */
+      /* Будуємо індекс існуючих вузлів по IP */
+      var byIp = {};
+      var byId = {};
+      existNodes.forEach(function(n) {
+        byId[n.id] = n;
+        if (n.ip) byIp[n.ip] = n;
+      });
+
+      /* Знаходимо router вузол */
+      var routerNode = byId['router-main'] || existNodes.find(function(n) {
+        return n.type === 'router';
+      });
+      if (routerNode) routerNodeId = routerNode.id;
+
+      /* ── Hostname map з DHCP leases ── */
       var hostnameMap = {};
       var macMap      = {};
-      if (Array.isArray(leases)) {
-        leases.forEach(function(l) {
-          if (l.address) {
-            hostnameMap[l.address] = l['host-name'] || '';
-            macMap[l.address]      = l['mac-address'] || '';
+      leases.forEach(function(l) {
+        if (l.address) {
+          hostnameMap[l.address] = l['host-name'] || '';
+          macMap[l.address]      = l['mac-address'] || '';
+        }
+      });
+
+      /* ── Збагачуємо існуючі вузли з DHCP ── */
+      existNodes.forEach(function(n) {
+        if (!n.ip) return;
+        if (hostnameMap[n.ip] && (!n.label || n.label === n.ip)) {
+          n.label = hostnameMap[n.ip];
+        }
+        if (macMap[n.ip] && !n.mac) {
+          n.mac = macMap[n.ip];
+          n.note = (n.note || '') + ' | MAC: ' + macMap[n.ip];
+        }
+      });
+
+      /* ── ARP хости — НОВІ вузли яких ще немає ── */
+      var newNodes = [];
+      var newEdges = [];
+      var hcol = 0;
+
+      arps.forEach(function(arp) {
+        var arpIp = arp.address || '';
+        if (!arpIp || arpIp === ip) return;
+
+        /* Якщо вже є в існуючій топології — збагачуємо */
+        if (byIp[arpIp]) {
+          var ex = byIp[arpIp];
+          var mac = arp['mac-address'] || macMap[arpIp] || '';
+          if (mac && !ex.mac) {
+            ex.mac  = mac;
+            ex.note = (ex.note || '') + ' | MAC: ' + mac;
           }
+          if (hostnameMap[arpIp] && ex.label === arpIp) {
+            ex.label = hostnameMap[arpIp];
+          }
+          /* Vendor lookup */
+          if (mac && typeof enrichNodeWithVendor === 'function') {
+            enrichNodeWithVendor(ex);
+          }
+          return;
+        }
+
+        /* Новий хост */
+        var hostname = hostnameMap[arpIp] || arpIp;
+        var mac2     = arp['mac-address'] || macMap[arpIp] || '';
+        var arpIface = arp.interface || '';
+        var nodeId   = 'host-' + arpIp.replace(/\./g, '-');
+
+        var hn   = hostname.toLowerCase();
+        var type = hn.includes('phone') || hn.includes('iphone') ? 'phone' :
+                   hn.includes('server') || hn.includes('srv')   ? 'server' :
+                   hn.includes('laptop')                          ? 'laptop' : 'pc';
+
+        var newNode = {
+          id: nodeId, type: type,
+          label: hostname,
+          ip: arpIp, mac: mac2,
+          iface: arpIface,
+          note: 'ARP | MAC: ' + mac2 + (arpIface ? ' | ' + arpIface : ''),
+          x: 80 + hcol * 170, y: 620,
+        };
+
+        /* Vendor lookup */
+        if (mac2 && typeof enrichNodeWithVendor === 'function') {
+          enrichNodeWithVendor(newNode);
+        }
+
+        newNodes.push(newNode);
+        byIp[arpIp] = newNode;
+
+        /* Підключаємо до LAN interface або router */
+        var parentId2 = ifaceNodes[arpIface] || routerNodeId;
+        newEdges.push({
+          from: parentId2, to: nodeId,
+          label: arpIface,
+          active: arp.complete !== 'false',
         });
-      }
+        hcol++;
+      });
 
-      /* Додаємо хости з ARP */
-      if (Array.isArray(arps)) {
-        arps.forEach(function(arp) {
-          if (!arp.address || arp.address === ip) return;
-          var hostId = 'host-' + arp.address.replace(/\./g, '-');
-          if (scanResults.nodes.find(function(n) { return n.id === hostId; })) return;
+      /* ── Merge: існуючі + нові ── */
+      var merged = {
+        nodes: existNodes.concat(newNodes),
+        edges: existEdges.concat(newEdges),
+      };
 
-          var hostname = hostnameMap[arp.address] || arp.address;
-          var mac      = arp['mac-address'] || macMap[arp.address] || '';
+      console.log('[TopoExt] deepScan merge:',
+        existNodes.length, '+', newNodes.length, '=', merged.nodes.length, 'nodes');
 
-          /* Визначаємо тип по MAC OUI або hostname */
-          var type = 'pc';
-          var hn   = hostname.toLowerCase();
-          if (hn.includes('phone') || hn.includes('iphone') || hn.includes('android')) type = 'phone';
-          else if (hn.includes('ap') || hn.includes('access')) type = 'ap';
-          else if (hn.includes('server') || hn.includes('srv'))  type = 'server';
-
-          scanResults.nodes.push({
-            id:    hostId,
-            type:  type,
-            label: hostname,
-            ip:    arp.address,
-            mac:   mac,
-            iface: arp.interface || '',
-            note:  'MAC: ' + mac + (arp.interface ? ' | iface: ' + arp.interface : ''),
-            x:     150 + Math.random() * 600,
-            y:     350 + Math.random() * 200,
-          });
-          scanResults.edges.push({ from: nodeId, to: hostId, label: arp.interface || '', active: true });
-        });
-      }
-
-      /* CAPsMAN AP */
-      if (Array.isArray(capsman)) {
-        capsman.forEach(function(ap) {
-          var apMac = ap['mac-address'] || '';
-          var apId  = 'ap-' + apMac.replace(/[:.]/g, '-');
-          if (!apMac || scanResults.nodes.find(function(n) { return n.id === apId; })) return;
-          scanResults.nodes.push({
-            id:    apId,
-            type:  'ap',
-            label: ap.ssid || apMac,
-            ip:    '',
-            mac:   apMac,
-            iface: ap.interface || '',
-            note:  'CAPsMAN AP | SSID: ' + (ap.ssid || '') + ' | MAC: ' + apMac,
-            x:     200 + Math.random() * 500,
-            y:     150 + Math.random() * 200,
-          });
-          scanResults.edges.push({ from: nodeId, to: apId, label: 'CAPsMAN', active: true });
-        });
-      }
-
-      /* Сусіди MikroTik — рекурсивно */
+      /* ── Рекурсивно для MikroTik neighbors ── */
       var pending = [];
-      if (Array.isArray(neighbors)) {
-        neighbors.forEach(function(nb) {
-          var nbIp = nb.address || nb.address4 || '';
-          if (!nbIp || scanVisited[nbIp]) return;
-          var platform = (nb.platform || '').toLowerCase();
-          if (platform.includes('mikrotik') || nb['software-id']) {
-            pending.push(nbIp);
-          } else {
-            var nbId   = 'nb-' + nbIp.replace(/\./g, '-');
-            var nbType = platform.includes('switch') ? 'switch' :
-                         platform.includes('cisco')  ? 'switch' : 'unknown';
-            if (!scanResults.nodes.find(function(n) { return n.id === nbId; })) {
-              scanResults.nodes.push({
-                id:    nbId,
-                type:  nbType,
-                label: nb.identity || nb['system-name'] || nbIp,
-                ip:    nbIp,
-                mac:   nb['mac-address'] || '',
-                iface: nb.interface || '',
-                note:  'Platform: ' + (nb.platform || '?') + ' | IP: ' + nbIp,
-                x:     300 + Math.random() * 400,
-                y:     100 + Math.random() * 300,
-              });
-              scanResults.edges.push({ from: nodeId, to: nbId, label: nb.interface || '', active: true });
-            }
-          }
-        });
-      }
+      neighbors.forEach(function(nb) {
+        var nbIp    = nb.address || nb['address4'] || '';
+        var platform = (nb.platform || '').toLowerCase();
+        if (nbIp && !scanVisited[nbIp] && platform.includes('mikrotik')) {
+          pending.push(nbIp);
+        }
+      });
+
+      /* Зберігаємо merged в scanResults */
+      scanResults.nodes = merged.nodes;
+      scanResults.edges = merged.edges;
 
       if (!pending.length) { onDone && onDone(); return; }
+
       var done = 0;
       pending.forEach(function(nbIp) {
-        deepScan(nbIp, user, pass, nodeId, depth + 1, onProg, function() {
+        deepScan(nbIp, user, pass, routerNodeId, depth+1, onProg, function() {
           done++;
           if (done >= pending.length) onDone && onDone();
         });
       });
-      setTimeout(function() { if (done < pending.length) onDone && onDone(); }, 8000);
-    }).catch(function() { onDone && onDone(); });
+      setTimeout(function() {
+        if (done < pending.length) onDone && onDone();
+      }, 8000);
+
+    }).catch(function(e) {
+      console.error('[TopoExt] deepScan error:', e);
+      onDone && onDone();
+    });
   }
 
   /* ── Додаємо кнопки в toolbar topology-visual.js ── */
   function injectUI() {
+    /* Видаляємо старий бар якщо є */
+    var oldBar = document.getElementById('topo-ext-bar');
+    if (oldBar) oldBar.remove();
+
     var modal = document.getElementById('topo-modal');
     if (!modal) return;
-    if (document.getElementById('topo-slots-btn')) return;
 
-    /* Шукаємо toolbar — пробуємо різні селектори */
-    var toolbar = null;
+    /* Знаходимо контейнер modal */
+    var modalBox = modal.querySelector('[style*="border-radius:14px"]') ||
+                   modal.querySelector('[style*="border-radius:12px"]') ||
+                   modal.firstElementChild;
 
-    /* Варіант 1: div з padding:8px */
-    var t1 = modal.querySelectorAll('div[style*="padding:8px"]');
-    if (t1.length) toolbar = t1[t1.length - 1];
+    /* Створюємо бар — вставляємо ВСЕРЕДИНУ modal вікна вгорі */
+    var bar = document.createElement('div');
+    bar.id = 'topo-ext-bar';
+    bar.style.cssText = [
+      'display:flex;gap:4px;align-items:center;flex-wrap:wrap;',
+      'padding:5px 12px;background:#060d14;',
+      'border-bottom:1px solid #1c2a37;',
+      'flex-shrink:0;'
+    ].join('');
 
-    /* Варіант 2: div що містить кнопки додавання вузлів */
-    if (!toolbar) {
-      var allDivs = modal.querySelectorAll('div');
-      for (var di = 0; di < allDivs.length; di++) {
-        var btns = allDivs[di].querySelectorAll('button');
-        if (btns.length >= 3) { toolbar = allDivs[di]; break; }
+    /* Вставляємо після шапки (перший div) */
+    if (modalBox) {
+      var firstChild = modalBox.firstElementChild;
+      if (firstChild && firstChild.nextSibling) {
+        modalBox.insertBefore(bar, firstChild.nextSibling);
+      } else {
+        modalBox.appendChild(bar);
       }
+    } else {
+      modal.appendChild(bar);
     }
-
-    /* Варіант 3: просто перший або другий дочірній div */
-    if (!toolbar) toolbar = modal.children[1] || modal.children[0];
-
-    if (!toolbar) {
-      console.warn('[TopoExt] toolbar не знайдено — retry за 1s');
-      setTimeout(injectUI, 1000);
-      return;
-    }
-
-    console.log('[TopoExt] toolbar знайдено:', toolbar.tagName, toolbar.style.cssText.slice(0,50));
 
     function makeBtn(id, text, color, onclick) {
+      if (document.getElementById(id)) return;
       var b = document.createElement('button');
       b.id = id;
       b.textContent = text;
-      b.style.cssText = 'background:transparent;border:1px solid ' + color + ';color:' + color + ';padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;white-space:nowrap;margin-left:2px;';
+      b.style.cssText = [
+        'background:transparent;border:1px solid ' + color + ';',
+        'color:' + color + ';padding:4px 10px;border-radius:5px;',
+        'cursor:pointer;font-size:11px;white-space:nowrap;'
+      ].join('');
+      b.onmouseover = function() { b.style.opacity = '0.75'; };
+      b.onmouseout  = function() { b.style.opacity = '1'; };
       b.onclick = onclick;
-      toolbar.appendChild(b);
-      return b;
+      bar.appendChild(b);
     }
 
-    /* Слоти */
-    makeBtn('topo-slots-btn', 'Слоти', '#5fd0a5', function() {
+    /* ── Кнопки ── */
+    makeBtn('topo-remote-btn', '+ Роутер', '#f0a840', showAddRouterDialog);
+    makeBtn('topo-slots-btn',  'Слоти',    '#5fd0a5', function() {
       var panel = document.getElementById('topo-save-panel');
       if (!panel) panel = buildSavePanel();
       renderSlots();
       panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
     });
-
-    /* З форми */
     makeBtn('topo-form-btn', 'З форми', '#8ea3b0', function() {
-      var data = {
+      topoSetState({
         nodes: [
-          { id: 'c1', type: 'cloud',  label: 'Internet',   x: 500, y: 60  },
-          { id: 'r1', type: 'router', label: 'Router\n192.168.88.1', ip: '192.168.88.1', x: 500, y: 220 },
-          { id: 's1', type: 'switch', label: 'LAN Bridge',  x: 300, y: 380 },
-          { id: 'a1', type: 'ap',     label: 'WiFi AP',     x: 150, y: 500 },
-          { id: 'p1', type: 'pc',     label: 'PC',          x: 400, y: 500 },
+          { id:'c1', type:'cloud',  label:'Internet', x:500, y:60  },
+          { id:'r1', type:'router', label:'Router 192.168.88.1', ip:'192.168.88.1', x:500, y:220 },
+          { id:'s1', type:'switch', label:'LAN Bridge', x:300, y:380 },
+          { id:'a1', type:'ap',     label:'WiFi AP',    x:150, y:500 },
+          { id:'p1', type:'pc',     label:'PC',         x:420, y:500 },
         ],
         edges: [
-          { from: 'c1', to: 'r1', label: 'WAN',    active: true },
-          { from: 'r1', to: 's1', label: 'LAN',    active: true },
-          { from: 's1', to: 'a1', label: 'ether2', active: true },
-          { from: 's1', to: 'p1', label: 'ether3', active: true },
+          { from:'c1', to:'r1', label:'WAN',    active:true },
+          { from:'r1', to:'s1', label:'LAN',    active:true },
+          { from:'s1', to:'a1', label:'ether2', active:true },
+          { from:'s1', to:'p1', label:'ether3', active:true },
         ]
-      };
-      topoSetState(data);
+      });
     });
-
-    /* З RSC */
     makeBtn('topo-rsc-btn', 'З RSC', '#8ea3b0', function() {
-      var input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.rsc,.txt';
-      input.onchange = function(e) {
-        var file = e.target.files[0];
-        if (!file) return;
+      var inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = '.rsc,.txt';
+      inp.onchange = function(e) {
+        var file = e.target.files[0]; if (!file) return;
         var reader = new FileReader();
         reader.onload = function(ev) {
           var data = importFromRSC(ev.target.result);
-          if (data) topoSetState(data);
+          console.log('[TopoExt] RSC imported:', data);
+          if (data && data.nodes && data.nodes.length) {
+            /* Збагачуємо vendor */
+            enrichAllVendors(data.nodes);
+            /* Читаємо поточну топологію */
+            var existRsc = { nodes: [], edges: [] };
+            try {
+              var sv = localStorage.getItem('mt-topology');
+              if (sv) existRsc = JSON.parse(sv);
+            } catch(ex2) {}
+            /* Merge якщо є існуючі дані */
+            var finalRsc = existRsc.nodes && existRsc.nodes.length
+              ? mergeTopologyData(existRsc, data)
+              : data;
+            topoSetState(finalRsc);
+          } else {
+            alert('RSC: не вдалось розпарсити файл! Перевір формат.');
+          }
         };
         reader.readAsText(file);
       };
-      input.click();
+      inp.click();
     });
-
-    /* Глибоке сканування */
     makeBtn('topo-deep-btn', 'Глибокий скан', '#5fd0a5', function() {
       var ipEl   = document.getElementById('topo-ip');
       var userEl = document.getElementById('topo-user');
       var passEl = document.getElementById('topo-pass');
-      if (!ipEl || !userEl || !passEl) { alert('Поля IP/User/Pass не знайдено!'); return; }
+      if (!ipEl) { alert('Поля IP не знайдено!'); return; }
       var ip   = ipEl.value.trim();
-      var user = userEl.value.trim();
-      var pass = passEl.value.trim();
+      var user = userEl ? userEl.value.trim() : 'admin';
+      var pass = passEl ? passEl.value.trim() : '';
       if (!ip) { alert('Введи IP роутера!'); return; }
       var btn = document.getElementById('topo-deep-btn');
       btn.disabled = true; btn.textContent = 'Сканую...';
       scanVisited = {};
       deepScan(ip, user, pass, null, 0,
-        function(msg) { btn.textContent = msg.slice(0, 20); },
+        function(msg) { if (btn) btn.textContent = msg.slice(0,18); },
         function() {
-          btn.disabled = false; btn.textContent = 'Глибокий скан';
+          if (btn) { btn.disabled = false; btn.textContent = 'Глибокий скан'; }
           if (!scanResults.nodes.length) { alert('Нічого не знайдено!'); return; }
-          topoSetState(scanResults);
-          alert('Знайдено: ' + scanResults.nodes.length + ' вузлів!');
+          console.log('[TopoExt] deepScan done:', scanResults.nodes.length, 'nodes');
+
+          /* Збагачуємо MAC vendor */
+          enrichAllVendors(scanResults.nodes);
+
+          /* Deep scan — завжди replace (merge дублював вузли) */
+          var finalData = {
+            nodes: scanResults.nodes.slice(),
+            edges: scanResults.edges.slice()
+          };
+          _doSetState(finalData);
         }
       );
     });
+    makeBtn('topo-note-btn', 'Нотатка', '#f0a840', showNoteDialog);
 
-    /* Нотатка */
-    makeBtn('topo-note-btn', 'Нотатка', '#f0a840', function() {
-      var overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999999;display:flex;align-items:center;justify-content:center;';
-      var box = document.createElement('div');
-      box.style.cssText = 'background:#0d1821;border:1px solid #2a3b48;border-radius:10px;padding:20px;width:300px;';
-      var ttl = document.createElement('div');
-      ttl.textContent = 'Текст нотатки';
-      ttl.style.cssText = 'font-size:13px;font-weight:700;color:#e6edf3;margin-bottom:10px;';
-      var inp2 = document.createElement('input');
-      inp2.type = 'text';
-      inp2.placeholder = 'Введи текст...';
-      inp2.style.cssText = 'width:100%;box-sizing:border-box;background:#111d27;border:1px solid #2a3b48;border-radius:6px;color:#e6edf3;padding:8px 10px;font-size:12px;outline:none;margin-bottom:10px;';
-      var btns2 = document.createElement('div');
-      btns2.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
-      var cancelBtn = document.createElement('button');
-      cancelBtn.textContent = 'Скасувати';
-      cancelBtn.style.cssText = 'background:transparent;border:1px solid #2a3b48;color:#8ea3b0;border-radius:6px;padding:6px 14px;font-size:11px;cursor:pointer;';
-      cancelBtn.onclick = function() { document.body.removeChild(overlay); };
-      var okBtn = document.createElement('button');
-      okBtn.textContent = 'Додати';
-      okBtn.style.cssText = 'background:#5fd0a5;color:#082018;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;';
-      okBtn.onclick = function() {
-        var txt = inp2.value.trim();
-        document.body.removeChild(overlay);
-        if (!txt) return;
-        window.dispatchEvent(new CustomEvent('topo-add-node', { detail: { type: 'note', label: txt, x: 400 + Math.random()*200, y: 300 } }));
-      };
-      inp2.addEventListener('keydown', function(e) { if (e.key === 'Enter') okBtn.click(); if (e.key === 'Escape') cancelBtn.click(); });
-      btns2.appendChild(cancelBtn); btns2.appendChild(okBtn);
-      box.appendChild(ttl); box.appendChild(inp2); box.appendChild(btns2);
-      overlay.appendChild(box); document.body.appendChild(overlay);
-      setTimeout(function() { inp2.focus(); }, 50);
-    });
+    console.log('[TopoExt] extBar вставлено — ' + bar.children.length + ' кнопок');
+  }
 
-    console.log('[TopoExt] UI ін\'єктовано!');
+  /* Виносимо діалоги в окремі функції */
+  function showNoteDialog() {
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999999;display:flex;align-items:center;justify-content:center;';
+    var bx = document.createElement('div');
+    bx.style.cssText = 'background:#0d1821;border:1px solid #2a3b48;border-radius:10px;padding:20px;width:300px;display:flex;flex-direction:column;gap:10px;';
+    var ttl = document.createElement('div');
+    ttl.textContent = 'Текст нотатки';
+    ttl.style.cssText = 'font-size:13px;font-weight:700;color:#e6edf3;';
+    var inp = document.createElement('input');
+    inp.type = 'text'; inp.placeholder = 'Введи текст...';
+    inp.style.cssText = 'background:#111d27;border:1px solid #2a3b48;border-radius:6px;color:#e6edf3;padding:8px 10px;font-size:12px;outline:none;';
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
+    var cb = document.createElement('button');
+    cb.textContent = 'Скасувати';
+    cb.style.cssText = 'background:transparent;border:1px solid #2a3b48;color:#8ea3b0;border-radius:6px;padding:6px 14px;font-size:11px;cursor:pointer;';
+    cb.onclick = function() { ov.remove(); };
+    var ob = document.createElement('button');
+    ob.textContent = 'Додати';
+    ob.style.cssText = 'background:#5fd0a5;color:#082018;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;';
+    ob.onclick = function() {
+      var txt = inp.value.trim(); ov.remove();
+      if (!txt) return;
+      window.dispatchEvent(new CustomEvent('topo-add-node', { detail: { type:'note', label:txt, x:400+Math.random()*200, y:300 } }));
+    };
+    inp.onkeydown = function(e) { if (e.key==='Enter') ob.click(); if (e.key==='Escape') cb.click(); };
+    row.appendChild(cb); row.appendChild(ob);
+    bx.appendChild(ttl); bx.appendChild(inp); bx.appendChild(row);
+    ov.appendChild(bx); document.body.appendChild(ov);
+    setTimeout(function() { inp.focus(); }, 50);
+  }
+
+  function showAddRouterDialog() {
+    /* (існуючий код діалогу + Роутер) */
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999999;display:flex;align-items:center;justify-content:center;';
+    var bx = document.createElement('div');
+    bx.style.cssText = 'background:#0d1821;border:1px solid #2a3b48;border-radius:12px;padding:20px;width:360px;display:flex;flex-direction:column;gap:10px;';
+    function mkRow(lbl, id, ph, tp) {
+      var w=document.createElement('div');
+      var l=document.createElement('div'); l.textContent=lbl; l.style.cssText='font-size:11px;color:#8ea3b0;margin-bottom:3px;';
+      var i=document.createElement('input'); i.id=id; i.placeholder=ph; i.type=tp||'text';
+      i.style.cssText='width:100%;box-sizing:border-box;background:#111d27;border:1px solid #2a3b48;border-radius:6px;color:#e6edf3;padding:7px 10px;font-size:12px;outline:none;';
+      w.appendChild(l); w.appendChild(i); return w;
+    }
+    var ttl=document.createElement('div'); ttl.textContent='Підключити роутер'; ttl.style.cssText='font-size:14px;font-weight:700;color:#e6edf3;';
+    var st=document.createElement('div'); st.style.cssText='font-size:11px;color:#8ea3b0;min-height:16px;';
+    var br=document.createElement('div'); br.style.cssText='display:flex;gap:8px;justify-content:flex-end;';
+    var cb=document.createElement('button'); cb.textContent='Скасувати'; cb.style.cssText='background:transparent;border:1px solid #2a3b48;color:#8ea3b0;border-radius:6px;padding:7px 14px;font-size:11px;cursor:pointer;'; cb.onclick=function(){ov.remove();};
+    var ab=document.createElement('button'); ab.textContent='Додати'; ab.style.cssText='background:#5fd0a5;color:#082018;border:none;border-radius:6px;padding:7px 14px;font-size:11px;font-weight:700;cursor:pointer;';
+    ab.onclick=function(){
+      var ip=document.getElementById('rem-ip').value.trim();
+      var user=document.getElementById('rem-user').value.trim();
+      var pass=document.getElementById('rem-pass').value.trim();
+      var name=document.getElementById('rem-name').value.trim()||ip;
+      if(!ip){st.textContent='Введи IP!';return;}
+      ab.disabled=true; st.textContent='Завантажую...'; st.style.color='#8ea3b0';
+      var nid='remote-'+ip.replace(/\./g,'-');
+      var newNode={id:nid,type:'router',label:name,ip:ip,mac:'',note:'Remote: '+ip,x:300+Math.random()*300,y:200+Math.random()*200};
+      if(window._topoNodes){
+        window._topoNodes.push(newNode);
+        if(window._topoDraw) window._topoDraw();
+        st.textContent='Додано!'; st.style.color='#5fd0a5';
+        ab.disabled=false;
+      }
+    };
+    br.appendChild(cb); br.appendChild(ab);
+    bx.appendChild(ttl);
+    bx.appendChild(mkRow('IP адреса','rem-ip','192.168.88.1 або 1.2.3.4'));
+    bx.appendChild(mkRow('Логін','rem-user','admin'));
+    bx.appendChild(mkRow('Пароль','rem-pass','','password'));
+    bx.appendChild(mkRow('Назва','rem-name','Офіс / Філія'));
+    bx.appendChild(st); bx.appendChild(br);
+    ov.appendChild(bx); document.body.appendChild(ov);
   }
 
   /* ── Слухаємо події ── */
@@ -599,8 +945,11 @@
     }
     if (modal && modal.style.display === 'none') {
       _injected = false;
-      /* Видаляємо старі кнопки щоб при повторному відкритті вони були додані знову */
-      ['topo-slots-btn','topo-form-btn','topo-rsc-btn','topo-deep-btn','topo-note-btn'].forEach(function(id) {
+      /* Видаляємо extBar при закритті */
+      var oldBar = document.getElementById('topo-ext-bar');
+      if (oldBar) oldBar.remove();
+      /* Видаляємо старі кнопки */
+      ['topo-slots-btn','topo-form-btn','topo-rsc-btn','topo-deep-btn','topo-note-btn','topo-remote-btn'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.remove();
       });
@@ -608,16 +957,116 @@
   });
   observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
 
-  /* Якщо modal вже є — перевіряємо кожну секунду */
-  var _retryInterval = setInterval(function() {
+  /* Перевіряємо кожні 500ms — якщо бар зник, вставляємо знову */
+  setInterval(function() {
     var modal = document.getElementById('topo-modal');
-    if (!modal) return;
-    if (modal.style.display === 'none') return;
-    if (document.getElementById('topo-slots-btn')) return;
-    console.log('[TopoExt] retry injectUI...');
-    injectUI();
-  }, 1000);
+    if (!modal || modal.style.display === 'none') return;
+    if (!document.getElementById('topo-ext-bar')) {
+      console.log('[TopoExt] extBar зник — відновлюємо...');
+      injectUI();
+    }
+  }, 500);
 
+
+  /* ══════════════════════════════════════════════════
+     AUTO DEEP SCAN + MERGE
+     Викликається автоматично після loadFromRouter
+  ══════════════════════════════════════════════════ */
+  function autoDeepScan(ip, user, pass) {
+    console.log('[TopoExt] autoDeepScan start:', ip);
+
+    scanVisited = {};
+
+    /* Беремо поточний стан canvas */
+    var existingNodes = (window._topoNodes || []).slice();
+    var existingEdges = (window._topoEdges || []).slice();
+
+    deepScan(ip, user, pass, null, 0,
+      function(msg) {
+        /* Оновлюємо статус */
+        var st = document.getElementById('topo-status-text');
+        if (st) st.textContent = msg;
+      },
+      function() {
+        if (!scanResults.nodes.length) {
+          console.warn('[TopoExt] autoDeepScan: нічого не знайдено');
+          return;
+        }
+
+        console.log('[TopoExt] autoDeepScan done:', scanResults.nodes.length, 'nodes');
+
+        /* Merge існуючих даних з результатами deepScan */
+        var merged = smartMerge(existingNodes, existingEdges,
+                                scanResults.nodes, scanResults.edges);
+
+        console.log('[TopoExt] після merge:', merged.nodes.length, 'nodes');
+        _doSetState(merged);
+      }
+    );
+  }
+
+  /* Розумний merge по IP адресі */
+  function smartMerge(existNodes, existEdges, newNodes, newEdges) {
+    /* Будуємо індекси */
+    var byId  = {};
+    var byIp  = {};
+    var result = { nodes: [], edges: [] };
+
+    /* Спочатку всі існуючі */
+    existNodes.forEach(function(n) {
+      byId[n.id] = n;
+      if (n.ip) byIp[n.ip] = n;
+      result.nodes.push(n);
+    });
+
+    /* Додаємо нові — якщо IP вже є, збагачуємо існуючий */
+    newNodes.forEach(function(n) {
+      /* Пошук по IP */
+      if (n.ip && byIp[n.ip]) {
+        var ex = byIp[n.ip];
+        /* Збагачуємо полями яких немає */
+        if (n.mac   && !ex.mac)    ex.mac   = n.mac;
+        if (n.note  && !ex.note)   ex.note  = n.note;
+        if (n.label && n.label !== n.ip && ex.label === ex.ip) ex.label = n.label;
+        if (n.vendor) ex.vendor = n.vendor;
+        return;
+      }
+      /* Пошук по ID */
+      if (byId[n.id]) {
+        var exId = byId[n.id];
+        if (n.mac && !exId.mac) exId.mac = n.mac;
+        if (n.ip  && !exId.ip)  exId.ip  = n.ip;
+        return;
+      }
+      /* Новий вузол */
+      byId[n.id] = n;
+      if (n.ip) byIp[n.ip] = n;
+      result.nodes.push(n);
+    });
+
+    /* Edges — існуючі + нові без дублів */
+    var edgeKey = {};
+    existEdges.forEach(function(e) {
+      var k = e.from + '->' + e.to;
+      edgeKey[k] = true;
+      result.edges.push(e);
+    });
+    newEdges.forEach(function(e) {
+      var k = e.from + '->' + e.to;
+      if (!edgeKey[k]) {
+        edgeKey[k] = true;
+        result.edges.push(e);
+      }
+    });
+
+    return result;
+  }
+
+  /* Експортуємо для topology-visual.js */
+  window._topoAutoDeepScan = autoDeepScan;
+
+  window._topoExtInject = injectUI;
+  window._doSetState = _doSetState;
   console.log('[TopoExt] ініціалізовано!');
 
 })();

@@ -1,5 +1,4 @@
 """
-MikroTik Config Generator — Proxy Server v4
 Підтримує: REST API proxy, SSH exec, статичні файли
 Режими: звичайний (8080+8888) та --electron (тільки 8888)
 Платформи: Windows, macOS, Linux
@@ -14,25 +13,19 @@ import urllib.request
 import urllib.error
 import time
 
-# ── Порти ──────────────────────────────────────────────────
 WEB_PORT   = 8080
 PROXY_PORT = 8888
 
-# ── Режим Electron ─────────────────────────────────────────
 ELECTRON_MODE = '--electron' in sys.argv
 if ELECTRON_MODE:
-    print('[proxy] Electron режим — веб-сервер 8080 вимкнено')
-
-# ── Базова директорія ──────────────────────────────────────
+    pass
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# ── SSH підтримка ──────────────────────────────────────────
 try:
     import paramiko
     SSH_OK = True
 except ImportError:
     SSH_OK = False
-    print('[proxy] paramiko не знайдено — SSH exec недоступний')
     print('[proxy] Встановити: python -m pip install paramiko')
 
 
@@ -54,7 +47,7 @@ def send_json(handler, data, status=200):
 # ══════════════════════════════════════════════════════════════
 #  SSH виконання команд
 # ══════════════════════════════════════════════════════════════
-def ssh_exec(host, port, username, password, command, timeout=15):
+def ssh_exec(host, port, username, password, command, timeout=10):
     if not SSH_OK:
         return {'ok': False, 'error': 'paramiko не встановлено. Виконай: python -m pip install paramiko'}
 
@@ -84,12 +77,10 @@ def ssh_exec(host, port, username, password, command, timeout=15):
 
 
 # ══════════════════════════════════════════════════════════════
-#  Proxy Handler — обробник запитів на порту 8888
 # ══════════════════════════════════════════════════════════════
 class ProxyHandler(http.server.BaseHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
-        # Тихий режим — виводимо тільки помилки
         if args and len(args) >= 2 and str(args[1]) not in ('200', '204'):
             print('[proxy] ' + fmt % args)
 
@@ -125,12 +116,10 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
     def _handle(self, method):
         path = self.path.split('?')[0]
 
-        # ── Health check ────────────────────────────────────
         if path == '/health' or path == '/ping':
             send_json(self, {'ok': True, 'ssh': SSH_OK, 'electron': ELECTRON_MODE})
             return
 
-        # ── SSH exec endpoint ────────────────────────────────
         if path == '/ssh/exec':
             body_bytes = self._read_body()
             try:
@@ -153,10 +142,37 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             send_json(self, result, 200 if result['ok'] else 500)
             return
 
-        # ── REST API proxy до роутера ────────────────────────
+        if self.path.startswith('/macvendor/'):
+            oui = self.path.replace('/macvendor/', '').replace('%3A', ':').strip()
+            oui = oui[:8]  # тільки перші 8 символів OUI
+            import urllib.request as _ur
+            try:
+                _url = 'https://api.macvendors.com/' + _ur.quote(oui)
+                _req = _ur.Request(_url, headers={'User-Agent': 'curl/7.0'})
+                with _ur.urlopen(_req, timeout=3) as _resp:
+                    vendor = _resp.read().decode('utf-8', errors='ignore').strip()
+            except Exception:
+                vendor = 'unknown'
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(vendor.encode('utf-8'))
+            return
+
         router_ip   = self.headers.get('x-router-ip')   or '192.168.88.1'
         router_port = self.headers.get('x-router-port') or '80'
         auth        = self.headers.get('Authorization')  or ''
+        if not auth:
+            _ru = self.headers.get('x-router-user') or self.headers.get('X-Router-User') or ''
+            _rp = self.headers.get('x-router-pass') or self.headers.get('X-Router-Pass') or ''
+            if _ru:
+                import base64 as _b64
+                _token = _b64.b64encode((_ru + ':' + _rp).encode()).decode()
+                auth   = 'Basic ' + _token
+
+        if router_port in ('8728', '8729'):
+            router_port = '80'  # WinboxAPI -> REST
 
         target = 'http://{}:{}{}'.format(router_ip, router_port, self.path)
 
@@ -175,7 +191,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 headers=fwd_headers,
                 method=method,
             )
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=10) as resp:
                 data    = resp.read()
                 status  = resp.status
                 ctype   = resp.headers.get('Content-Type', 'application/json')
@@ -209,7 +225,6 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
 
 
 # ══════════════════════════════════════════════════════════════
-#  Static Handler — обробник статичних файлів на порту 8080
 # ══════════════════════════════════════════════════════════════
 class StaticHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -242,7 +257,6 @@ def main():
     print('  Ctrl+C щоб зупинити')
     print('=' * 52)
 
-    # Запускаємо proxy сервер (порт 8888) — завжди
     proxy_server = http.server.ThreadingHTTPServer(
         ('127.0.0.1', PROXY_PORT),
         ProxyHandler,
@@ -254,9 +268,7 @@ def main():
     proxy_thread.start()
     print('[proxy] Proxy сервер -> http://localhost:{}'.format(PROXY_PORT))
 
-    # В Electron режимі — тільки proxy, без веб-сервера
     if ELECTRON_MODE:
-        print('[proxy] Electron режим — тільки proxy на порту {}'.format(PROXY_PORT))
         try:
             proxy_server.serve_forever()
         except KeyboardInterrupt:
@@ -264,7 +276,6 @@ def main():
             proxy_server.shutdown()
         return
 
-    # Звичайний режим — веб-сервер + автовідкриття браузера
     browser_thread = threading.Thread(target=open_browser, daemon=True)
     browser_thread.start()
 

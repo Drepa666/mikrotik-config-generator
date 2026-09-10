@@ -459,6 +459,64 @@
   /* ════════════════════════════════════════
      ПАНЕЛЬ ДЕТАЛЕЙ
   ════════════════════════════════════════ */
+
+  /* ── MAC Vendor Lookup ── */
+  function lookupVendor(node) {
+    if (!node || !node.mac) return;
+    var vendorEl = document.getElementById('detail-vendor');
+    if (!vendorEl) return;
+
+    if (node.vendor) {
+      vendorEl.value = node.vendor;
+      return;
+    }
+
+    vendorEl.value = 'Визначаю...';
+    var oui = node.mac.toUpperCase().slice(0, 8).replace(/:/g, '%3A');
+
+    /* Локальний OUI словник */
+    var LOCAL_OUI = {
+      'A8:2B:DD': 'Intel',
+      'D4:CA:6D': 'MikroTik', 'E4:8D:8C': 'MikroTik',
+      '4C:5E:0C': 'MikroTik', '74:4D:28': 'MikroTik',
+      'B8:69:F4': 'MikroTik', '2C:C8:1B': 'MikroTik',
+      '3C:22:FB': 'Apple',    'CC:2D:E0': 'Apple',
+      'AC:DE:48': 'Apple',    'F0:18:98': 'Apple',
+      'B8:27:EB': 'Raspberry Pi', 'DC:A6:32': 'Raspberry Pi',
+      'EC:FA:BC': 'TP-Link',  '50:C7:BF': 'TP-Link',
+      'C4:E9:84': 'TP-Link',  '18:D6:C7': 'TP-Link',
+      'AC:84:C9': 'Ubiquiti', 'FC:EC:DA': 'Ubiquiti',
+      '78:8A:20': 'Ubiquiti', '44:D9:E7': 'Ubiquiti',
+      '68:72:51': 'Cisco',    'B4:E9:B0': 'Cisco',
+      '28:D2:44': 'Samsung',  '8C:77:12': 'Samsung',
+      '18:FE:34': 'Espressif','24:6F:28': 'Espressif',
+      '18:8B:9D': 'Huawei',   'AC:85:3D': 'Huawei',
+    };
+
+    var oui3 = node.mac.toUpperCase().slice(0, 8);
+    if (LOCAL_OUI[oui3]) {
+      node.vendor    = LOCAL_OUI[oui3];
+      vendorEl.value = LOCAL_OUI[oui3];
+      if (typeof draw === 'function') draw();
+      return;
+    }
+
+    /* API через proxy */
+    fetch('http://localhost:8888/macvendor/' + oui)
+      .then(function(r) { return r.text(); })
+      .then(function(v) {
+        v = (v || '').trim();
+        if (v && v !== 'unknown' && !v.includes('{') && !v.includes('<')) {
+          node.vendor    = v;
+          vendorEl.value = v;
+          if (typeof draw === 'function') draw();
+        } else {
+          vendorEl.value = 'Невідомий';
+        }
+      })
+      .catch(function() { vendorEl.value = 'Офлайн'; });
+  }
+
   function showDetail(node) {
     var panel = document.getElementById('topo-detail');
     if (!node) {
@@ -501,6 +559,14 @@
       '<input id="detail-mac" type="text" value="' + (node.mac||'') + '" placeholder="AA:BB:CC:DD:EE:FF"' +
       ' style="background:#060d14;border:1px solid #1c2a37;color:#e6edf3;padding:5px 8px;border-radius:5px;font-size:12px;width:100%;"></div>' +
 
+      '<div class="detail-row">' +
+      '<label style="color:#8ea3b0;font-size:11px;">Виробник (MAC Vendor)</label>' +
+      '<input id="detail-vendor" type="text" readonly' +
+      ' value="' + (node.vendor || '') + '"' +
+      ' placeholder="Визначаю..."' +
+      ' style="background:#0d1821;color:#f0a840;border:1px solid #2a3b48;' +
+      ' border-radius:6px;padding:6px 10px;font-size:12px;width:100%;box-sizing:border-box;">' +
+      '</div>' +
       /* Інтерфейс */
       '<div><div style="font-size:10px;color:#4a6070;margin-bottom:3px;">Інтерфейс</div>' +
       '<input id="detail-iface" type="text" value="' + (node.iface||'') + '" placeholder="ether1, wlan1..."' +
@@ -995,6 +1061,7 @@
       };
       nodes.push(node);
       selected = node;
+    lookupVendor(node);
       showDetail(node);
       updateCount();
       draw();

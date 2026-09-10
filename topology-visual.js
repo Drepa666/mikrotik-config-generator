@@ -685,21 +685,25 @@
       label: routerName,
       ip: routerIp, mac: '', iface: '',
       note: 'RouterOS | IP: ' + routerIp,
-      x: 500, y: 280,
+      x: 500, y: 300,
     });
 
     /* ── WAN → Internet ── */
     var wanIface = 'ether1';
     if (Array.isArray(ifaces)) {
       ifaces.forEach(function(f) {
-        if (f.name === 'ether1' || (f.comment && f.comment.toLowerCase().includes('wan'))) {
+        if (f.name === 'ether1' ||
+           (f.comment && f.comment.toLowerCase().includes('wan'))) {
           wanIface = f.name;
         }
       });
     }
-    edges.push({ from: 'cloud-internet', to: 'router-main', label: wanIface, active: true });
+    edges.push({
+      from: 'cloud-internet', to: 'router-main',
+      label: wanIface, active: true,
+    });
 
-    /* ── LAN interfaces (тільки ті що мають IP) ── */
+    /* ── LAN interfaces ── */
     var ifaceNodes = {};
     var col = 0;
     if (Array.isArray(addresses)) {
@@ -719,7 +723,7 @@
           label: iface,
           ip: ip, mac: '', iface: iface,
           note: 'IP: ' + addr.address,
-          x: 180 + col * 220, y: 460,
+          x: 200 + col * 250, y: 480,
         });
         edges.push({
           from: 'router-main', to: nodeId,
@@ -730,7 +734,8 @@
       });
     }
 
-    /* ── Neighbors — сусідні пристрої ── */
+    /* ── Neighbors ── */
+    var neighborIps = {};
     if (Array.isArray(neighbors)) {
       neighbors.forEach(function(nb, ni) {
         var nbIp   = nb.address || nb['address4'] || '';
@@ -741,6 +746,8 @@
         var platform = (nb.platform || '').toLowerCase();
         var type     = platform.includes('mikrotik') ? 'router' : 'switch';
 
+        neighborIps[nbIp] = nodeId;
+
         if (nodes.find(function(n) { return n.id === nodeId; })) return;
 
         nodes.push({
@@ -749,7 +756,7 @@
           ip: nbIp, mac: nb['mac-address'] || '',
           iface: nb.interface || '',
           note: 'Neighbor | ' + (nb.platform || 'Unknown') + ' | ' + nbIp,
-          x: 820 + ni * 200, y: 280,
+          x: 820 + ni * 220, y: 300,
         });
         edges.push({
           from: 'router-main', to: nodeId,
@@ -759,11 +766,79 @@
       });
     }
 
-    /* Зберігаємо в localStorage для подальшого merge */
+    /* ── DHCP Leases з hostname — показуємо відомих клієнтів ── */
+    /* Будуємо MAC map з ARP */
+    var arpMacMap = {};
+    if (Array.isArray(arps)) {
+      arps.forEach(function(arp) {
+        if (arp.address && arp['mac-address']) {
+          arpMacMap[arp.address] = {
+            mac:   arp['mac-address'],
+            iface: arp.interface || '',
+            complete: arp.complete,
+          };
+        }
+      });
+    }
+
+    var hcol = 0;
+    if (Array.isArray(leases)) {
+      leases.forEach(function(lease) {
+        var leaseIp   = lease.address || '';
+        var hostname  = lease['host-name'] || '';
+        var leaseMac  = lease['mac-address'] || '';
+
+        /* Пропускаємо без hostname або якщо вже є в neighbors */
+        if (!leaseIp || !hostname) return;
+        if (neighborIps[leaseIp]) return;
+        if (leaseIp === routerIp)  return;
+
+        /* Пропускаємо неактивні leases */
+        var status = (lease.status || lease['lease-status'] || '');
+        if (status && status !== 'bound' && status !== 'waiting') return;
+
+        var arpInfo = arpMacMap[leaseIp] || {};
+        var mac     = leaseMac || arpInfo.mac || '';
+        var iface   = arpInfo.iface || '';
+        var nodeId  = 'host-' + leaseIp.replace(/\./g, '-');
+
+        if (nodes.find(function(n) { return n.id === nodeId; })) return;
+
+        /* Тип по hostname */
+        var hn   = hostname.toLowerCase();
+        var type = hn.includes('phone') || hn.includes('iphone') ? 'phone' :
+                   hn.includes('laptop') || hn.includes('book')  ? 'laptop' :
+                   hn.includes('server') || hn.includes('srv')   ? 'server' : 'pc';
+
+        nodes.push({
+          id: nodeId, type: type,
+          label: hostname,
+          ip: leaseIp, mac: mac,
+          iface: iface,
+          note: 'DHCP | MAC: ' + mac + (iface ? ' | ' + iface : ''),
+          x: 100 + hcol * 200, y: 650,
+        });
+
+        /* Підключаємо до LAN bridge або router */
+        var parentId = ifaceNodes[iface] ||
+                       ifaceNodes['bridge-lan'] ||
+                       ifaceNodes[Object.keys(ifaceNodes)[0]] ||
+                       'router-main';
+
+        edges.push({
+          from: parentId, to: nodeId,
+          label: iface || 'LAN',
+          active: arpInfo.complete !== 'false',
+        });
+        hcol++;
+      });
+    }
+
+    /* Зберігаємо в localStorage */
     try {
       localStorage.setItem('mt-topology', JSON.stringify({
-        nodes: nodes.slice(),
-        edges: edges.slice(),
+        nodes:       nodes.slice(),
+        edges:       edges.slice(),
         _wanIface:   wanIface,
         _ifaceNodes: ifaceNodes,
         _routerIp:   routerIp,
@@ -773,7 +848,7 @@
     updateCount();
     fitToScreen();
     draw();
-    setStatus('Завантажено: ' + nodes.length + ' вузлів — для деталей натисни "Глибокий скан"');
+    setStatus('Завантажено: ' + nodes.length + ' вузлів — для ARP деталей натисни "Глибокий скан"');
   }
 
   /* ════════════════════════════════════════

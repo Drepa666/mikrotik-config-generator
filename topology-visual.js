@@ -8,6 +8,9 @@
   ════════════════════════════════════════ */
   var nodes    = [];   /* { id, type, label, x, y, ip, mac, iface } */
   var edges    = [];   /* { from, to, label, speed, active } */
+  /* ── Експортуємо для topology-extend.js ── */
+  window._topoNodes = nodes;
+  window._topoEdges = edges;
   var selected = null;
   var dragging = null;
   var dragOffX = 0, dragOffY = 0;
@@ -160,6 +163,7 @@
   }
 
   function draw() {
+  window._topoDraw = draw;
     var W = canvas.width;
     var H = canvas.height;
     ctx.clearRect(0, 0, W, H);
@@ -762,6 +766,7 @@
      АВТО-РОЗМІЩЕННЯ
   ════════════════════════════════════════ */
   function autoLayout(animate) {
+  window._topoAutoLayout = autoLayout;
     var W = canvas.width;
     var H = canvas.height;
     var cx = W / 2 / scale;
@@ -931,6 +936,7 @@
       }
     } catch(e) {}
   }
+  window._topoLoadSaved = loadSaved;
 
   /* ════════════════════════════════════════
      EXPORT PNG

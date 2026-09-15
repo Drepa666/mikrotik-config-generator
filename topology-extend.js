@@ -884,47 +884,282 @@
   }
 
   function showAddRouterDialog() {
-    /* (існуючий код діалогу + Роутер) */
-    var ov = document.createElement('div');
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999999;display:flex;align-items:center;justify-content:center;';
-    var bx = document.createElement('div');
-    bx.style.cssText = 'background:#0d1821;border:1px solid #2a3b48;border-radius:12px;padding:20px;width:360px;display:flex;flex-direction:column;gap:10px;';
-    function mkRow(lbl, id, ph, tp) {
-      var w=document.createElement('div');
-      var l=document.createElement('div'); l.textContent=lbl; l.style.cssText='font-size:11px;color:#8ea3b0;margin-bottom:3px;';
-      var i=document.createElement('input'); i.id=id; i.placeholder=ph; i.type=tp||'text';
-      i.style.cssText='width:100%;box-sizing:border-box;background:#111d27;border:1px solid #2a3b48;border-radius:6px;color:#e6edf3;padding:7px 10px;font-size:12px;outline:none;';
-      w.appendChild(l); w.appendChild(i); return w;
-    }
-    var ttl=document.createElement('div'); ttl.textContent='Підключити роутер'; ttl.style.cssText='font-size:14px;font-weight:700;color:#e6edf3;';
-    var st=document.createElement('div'); st.style.cssText='font-size:11px;color:#8ea3b0;min-height:16px;';
-    var br=document.createElement('div'); br.style.cssText='display:flex;gap:8px;justify-content:flex-end;';
-    var cb=document.createElement('button'); cb.textContent='Скасувати'; cb.style.cssText='background:transparent;border:1px solid #2a3b48;color:#8ea3b0;border-radius:6px;padding:7px 14px;font-size:11px;cursor:pointer;'; cb.onclick=function(){ov.remove();};
-    var ab=document.createElement('button'); ab.textContent='Додати'; ab.style.cssText='background:#5fd0a5;color:#082018;border:none;border-radius:6px;padding:7px 14px;font-size:11px;font-weight:700;cursor:pointer;';
-    ab.onclick=function(){
-      var ip=document.getElementById('rem-ip').value.trim();
-      var user=document.getElementById('rem-user').value.trim();
-      var pass=document.getElementById('rem-pass').value.trim();
-      var name=document.getElementById('rem-name').value.trim()||ip;
-      if(!ip){st.textContent='Введи IP!';return;}
-      ab.disabled=true; st.textContent='Завантажую...'; st.style.color='#8ea3b0';
-      var nid='remote-'+ip.replace(/\./g,'-');
-      var newNode={id:nid,type:'router',label:name,ip:ip,mac:'',note:'Remote: '+ip,x:300+Math.random()*300,y:200+Math.random()*200};
-      if(window._topoNodes){
-        window._topoNodes.push(newNode);
-        if(window._topoDraw) window._topoDraw();
-        st.textContent='Додано!'; st.style.color='#5fd0a5';
-        ab.disabled=false;
-      }
+    /* Видаляємо старий діалог */
+    var old = document.getElementById('add-router-dialog');
+    if (old) old.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id  = 'add-router-dialog';
+    overlay.style.cssText = [
+      'position:fixed','top:0','left:0','width:100%','height:100%',
+      'background:rgba(0,0,0,0.7)','z-index:9999',
+      'display:flex','align-items:center','justify-content:center',
+    ].join(';');
+
+    overlay.innerHTML = [
+      '<div style="background:#0d1821;border:1px solid #1c2a37;border-radius:12px;',
+      'padding:28px;width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.6);">',
+
+      '<h3 style="color:#e6edf3;margin:0 0 20px;font-size:16px;">',
+      '&#128279; Підключити роутер</h3>',
+
+      '<label style="color:#8ea3b0;font-size:12px;">IP адреса</label>',
+      '<input id="ar-ip" placeholder="192.168.88.1 або 1.2.3.4" style="',
+      'width:100%;box-sizing:border-box;margin:4px 0 12px;padding:8px 12px;',
+      'background:#060d14;border:1px solid #1c2a37;border-radius:6px;',
+      'color:#e6edf3;font-size:13px;">',
+
+      '<label style="color:#8ea3b0;font-size:12px;">Порт (80, 443, 1001...)</label>',
+      '<input id="ar-port" value="80" style="',
+      'width:100%;box-sizing:border-box;margin:4px 0 12px;padding:8px 12px;',
+      'background:#060d14;border:1px solid #1c2a37;border-radius:6px;',
+      'color:#e6edf3;font-size:13px;">',
+
+      '<label style="color:#8ea3b0;font-size:12px;">Протокол</label>',
+      '<input id="ar-proto" value="http" style="',
+      'width:100%;box-sizing:border-box;margin:4px 0 12px;padding:8px 12px;',
+      'background:#060d14;border:1px solid #1c2a37;border-radius:6px;',
+      'color:#e6edf3;font-size:13px;">',
+
+      '<label style="color:#8ea3b0;font-size:12px;">Логін</label>',
+      '<input id="ar-user" value="admin" style="',
+      'width:100%;box-sizing:border-box;margin:4px 0 12px;padding:8px 12px;',
+      'background:#060d14;border:1px solid #1c2a37;border-radius:6px;',
+      'color:#e6edf3;font-size:13px;">',
+
+      '<label style="color:#8ea3b0;font-size:12px;">Пароль</label>',
+      '<input id="ar-pass" type="password" style="',
+      'width:100%;box-sizing:border-box;margin:4px 0 12px;padding:8px 12px;',
+      'background:#060d14;border:1px solid #1c2a37;border-radius:6px;',
+      'color:#e6edf3;font-size:13px;">',
+
+      '<label style="color:#8ea3b0;font-size:12px;">Назва</label>',
+      '<input id="ar-name" placeholder="Офіс / Філія" style="',
+      'width:100%;box-sizing:border-box;margin:4px 0 20px;padding:8px 12px;',
+      'background:#060d14;border:1px solid #1c2a37;border-radius:6px;',
+      'color:#e6edf3;font-size:13px;">',
+
+      '<div id="ar-status" style="color:#e05252;font-size:12px;',
+      'margin-bottom:12px;min-height:16px;"></div>',
+
+      '<div style="display:flex;gap:10px;justify-content:flex-end;">',
+      '<button id="ar-cancel" style="padding:8px 20px;background:transparent;',
+      'border:1px solid #2a3b48;border-radius:6px;color:#8ea3b0;cursor:pointer;">',
+      'Скасувати</button>',
+      '<button id="ar-add" style="padding:8px 20px;background:#5fd0a5;',
+      'border:none;border-radius:6px;color:#0d1821;font-weight:700;cursor:pointer;">',
+      'Додати</button>',
+      '</div>',
+      '</div>',
+    ].join('');
+
+    document.body.appendChild(overlay);
+
+    /* Завантажуємо збережені значення */
+    try {
+      var saved = JSON.parse(localStorage.getItem('ar-fields') || '{}');
+      if (saved.ip)    document.getElementById('ar-ip').value    = saved.ip;
+      if (saved.port)  document.getElementById('ar-port').value  = saved.port;
+      if (saved.proto) document.getElementById('ar-proto').value = saved.proto;
+      if (saved.user)  document.getElementById('ar-user').value  = saved.user;
+      if (saved.name)  document.getElementById('ar-name').value  = saved.name;
+      /* Пароль не зберігаємо з міркувань безпеки */
+    } catch(ex) {}
+
+    /* Скасувати */
+    document.getElementById('ar-cancel').onclick = function() {
+      overlay.remove();
     };
-    br.appendChild(cb); br.appendChild(ab);
-    bx.appendChild(ttl);
-    bx.appendChild(mkRow('IP адреса','rem-ip','192.168.88.1 або 1.2.3.4'));
-    bx.appendChild(mkRow('Логін','rem-user','admin'));
-    bx.appendChild(mkRow('Пароль','rem-pass','','password'));
-    bx.appendChild(mkRow('Назва','rem-name','Офіс / Філія'));
-    bx.appendChild(st); bx.appendChild(br);
-    ov.appendChild(bx); document.body.appendChild(ov);
+    overlay.onclick = function(e) {
+      if (e.target === overlay) overlay.remove();
+    };
+
+    /* Додати */
+    document.getElementById('ar-add').onclick = function() {
+      var ip    = (document.getElementById('ar-ip').value    || '').trim();
+      var port  = (document.getElementById('ar-port').value  || '80').trim();
+      var proto = (document.getElementById('ar-proto').value || 'http').trim();
+      var user  = (document.getElementById('ar-user').value  || 'admin').trim();
+      var pass  = (document.getElementById('ar-pass').value  || '').trim();
+      var name  = (document.getElementById('ar-name').value  || '').trim() || ip;
+      var stEl  = document.getElementById('ar-status');
+      var addBtn= document.getElementById('ar-add');
+
+      if (!ip) { stEl.textContent = 'Введи IP адресу!'; return; }
+
+      /* Зберігаємо поля в localStorage */
+      try {
+        localStorage.setItem('ar-fields', JSON.stringify({
+          ip:    ip,
+          port:  port,
+          proto: proto,
+          user:  user,
+          name:  name,
+        }));
+      } catch(ex) {}
+
+      addBtn.textContent = 'Підключаюсь...';
+      addBtn.disabled    = true;
+      stEl.style.color   = '#8ea3b0';
+      stEl.textContent   = 'Перевіряю підключення до ' + ip + ':' + port + '...';
+
+      var BASE = 'http://localhost:8888';
+      var hdrs = {
+        'Content-Type':   'application/json',
+        'X-Router-IP':    ip,
+        'X-Router-User':  user,
+        'X-Router-Pass':  pass,
+        'X-Router-Port':  port,
+        'X-Router-Proto': proto,
+      };
+
+      function sf(url, def) {
+        var ctrl = new AbortController();
+        var tid  = setTimeout(function() { ctrl.abort(); }, 5000);
+        return fetch(BASE + url, { method:'GET', headers:hdrs, signal:ctrl.signal })
+          .then(function(r) { clearTimeout(tid); return r.ok ? r.json() : def; })
+          .catch(function()  { clearTimeout(tid); return def; });
+      }
+
+      /* Тест підключення */
+      sf('/rest/system/identity', null)
+        .then(function(identity) {
+          if (identity && identity.name) {
+            /* MikroTik — завантажуємо дані */
+            stEl.style.color = '#5fd0a5';
+            stEl.textContent = 'MikroTik знайдено: ' + identity.name;
+
+            return Promise.all([
+              sf('/rest/ip/address',           []),
+              sf('/rest/ip/arp',               []),
+              sf('/rest/ip/dhcp-server/lease', []),
+              sf('/rest/ip/neighbor',          []),
+              sf('/rest/interface',            []),
+            ]).then(function(res) {
+              var addresses = Array.isArray(res[0]) ? res[0] : [];
+              var arps      = Array.isArray(res[1]) ? res[1] : [];
+              var leases    = Array.isArray(res[2]) ? res[2] : [];
+              var neighbors = Array.isArray(res[3]) ? res[3] : [];
+
+              var nid = 'remote-' + ip.replace(/\./g, '-');
+              var newNodes = [];
+              var newEdges = [];
+
+              newNodes.push({
+                id: nid, type: 'router',
+                label: name || identity.name || ip,
+                ip: ip, mac: '',
+                note: proto + '://' + ip + ':' + port + ' | ' + identity.name,
+                x: 300 + Math.random() * 400,
+                y: 200 + Math.random() * 150,
+              });
+
+              /* LAN interfaces */
+              var ifMap = {};
+              var col   = 0;
+              addresses.forEach(function(addr) {
+                if (!addr.address || !addr.interface) return;
+                if (ifMap[addr.interface]) return;
+                var subId = nid + '-' + addr.interface.replace(/[^a-z0-9]/gi, '-');
+                ifMap[addr.interface] = subId;
+                newNodes.push({
+                  id: subId, type: 'switch',
+                  label: addr.interface,
+                  ip: addr.address.split('/')[0], mac: '',
+                  note: 'IP: ' + addr.address,
+                  x: 150 + col * 200, y: 380,
+                });
+                newEdges.push({ from:nid, to:subId, label:addr.interface, active:true });
+                col++;
+              });
+
+              /* DHCP + ARP хости */
+              var macMap = {};
+              arps.forEach(function(a) {
+                if (a.address) macMap[a.address] = a['mac-address'] || '';
+              });
+              var hcol = 0;
+              leases.forEach(function(l) {
+                if (!l.address || !l['host-name']) return;
+                var hid = nid + '-h-' + l.address.replace(/\./g, '-');
+                newNodes.push({
+                  id: hid, type: 'pc',
+                  label: l['host-name'],
+                  ip: l.address,
+                  mac: l['mac-address'] || macMap[l.address] || '',
+                  note: 'DHCP | ' + l.address,
+                  x: 80 + hcol * 170, y: 530,
+                });
+                var parent = Object.values(ifMap)[0] || nid;
+                newEdges.push({ from:parent, to:hid, label:'LAN', active:true });
+                hcol++;
+              });
+
+              /* Додаємо в топологію */
+              _addNodesToTopology(newNodes, newEdges);
+              stEl.textContent = 'Додано: ' + newNodes.length + ' вузлів!';
+              addBtn.textContent = 'Готово!';
+              setTimeout(function() {
+                overlay.remove();
+                if (typeof window._topoFit === 'function') window._topoFit();
+              }, 1500);
+            });
+
+          } else {
+            /* Не MikroTik — додаємо як generic вузол */
+            stEl.style.color = '#f0a840';
+            stEl.textContent = 'Generic роутер — додаю вузол...';
+
+            var nid = 'remote-' + ip.replace(/\./g, '-');
+            _addNodesToTopology([{
+              id: nid, type: 'router',
+              label: name || ip,
+              ip: ip, mac: '',
+              note: proto + '://' + ip + ':' + port,
+              x: 300 + Math.random() * 400,
+              y: 200 + Math.random() * 150,
+            }], []);
+
+            stEl.textContent = 'Додано як generic роутер!';
+            addBtn.textContent = 'Готово!';
+            setTimeout(function() { overlay.remove(); }, 1500);
+          }
+        })
+        .catch(function(e) {
+          stEl.style.color  = '#e05252';
+          stEl.textContent  = 'Помилка: ' + (e.message || 'недоступний');
+          addBtn.textContent = 'Додати';
+          addBtn.disabled    = false;
+        });
+    };
+  }
+
+  /* Додаємо вузли в існуючу топологію */
+  function _addNodesToTopology(newNodes, newEdges) {
+    if (!window._topoNodes) return;
+    var byId = {};
+    window._topoNodes.forEach(function(n) { byId[n.id] = true; });
+
+    newNodes.forEach(function(n) {
+      if (!byId[n.id]) { window._topoNodes.push(n); byId[n.id] = true; }
+    });
+    if (window._topoEdges) {
+      var edgeKey = {};
+      window._topoEdges.forEach(function(e) { edgeKey[e.from+'->'+e.to] = true; });
+      newEdges.forEach(function(e) {
+        if (!edgeKey[e.from+'->'+e.to]) {
+          window._topoEdges.push(e);
+          edgeKey[e.from+'->'+e.to] = true;
+        }
+      });
+    }
+    try {
+      localStorage.setItem('mt-topology', JSON.stringify({
+        nodes: window._topoNodes,
+        edges: window._topoEdges || [],
+      }));
+    } catch(ex) {}
+    if (typeof window._topoDraw === 'function') window._topoDraw();
   }
 
   /* ── Слухаємо події ── */

@@ -382,7 +382,7 @@ function initDiffApply() {
       </div>
 
       <!-- Вивід diff -->
-      <div id="da-diff-output" style="background:#060d14;border:1px solid #2a3b48;border-radius:8px;padding:14px;font-family:monospace;font-size:11px;max-height:350px;overflow-y:auto;line-height:1.7;margin-bottom:12px;overflow:auto;"></div>
+      <div id="da-diff-output" style="margin-bottom:12px;overflow:auto;"></div>
 
       <!-- Apply секція -->
       <div style="background:#0a1f14;border:1px solid #1a4a2a;border-radius:8px;padding:16px;">
@@ -548,10 +548,8 @@ function initDiffApply() {
     injectDiffCSS();
     /* ── Рендер результату ── */
     try {
-      output.style.whiteSpace = 'normal';
-      output.style.padding    = '0';
-      output.style.background = 'transparent';
-      output.style.border     = 'none';
+      output.removeAttribute('style');
+      output.style.marginBottom = '12px';
       renderDiffVisual(textA, textB, diff, output, stats);
     } catch(err) {
       console.error('Diff error:', err);

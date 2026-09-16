@@ -338,10 +338,12 @@
     var opts = {
       method:  method,
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type':  'application/json',
         'x-router-ip':   router.ip,
-        'x-router-port': String(router.port),
-        'Authorization': 'Basic ' + btoa(router.user + ':' + router.pass),
+        'x-router-port': String(router.port || 80),
+        'x-router-user': router.user || 'admin',
+        'x-router-pass': router.pass || '',
+        'Authorization': 'Basic ' + btoa((router.user||'admin') + ':' + (router.pass||'')),
       },
     };
     if (body) opts.body = JSON.stringify(body);
@@ -381,6 +383,29 @@
         router.info      = {};
         renderTabs();
         loadDashboard(id);
+        /* Підтягуємо MAC роутера */
+        restCall(router, 'GET', '/interface').then(function(ifaces) {
+          if (!Array.isArray(ifaces)) return;
+          var main = ifaces.find(function(i) { return i.type === 'ether' && i.name === 'ether1'; })
+                  || ifaces.find(function(i) { return i.type === 'ether'; });
+          if (main && main['mac-address']) {
+            router.mac = main['mac-address'];
+            /* Визначаємо vendor по перших 3 октетах */
+            var oui = main['mac-address'].substring(0,8).toUpperCase();
+            var vendors = {
+              '2C:C8:1B': 'MikroTik', 'D4:CA:6D': 'MikroTik',
+              'B8:69:F4': 'MikroTik', '4C:5E:0C': 'MikroTik',
+              'CC:2D:E0': 'MikroTik', '48:8F:5A': 'MikroTik',
+              '6C:3B:6B': 'MikroTik', 'DC:2C:6E': 'MikroTik',
+              '00:0C:42': 'MikroTik', 'E4:8D:8C': 'MikroTik',
+              '18:FD:74': 'MikroTik', '74:4D:28': 'MikroTik',
+              '08:55:31': 'MikroTik', 'C4:AD:34': 'MikroTik',
+            };
+            router.vendor = vendors[oui] || 'MikroTik';
+            saveRouters();
+            renderTabs();
+          }
+        }).catch(function(){});
       } else {
         router.connected = false;
         renderTabs();

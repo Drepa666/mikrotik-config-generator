@@ -316,13 +316,6 @@ textarea.ta-invalid { border-color: #e0665a !important; box-shadow: 0 0 0 2px rg
 textarea.ta-valid   { border-color: #5fd0a5 !important; }
 
 </style>
-
-<style id="hide-duplicates-css">
-  /* Приховуємо FAB кнопки — є в Router Manager */
-  #btn-audit-fab,
-  #audit-modal,
-  #btn-nettools-fab { display: none !important; }
-</style>
 </head>
 
 <body>
@@ -1483,7 +1476,10 @@ const AI_COMPAT = {
     url: 'https://api.x.ai/v1/chat/completions',
     model: 'grok-2-latest'
   },
-  groq:    {url:'https://api.groq.com/openai/v1/chat/completions',model:'openai/gpt-oss-120b'},
+  groq: {
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    model: 'llama-3.3-70b-versatile'
+  },
   deepseek: {
     url: 'https://api.deepseek.com/chat/completions',
     model: 'deepseek-chat'
@@ -6340,8 +6336,6 @@ function highlightRos(rawText) {
 <script src="audit.js"></script>
 <button id="btn-audit-fab" title="Audit Log" onclick="document.getElementById('audit-modal').style.display='block';" style="position:fixed;bottom:166px;right:16px;background:#16212c;border:2px solid #e0665a;color:#e0665a;border-radius:50%;width:42px;height:42px;font-size:18px;cursor:pointer;z-index:10000;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(224,102,90,.4);">&#128274;</button>
 <script src="topology-visual.js"></script>
-<script src="topology-extend.js"></script>
-<script src="ip-scanner-plugin.js"></script>
 <script src="plugins.js"></script>
 <script src="fab-manager.js"></script>
 <script src="terminal-plus.js"></script>
@@ -6369,46 +6363,5 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js');
 }
 </script>
-<script src="electron-bridge.js"></script>
-<script src="subnet-validator.js"></script>
-<!-- -->
-<script src="router-manager-crud.js"></script>
-<script src="tab-completion.js"></script>
-
-<script id="hide-duplicates-js">
-(function() {
-  function hideByText() {
-    var HIDE_TEXTS = ['Роутер', 'Статистика'];
-    var btns = document.querySelectorAll('button, a.btn, .btn');
-    btns.forEach(function(btn) {
-      if (btn.id === 'btn-router-manager') return;
-      var text = btn.textContent.trim();
-      HIDE_TEXTS.forEach(function(t) {
-        if (text === t || text.endsWith(t)) {
-          btn.style.setProperty('display', 'none', 'important');
-          console.log('[Hide] Прихована кнопка:', text, btn.id);
-        }
-      });
-    });
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', hideByText);
-  } else {
-    hideByText();
-  }
-  setTimeout(hideByText, 1000);
-  setTimeout(hideByText, 2000);
-})();
-</script>
-
-<script src="router-manager.js"></script>
-<script src="rm-datastore.js"></script>
-<script src="rm-sections.js"></script>
-<script src="rm-sections-extra.js"></script>
-<script src="rm-dashboard.js"></script>
-<script src="rm-capsman.js"></script>
-<script src="rm-plugins.js"></script>
-<!--
-<!-- rm-ux.js DISABLED — UX вбудовано в router-manager.js --> -->
 </body>
 </html>

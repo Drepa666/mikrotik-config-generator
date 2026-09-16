@@ -47,7 +47,7 @@ def send_json(handler, data, status=200):
 # ══════════════════════════════════════════════════════════════
 #  SSH виконання команд
 # ══════════════════════════════════════════════════════════════
-def ssh_exec(host, port, username, password, command, timeout=10):
+def ssh_exec(host, port, username, password, command, timeout=15):
     if not SSH_OK:
         return {'ok': False, 'error': 'paramiko не встановлено. Виконай: python -m pip install paramiko'}
 
@@ -59,7 +59,7 @@ def ssh_exec(host, port, username, password, command, timeout=10):
             port=int(port),
             username=username,
             password=password,
-            timeout=10,
+            timeout=15,
             look_for_keys=False,
             allow_agent=False,
         )
@@ -95,6 +95,8 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         self._handle('GET')
 
+    
+
     def do_POST(self):
         self._handle('POST')
 
@@ -117,118 +119,40 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         path = self.path.split('?')[0]
 
         if path == '/health' or path == '/ping':
-            send_json(self, {'ok': True, 'ssh': SSH_OK, 'electron': ELECTRON_MODE})
+            send_json({'ok': True, 'ssh': SSH_OK, 'electron': ELECTRON_MODE})
             return
-
-        if path == '/ssh/exec':
-            body_bytes = self._read_body()
+        elif path == '/ruijie-rpc':
             try:
-                body = json.loads(body_bytes) if body_bytes else {}
-            except Exception:
-                send_json(self, {'ok': False, 'error': 'Невалідний JSON'}, 400)
-                return
-
-            host     = body.get('host')     or self.headers.get('x-router-ip')   or '192.168.88.1'
-            port     = body.get('port')     or self.headers.get('x-router-port')  or 22
-            username = body.get('username') or self.headers.get('x-router-user')  or 'admin'
-            password = body.get('password') or self.headers.get('x-router-pass')  or ''
-            command  = body.get('command',  '')
-
-            if not command:
-                send_json(self, {'ok': False, 'error': 'Команда не вказана'}, 400)
-                return
-
-            result = ssh_exec(host, int(port), username, password, command)
-            send_json(self, result, 200 if result['ok'] else 500)
-            return
-
-        if self.path.startswith('/macvendor/'):
-            oui = self.path.replace('/macvendor/', '').replace('%3A', ':').strip()
-            oui = oui[:8]  # тільки перші 8 символів OUI
-            import urllib.request as _ur
-            try:
-                _url = 'https://api.macvendors.com/' + _ur.quote(oui)
-                _req = _ur.Request(_url, headers={'User-Agent': 'curl/7.0'})
-                with _ur.urlopen(_req, timeout=3) as _resp:
-                    vendor = _resp.read().decode('utf-8', errors='ignore').strip()
-            except Exception:
-                vendor = 'unknown'
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/plain; charset=utf-8')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(vendor.encode('utf-8'))
-            return
-
-        router_ip   = self.headers.get('x-router-ip')   or '192.168.88.1'
-        router_port = self.headers.get('x-router-port') or '80'
-        auth        = self.headers.get('Authorization')  or ''
-        if not auth:
-            _ru = self.headers.get('x-router-user') or self.headers.get('X-Router-User') or ''
-            _rp = self.headers.get('x-router-pass') or self.headers.get('X-Router-Pass') or ''
-            if _ru:
-                import base64 as _b64
-                _token = _b64.b64encode((_ru + ':' + _rp).encode()).decode()
-                auth   = 'Basic ' + _token
-
-        if router_port in ('8728', '8729'):
-            router_port = '80'  # WinboxAPI -> REST
-
-        target = 'http://{}:{}{}'.format(router_ip, router_port, self.path)
-
-        body_bytes = self._read_body()
-
-        fwd_headers = {
-            'Content-Type': self.headers.get('Content-Type', 'application/json'),
-        }
-        if auth:
-            fwd_headers['Authorization'] = auth
-
-        try:
-            req = urllib.request.Request(
-                target,
-                data=body_bytes or None,
-                headers=fwd_headers,
-                method=method,
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data    = resp.read()
-                status  = resp.status
-                ctype   = resp.headers.get('Content-Type', 'application/json')
-
-            self.send_response(status)
-            self.send_header('Content-Type',   ctype)
-            self.send_header('Content-Length', str(len(data)))
-            self.send_header('Access-Control-Allow-Origin',  '*')
-            self.send_header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
-            self.send_header('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-router-ip,x-router-port,x-router-user,x-router-pass')
-            self.end_headers()
-            self.wfile.write(data)
-
-        except urllib.error.HTTPError as e:
-            err_body = e.read()
-            self.send_response(e.code)
-            self.send_header('Content-Type',   'application/json')
-            self.send_header('Content-Length', str(len(err_body)))
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(err_body)
-
-        except Exception as e:
-            msg = json.dumps({'error': str(e), 'target': target}).encode()
-            self.send_response(502)
-            self.send_header('Content-Type',   'application/json')
-            self.send_header('Content-Length', str(len(msg)))
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(msg)
-
-
-# ══════════════════════════════════════════════════════════════
-# ══════════════════════════════════════════════════════════════
-class StaticHandler(http.server.SimpleHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=BASE_DIR, **kwargs)
+                body   = json.loads(request.body.read().decode())
+                host   = body.get('host',   '192.168.110.1')
+                port   = body.get('port',   443)
+                token  = body.get('token',  '')
+                method = body.get('method', '')
+                params = body.get('params', {})
+                import ssl as _ssl, http.client, json as _json
+                ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
+                ctx.check_hostname = False
+                ctx.verify_mode    = _ssl.CERT_NONE
+                try:    ctx.minimum_version = _ssl.TLSVersion.TLSv1
+                except: pass
+                try:    ctx.set_ciphers('ALL:@SECLEVEL=0')
+                except: ctx.set_ciphers('DEFAULT@SECLEVEL=0')
+                conn = http.client.HTTPSConnection(host, port, timeout=15, context=ctx)
+                conn.request('POST',
+                    '/cgi-bin/luci/api/cmd?auth=' + token,
+                    body=_json.dumps({'method': method, 'params': params}),
+                    headers={
+                        'Content-Type':     'application/json;charset=UTF-8',
+                        'Accept':           'application/json, text/plain, */*',
+                        'Connection':       'close',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    })
+                resp = conn.getresponse()
+                rb   = resp.read()
+                conn.close()
+                send_json(_json.loads(rb))
+            except Exception as e:
+                send_json({'error': str(e)}, 500)
 
     def log_message(self, fmt, *args):
         pass  # тихий режим

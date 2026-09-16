@@ -675,21 +675,94 @@
   function showAddRouterFormHTML() {
     return `
       <div class="rm-connect-form">
-        <h3>➕ Додати роутер</h3>
-        <div class="rm-field">
-          <label>Назва (необов'язково)</label>
-          <input id="rm-f-name" type="text" placeholder="Home Router">
-        </div>
-        <div class="rm-row">
-          <div class="rm-field">
-            <label>IP адреса роутера</label>
-            <input id="rm-f-ip" type="text" value="192.168.88.1">
+        <h3>🔌 Підключити роутер</h3>
+
+        <!-- ── Таблиця знайдених пристроїв (авто-скан) ── -->
+        <div style="margin-bottom:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span style="font-size:12px;color:#8ea3b0;">📡 Пристрої в мережі</span>
+            <button class="rm-btn rm-btn-secondary" id="rm-f-rescan" style="font-size:11px;padding:3px 10px;">🔄 Перескан</button>
           </div>
+          <div id="rm-f-scan-status" style="font-size:12px;color:#4a6070;margin-bottom:6px;">⏳ Сканую мережу...</div>
+          <div style="border:1px solid #2a3b48;border-radius:6px;overflow:hidden;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="background:#080f17;color:#4a6070;">
+                  <th style="padding:6px 10px;text-align:left;border-bottom:1px solid #2a3b48;width:30px;"></th>
+                  <th style="padding:6px 10px;text-align:left;border-bottom:1px solid #2a3b48;">Status</th>
+                  <th style="padding:6px 10px;text-align:left;border-bottom:1px solid #2a3b48;">MAC Address</th>
+                  <th style="padding:6px 10px;text-align:left;border-bottom:1px solid #2a3b48;">IP Address</th>
+                  <th style="padding:6px 10px;text-align:left;border-bottom:1px solid #2a3b48;">Identity</th>
+                  <th style="padding:6px 10px;text-align:left;border-bottom:1px solid #2a3b48;">Version</th>
+                  <th style="padding:6px 10px;text-align:left;border-bottom:1px solid #2a3b48;">Board</th>
+                </tr>
+              </thead>
+              <tbody id="rm-f-scan-tbody">
+                <tr><td colspan="6" style="padding:16px;text-align:center;color:#4a6070;">⏳ Пошук...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── Вибраний пристрій ── -->
+        <div id="rm-f-selected-wrap" style="background:#0a1a2a;border:1px solid #2a3b48;border-radius:6px;padding:10px 14px;margin-bottom:14px;display:none;">
+          <div style="font-size:11px;color:#4a6070;margin-bottom:6px;">Вибраний пристрій:</div>
+          <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
+            <div>
+              <span style="color:#8ea3b0;font-size:11px;">MAC</span><br>
+              <span id="rm-f-sel-mac" style="color:#4a90d9;font-family:monospace;font-size:13px;font-weight:600;">—</span>
+            </div>
+            <div>
+              <span style="color:#8ea3b0;font-size:11px;">IP</span><br>
+              <span id="rm-f-sel-ip" style="color:#5fd0a5;font-family:monospace;font-size:13px;font-weight:600;">—</span>
+            </div>
+            <div>
+              <span style="color:#8ea3b0;font-size:11px;">Identity</span><br>
+              <span id="rm-f-sel-name" style="color:#e6edf3;font-size:13px;font-weight:600;">—</span>
+            </div>
+            <div style="margin-left:auto;">
+              <span style="font-size:11px;color:#8ea3b0;display:block;margin-bottom:4px;">Підключатись по:</span>
+              <div style="display:flex;gap:12px;">
+                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:#e6edf3;">
+                  <input type="radio" name="rm-f-conn-by" value="ip" checked style="accent-color:#5fd0a5;"> IP
+                </label>
+                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:#e6edf3;">
+                  <input type="radio" name="rm-f-conn-by" value="mac" style="accent-color:#5fd0a5;"> MAC
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Ручне введення (якщо не знайдено) ── -->
+        <details id="rm-f-manual-wrap" style="margin-bottom:14px;">
+          <summary style="font-size:12px;color:#4a6070;cursor:pointer;padding:4px 0;">✏️ Ввести вручну</summary>
+          <div style="margin-top:10px;">
+            <div class="rm-field">
+              <label>IP або MAC адреса</label>
+              <input id="rm-f-connect-to" type="text"
+                placeholder="192.168.88.1  або  2C:C8:1B:8C:DE:C5"
+                style="font-family:monospace;">
+            </div>
+          </div>
+        </details>
+
+        <!-- ── Параметри підключення ── -->
+        <div class="rm-row">
           <div class="rm-field">
             <label>REST API порт</label>
             <input id="rm-f-port" type="number" value="80">
           </div>
+          <div class="rm-field">
+            <label>SSH порт</label>
+            <input id="rm-f-ssh" type="number" value="22">
+          </div>
         </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8ea3b0;cursor:pointer;margin-bottom:10px;">
+          <input type="checkbox" id="rm-f-https" style="accent-color:#5fd0a5;"
+            onchange="var p=document.getElementById('rm-f-port'); if(this.checked){p.value=443;}else{p.value=80;}">
+          🔐 Використовувати HTTPS (порт 443)
+        </label>
         <div class="rm-row">
           <div class="rm-field">
             <label>Логін</label>
@@ -697,22 +770,32 @@
           </div>
           <div class="rm-field">
             <label>Пароль</label>
-            <input id="rm-f-pass" type="password" placeholder="">
+            <input id="rm-f-pass" type="password">
           </div>
         </div>
         <div class="rm-field">
-          <label>SSH порт (для термінала)</label>
-          <input id="rm-f-ssh" type="number" value="22">
+          <label>Назва (необов'язково)</label>
+          <input id="rm-f-name" type="text" placeholder="Офіс / Філія / Home">
         </div>
-        <div style="display:flex;gap:8px;margin-top:16px;">
+
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8ea3b0;cursor:pointer;margin-bottom:16px;">
+          <input type="checkbox" id="rm-f-remember" style="accent-color:#5fd0a5;"> Запам'ятати пароль
+        </label>
+
+        <div style="display:flex;gap:8px;">
           <button class="rm-btn rm-btn-primary" id="rm-f-connect">🔌 Підключити</button>
         </div>
-        <div id="rm-f-status" style="margin-top:10px;font-size:12px;color:#8ea3b0;"></div>
+        <div id="rm-f-status" style="margin-top:10px;font-size:12px;color:#8ea3b0;min-height:18px;"></div>
       </div>
     `;
   }
 
   function showAddRouterForm() {
+    /* Зупиняємо попередній таймер якщо є */
+    if (window.__rmScanTimer) {
+      clearInterval(window.__rmScanTimer);
+      window.__rmScanTimer = null;
+    }
     state.activeRouter = null;
     renderTabs();
     renderSidebar();
@@ -720,24 +803,374 @@
     if (cont) { cont.innerHTML = showAddRouterFormHTML(); bindAddRouterForm(); }
   }
 
+  function isValidHost(ip, mac) {
+    if (!ip || !mac) return false;
+    /* Фільтруємо multicast MAC: 01:00:5E:xx, 33:33:xx */
+    var macU = (mac || '').toUpperCase();
+    if (macU.startsWith('01:00:5E')) return false;
+    if (macU.startsWith('33:33:'))   return false;
+    if (macU === 'FF:FF:FF:FF:FF:FF') return false;
+    /* Фільтруємо multicast/broadcast IP */
+    var parts = (ip || '').split('.').map(Number);
+    if (!parts[0]) return false;
+    if (parts[0] >= 224) return false;   /* 224-239 multicast, 240+ reserved */
+    if (parts[0] === 0)  return false;
+    if (ip === '255.255.255.255') return false;
+    return true;
+  }
+
+  function isValidArpEntry(a) {
+    /* ARP запис валідний тільки якщо complete=true і не invalid */
+    if (a.invalid === 'true')   return false;
+    if (a.complete !== 'true')  return false;
+    if (!isValidHost(a.address, a['mac-address'])) return false;
+    return true;
+  }
+
+  function checkDeviceOnline(router, ip, callback) {
+    /* Спочатку перевіряємо ARP — якщо complete:true то онлайн */
+    restCall(router, 'GET', '/ip/arp')
+      .then(function(arps) {
+        if (!Array.isArray(arps)) { callback('unknown'); return; }
+        var entry = arps.find(function(a) { return a.address === ip; });
+        if (!entry) { callback('offline'); return; }
+        /* complete=true і не invalid → онлайн */
+        if (entry.complete === 'true' && entry.invalid !== 'true') {
+          callback('online');
+        } else if (entry.invalid === 'true') {
+          callback('offline');
+        } else {
+          /* Пінг для перевірки */
+          restCall(router, 'POST', '/ping', { address: ip, count: '1', interval: '0.1' })
+            .then(function(res) {
+              var pkt = Array.isArray(res) ? res[0] : res;
+              var lost = parseInt(pkt && pkt['packet-loss'] || '100');
+              callback(lost < 100 ? 'online' : 'offline');
+            })
+            .catch(function() { callback('unknown'); });
+        }
+      })
+      .catch(function() { callback('unknown'); });
+  }
+
+  function statusDot(status) {
+    var colors = { online: '#5fd0a5', offline: '#e05252', unknown: '#f0a840' };
+    var labels = { online: '● Online', offline: '● Offline', unknown: '● ...' };
+    var c = colors[status] || colors.unknown;
+    var l = labels[status] || labels.unknown;
+    return '<span style="color:' + c + ';font-size:11px;font-weight:600;">' + l + '</span>';
+  }
+
   function bindAddRouterForm() {
-    var btn = document.getElementById('rm-f-connect');
+    var st      = document.getElementById('rm-f-status');
+    var btn     = document.getElementById('rm-f-connect');
+    var rescan  = document.getElementById('rm-f-rescan');
+    var tbody   = document.getElementById('rm-f-scan-tbody');
+    var scanSt  = document.getElementById('rm-f-scan-status');
+
+    /* ── Стан вибраного пристрою ── */
+    var _selected = { ip: null, mac: null, name: null };
+
+    /* ── Функція вибору рядка ── */
+    function pickDevice(ip, mac, name) {
+      _selected.ip   = ip   || null;
+      _selected.mac  = mac  || null;
+      _selected.name = name || null;
+
+      var wrap = document.getElementById('rm-f-selected-wrap');
+      if (wrap) wrap.style.display = 'block';
+
+      var selIp   = document.getElementById('rm-f-sel-ip');
+      var selMac  = document.getElementById('rm-f-sel-mac');
+      var selName = document.getElementById('rm-f-sel-name');
+      if (selIp)   selIp.textContent   = ip   || '—';
+      if (selMac)  selMac.textContent  = mac  || '—';
+      if (selName) selName.textContent = name || '—';
+
+      /* Якщо нема IP — примусово MAC */
+      if (!ip || ip === '—') {
+        var radios = document.querySelectorAll('input[name="rm-f-conn-by"]');
+        radios.forEach(function(r){ r.value === 'mac' ? (r.checked = true) : null; });
+      }
+      /* Якщо нема MAC — примусово IP */
+      if (!mac || mac === '—') {
+        var radios = document.querySelectorAll('input[name="rm-f-conn-by"]');
+        radios.forEach(function(r){ r.value === 'ip' ? (r.checked = true) : null; });
+      }
+
+      /* Підсвічуємо рядок */
+      if (tbody) {
+        [].forEach.call(tbody.querySelectorAll('tr'), function(tr) {
+          tr.style.background = '';
+        });
+      }
+    }
+
+    /* ── Рендер таблиці сканування ── */
+    function renderScanTable(rows) {
+      if (!tbody) return;
+      if (!rows || !rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="padding:16px;text-align:center;color:#8ea3b0;">Пристроїв не знайдено. Введіть вручну.</td></tr>';
+        if (scanSt) scanSt.textContent = 'Нічого не знайдено';
+        return;
+      }
+
+      if (scanSt) scanSt.textContent = '✅ Знайдено: ' + rows.length + ' пристроїв — клікни щоб вибрати';
+
+      tbody.innerHTML = rows.map(function(r, i) {
+        return '<tr data-idx="' + i + '" style="cursor:pointer;transition:background .15s;"' +
+          ' onclick="window.__rmPickRow(' + i + ')">' +
+          '<td style="padding:6px 10px;text-align:center;">' +
+            '<input type="radio" name="rm-row-sel" style="accent-color:#5fd0a5;"></td>' +
+          '<td style="padding:6px 10px;">' + statusDot(r.status || (r.isSelf ? 'online' : 'unknown')) + '</td>' +
+          '<td style="padding:6px 10px;color:#4a90d9;font-family:monospace;">' + esc(r.mac || '—') + '</td>' +
+          '<td style="padding:6px 10px;color:#5fd0a5;font-family:monospace;">' + esc(r.ip || '—') + '</td>' +
+          '<td style="padding:6px 10px;color:#e6edf3;font-weight:' + (r.isSelf?'700':'400') + ';">' +
+            esc(r.identity || '—') + (r.isSelf ? ' ⭐' : '') + '</td>' +
+          '<td style="padding:6px 10px;color:#8ea3b0;">' + esc(r.version || '—') + '</td>' +
+          '<td style="padding:6px 10px;color:#8ea3b0;">' + esc(r.board || '—') + '</td>' +
+          '</tr>';
+      }).join('');
+
+      /* Глобальний хендлер кліку по рядку */
+      window.__rmScanRows = rows;
+      window.__rmPickRow  = function(idx) {
+        var r = window.__rmScanRows[idx];
+        if (!r) return;
+        /* Вибираємо радіо */
+        var radios = tbody.querySelectorAll('input[type=radio]');
+        [].forEach.call(radios, function(rb, i) { rb.checked = (i === idx); });
+        /* Підсвічуємо */
+        [].forEach.call(tbody.querySelectorAll('tr'), function(tr) {
+          tr.style.background = (tr.dataset.idx == idx) ? '#0a2540' : '';
+        });
+        pickDevice(r.ip, r.mac, r.identity);
+      };
+
+      /* Автовибір першого рядка */
+      if (rows.length > 0) {
+        setTimeout(function() { if (window.__rmPickRow) window.__rmPickRow(0); }, 50);
+      }
+    }
+
+    /* ── Скан мережі ── */
+    function doScan() {
+      if (scanSt) scanSt.textContent = '⏳ Сканую мережу...';
+      if (tbody)  tbody.innerHTML = '<tr><td colspan="6" style="padding:16px;text-align:center;color:#4a6070;">⏳ Пошук пристроїв...</td></tr>';
+
+      var activeR = getActive();
+      var rows = [];
+
+      function finish(rows) { renderScanTable(rows); }
+
+      if (activeR) {
+        /* Є підключений роутер — через /ip/neighbor + /ip/arp */
+        Promise.all([
+          restCall(activeR, 'GET', '/ip/neighbor').catch(function(){return[];}),
+          restCall(activeR, 'GET', '/ip/arp').catch(function(){return[];}),
+          restCall(activeR, 'GET', '/system/resource').catch(function(){return{};}),
+          restCall(activeR, 'GET', '/system/routerboard').catch(function(){return{};}),
+          restCall(activeR, 'GET', '/system/identity').catch(function(){return{};}),
+        ]).then(function(res) {
+          var neighbors = Array.isArray(res[0]) ? res[0] : [];
+          var arps      = Array.isArray(res[1]) ? res[1] : [];
+          var resource  = res[2] || {};
+          var rb        = res[3] || {};
+
+          /* Сам роутер */
+          var routerIdentity = (res[4] && res[4].name) ? res[4].name : (activeR.name || activeR.ip);
+          rows.push({
+            mac:      activeR.mac || '—',
+            ip:       activeR.ip,
+            identity: routerIdentity,
+            version:  resource.version || '—',
+            board:    rb.model || rb['board-name'] || '—',
+            isSelf:   true,
+            status:   'online',
+          });
+
+          /* Neighbors — фільтруємо multicast */
+          var knownIps = new Set([activeR.ip]);
+          var knownMacs = new Set();
+          neighbors.forEach(function(n) {
+            var ip  = n.address || n['ip-address'] || '';
+            var mac = n['mac-address'] || '';
+            if (!isValidHost(ip, mac)) return;   /* пропускаємо multicast */
+            if (!knownIps.has(ip) || !knownMacs.has(mac)) {
+              knownIps.add(ip); knownMacs.add(mac);
+              rows.push({
+                mac:      mac || '—',
+                ip:       ip  || '—',
+                identity: n.identity || n['system-description'] || '—',
+                version:  n.version  || '—',
+                board:    n.board    || n.platform || '—',
+                isSelf:   false,
+              });
+            }
+          });
+
+          /* ARP — тільки нові, тільки complete=true, без multicast */
+          arps.forEach(function(a) {
+            if (!isValidArpEntry(a)) return;
+            if (knownIps.has(a.address)) return;
+            knownIps.add(a.address);
+            rows.push({
+              mac:      a['mac-address'] || '—',
+              ip:       a.address,
+              identity: '—',
+              version:  '—',
+              board:    '—',
+              isSelf:   false,
+            });
+          });
+
+          /* Перевіряємо online/offline через ARP complete */
+          var router4check = activeR;
+          var pending = rows.filter(function(r){ return !r.isSelf && r.ip && r.ip !== '—'; });
+          var checked  = 0;
+          if (!pending.length) { finish(rows); return; }
+          pending.forEach(function(r) {
+            restCall(router4check, 'GET', '/ip/arp').then(function(arps) {
+              if (Array.isArray(arps)) {
+                var entry = arps.find(function(a){ return a.address === r.ip; });
+                if (!entry)                          r.status = 'offline';
+                else if (entry.complete === 'true')  r.status = 'online';
+                else                                 r.status = 'offline';
+              } else {
+                r.status = 'unknown';
+              }
+            }).catch(function(){ r.status = 'unknown'; })
+            .finally(function() {
+              checked++;
+              if (checked >= pending.length) finish(rows);
+            });
+          });
+        }).catch(function() {
+          finish([]);
+        });
+
+      } else {
+        /* Немає роутера — ARP скан через проксі */
+        fetch(PROXY + '/arp-scan?subnet=192.168.88.0')
+          .then(function(r) { return r.json(); })
+          .then(function(hosts) {
+            if (!Array.isArray(hosts)) { finish([]); return; }
+            finish(hosts.map(function(h) {
+              return {
+                mac:      h.mac || '—',
+                ip:       h.ip  || '—',
+                identity: h.hostname || h.ip || '—',
+                version:  '—',
+                board:    '—',
+                isSelf:   false,
+              };
+            }));
+          })
+          .catch(function() { finish([]); });
+      }
+    }
+
+    /* ── Кнопка Перескан ── */
+    if (rescan) {
+      rescan.addEventListener('click', function() { doScan(); });
+    }
+
+    /* ── Запускаємо скан одразу при відкритті форми ── */
+    doScan();
+
+    /* ── Авто-оновлення кожні 30 сек ── */
+    var _scanTimer = setInterval(function() {
+      var form = document.querySelector('.rm-connect-form');
+      if (!form || !document.body.contains(form)) {
+        clearInterval(_scanTimer); /* Форму закрито — зупиняємо */
+        return;
+      }
+      doScan();
+    }, 30000);
+
+    /* ── Зберігаємо таймер щоб зупинити при навігації ── */
+    window.__rmScanTimer = _scanTimer;
+
+    /* ── Кнопка Підключити ── */
     if (!btn) return;
     btn.addEventListener('click', function() {
-      var ip   = (document.getElementById('rm-f-ip').value   || '').trim();
-      var port = (document.getElementById('rm-f-port').value  || '80').trim();
-      var user = (document.getElementById('rm-f-user').value  || 'admin').trim();
-      var pass =  document.getElementById('rm-f-pass').value  || '';
-      var ssh  = (document.getElementById('rm-f-ssh').value   || '22').trim();
-      var name = (document.getElementById('rm-f-name').value  || '').trim();
-      var st   = document.getElementById('rm-f-status');
+      /* Визначаємо куди підключатись */
+      var connBy = 'ip';
+      var radios = document.querySelectorAll('input[name="rm-f-conn-by"]');
+      radios.forEach(function(r) { if (r.checked) connBy = r.value; });
 
-      if (!ip) { st.textContent = '⚠ Введи IP адресу!'; return; }
-      st.textContent = '⏳ Підключення...';
+      var target = '';
+      if (_selected.ip || _selected.mac) {
+        target = (connBy === 'mac' && _selected.mac && _selected.mac !== '—')
+          ? _selected.mac
+          : (_selected.ip && _selected.ip !== '—' ? _selected.ip : _selected.mac);
+      } else {
+        /* Ручне введення */
+        var manualEl = document.getElementById('rm-f-connect-to');
+        target = manualEl ? (manualEl.value || '').trim() : '';
+      }
+
+      var port = parseInt(document.getElementById('rm-f-port').value || '80');
+      var user = (document.getElementById('rm-f-user').value || 'admin').trim();
+      var pass =  document.getElementById('rm-f-pass').value || '';
+      var ssh  = parseInt(document.getElementById('rm-f-ssh').value  || '22');
+      var name = (document.getElementById('rm-f-name').value  || '').trim();
+      var remember = document.getElementById('rm-f-remember').checked;
+
+      if (!target) {
+        st.textContent = '⚠ Вибери пристрій або введи вручну!';
+        st.style.color = '#e05252';
+        return;
+      }
+
+      /* Зберігаємо */
+      try {
+        localStorage.setItem('rm-form-saved', JSON.stringify({
+          user:user, pass:remember?pass:'', remember:remember
+        }));
+      } catch(e) {}
+
+      /* Завантажуємо збережений логін/пароль */
+      var isMac = /^([0-9A-Fa-f]{2}[:\-]){5}[0-9A-Fa-f]{2}$/.test(target);
+      st.textContent = '⏳ Підключення до ' + target + '...';
+      st.style.color = '#8ea3b0';
       btn.disabled   = true;
 
-      addRouter({ ip: ip, port: parseInt(port), user: user, pass: pass, sshPort: parseInt(ssh), name: name || ip });
+      var routerName = name || _selected.name || target;
+
+      if (isMac) {
+        /* Підключення по MAC — резолвимо через ARP */
+        st.textContent = '🔍 Шукаю IP для MAC ' + target + '...';
+        var resolvedIp = null;
+        if (_selected.mac === target && _selected.ip && _selected.ip !== '—') {
+          resolvedIp = _selected.ip;
+        }
+        if (resolvedIp) {
+          st.textContent = '✅ ' + target + ' → ' + resolvedIp;
+          addRouter({ ip: resolvedIp, port:port, user:user, pass:pass, sshPort:ssh, name:routerName, mac:target });
+          btn.disabled = false;
+        } else {
+          st.textContent = '❌ Не вдалось знайти IP. Введіть IP вручну.';
+          st.style.color = '#e05252';
+          btn.disabled   = false;
+        }
+      } else {
+        /* Авто-назва: якщо не вказано — підтягнемо з Identity після підключення */
+        addRouter({ ip:target, port:port, user:user, pass:pass, sshPort:ssh,
+          name:routerName, mac:_selected.mac||null,
+          useHttps: document.getElementById('rm-f-https') && document.getElementById('rm-f-https').checked,
+        });
+        btn.disabled = false;
+      }
     });
+
+    /* ── Відновлення збережених полів ── */
+    try {
+      var saved = JSON.parse(localStorage.getItem('rm-form-saved') || '{}');
+      if (saved.user) { var u = document.getElementById('rm-f-user'); if(u) u.value = saved.user; }
+      if (saved.pass && saved.remember) { var p = document.getElementById('rm-f-pass'); if(p) p.value = saved.pass; }
+      if (saved.remember) { var r = document.getElementById('rm-f-remember'); if(r) r.checked = true; }
+    } catch(e) {}
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -1519,53 +1952,130 @@
      NEIGHBORS (IP Neighbor Discovery)
      ══════════════════════════════════════════════════════════ */
   function renderNeighbors() {
-    var cont = document.getElementById('rm-content');
+    var cont   = document.getElementById('rm-content');
     var router = getActive();
     if (!cont || !router) return;
 
-    cont.innerHTML = '<div class="rm-section-title">🏘️ IP Neighbors <span class="rm-badge rm-badge-warn">⏳</span></div>';
+    cont.innerHTML =
+      '<div class="rm-section-title">🏘️ Neighbors' +
+      '  <button class="rm-btn rm-btn-secondary" style="margin-left:auto;font-size:11px;" id="rm-nb-refresh">🔄 Оновити</button>' +
+      '</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;">' +
+        '<thead>' +
+          '<tr style="background:#080f17;color:#4a6070;text-align:left;">' +
+            '<th style="padding:8px 12px;border-bottom:1px solid #2a3b48;">MAC Address</th>' +
+            '<th style="padding:8px 12px;border-bottom:1px solid #2a3b48;">IP Address</th>' +
+            '<th style="padding:8px 12px;border-bottom:1px solid #2a3b48;">Identity</th>' +
+            '<th style="padding:8px 12px;border-bottom:1px solid #2a3b48;">Version</th>' +
+            '<th style="padding:8px 12px;border-bottom:1px solid #2a3b48;">Board</th>' +
+            '<th style="padding:8px 12px;border-bottom:1px solid #2a3b48;">Uptime</th>' +
+            '<th style="padding:8px 12px;border-bottom:1px solid #2a3b48;">Interface</th>' +
+            '<th style="padding:8px 12px;border-bottom:1px solid #2a3b48;"></th>' +
+          '</tr>' +
+        '</thead>' +
+        '<tbody id="rm-nb-rows">' +
+          '<tr><td colspan="8" style="padding:20px;text-align:center;color:#4a6070;">⏳ Завантажую...</td></tr>' +
+        '</tbody>' +
+      '</table>';
 
-    restCall(router, 'GET', '/ip/neighbor').then(function(data) {
-      if (!Array.isArray(data)) { cont.innerHTML = '<div style="color:#e05252">Помилка</div>'; return; }
+    var nbRefresh = document.getElementById('rm-nb-refresh');
+    if (nbRefresh) nbRefresh.addEventListener('click', function() { renderNeighbors(); });
 
-      var html = '<div class="rm-section-title">🏘️ IP Neighbors <span class="rm-badge">' + data.length + '</span>' +
-        '<button class="rm-btn rm-btn-secondary" style="margin-left:auto;font-size:11px;" onclick="window.__rmRefNeigh()">🔄</button></div>';
+    Promise.all([
+      restCall(router, 'GET', '/ip/neighbor').catch(function(){return[];}),
+      restCall(router, 'GET', '/ip/arp').catch(function(){return[];}),
+      restCall(router, 'GET', '/system/resource').catch(function(){return{};}),
+      restCall(router, 'GET', '/system/routerboard').catch(function(){return{};}),
+    ]).then(function(res) {
+      var neighbors = Array.isArray(res[0]) ? res[0] : [];
+      var arps      = Array.isArray(res[1]) ? res[1] : [];
+      var resource  = res[2] || {};
+      var rb        = res[3] || {};
+      var tbody     = document.getElementById('rm-nb-rows');
+      if (!tbody) return;
 
-      data.forEach(function(n) {
-        var name    = n.identity || n['system-description'] || '—';
-        var ip      = n.address || n['ip-address'] || '—';
-        var mac     = n['mac-address'] || '—';
-        var iface   = n.interface || '—';
-        var board   = n['board'] || n['platform'] || '—';
-        var version = n.version || '—';
+      var rows = [];
 
-        html +=
-          '<div class="rm-romon-card">' +
-            '<div class="rm-romon-icon">🏘️</div>' +
-            '<div class="rm-romon-info">' +
-              '<div class="rm-romon-name">' + esc(name) + '</div>' +
-              '<div class="rm-romon-meta">' +
-                'IP: <b>' + esc(ip) + '</b> | MAC: ' + esc(mac) + ' | IF: ' + esc(iface) +
-                ' | Board: ' + esc(board) + ' | OS: ' + esc(version) +
-              '</div>' +
-            '</div>' +
-            (ip !== '—' ?
-              '<button class="rm-btn rm-btn-primary" style="font-size:11px;" ' +
-              'onclick="window.__rmAddNeigh(\'' + esc(ip) + '\',\'' + esc(name) + '\')">🔌 Підключити</button>'
-            : '') +
-          '</div>';
+      /* Сам роутер — перший рядок */
+      rows.push({
+        mac:      '—',
+        ip:       router.ip,
+        identity: router.name,
+        version:  resource.version || '—',
+        board:    rb.model || rb['board-name'] || '—',
+        uptime:   resource.uptime || '—',
+        iface:    'local',
+        isSelf:   true,
       });
 
-      if (!data.length) html += '<div style="color:#8ea3b0">Сусідів не знайдено</div>';
-      cont.innerHTML = html;
+      /* Сусіди */
+      neighbors.forEach(function(n) {
+        rows.push({
+          mac:      n['mac-address'] || '—',
+          ip:       n.address || n['ip-address'] || '—',
+          identity: n.identity || n['system-description'] || '—',
+          version:  n.version || '—',
+          board:    n.board || n.platform || '—',
+          uptime:   n.uptime || '—',
+          iface:    n.interface || '—',
+          isSelf:   false,
+        });
+      });
 
-      window.__rmRefNeigh = function() { renderNeighbors(); };
+      /* ARP хости */
+      var knownIps = new Set(rows.map(function(r){return r.ip;}));
+      arps.forEach(function(a) {
+        /* Пропускаємо incomplete ARP записи (пристрій відключений) */
+        if (a.complete !== 'true' || a.invalid === 'true') return;
+        if (!knownIps.has(a.address) && a.address && a['mac-address']) {
+          rows.push({
+            mac:      a['mac-address'] || '—',
+            ip:       a.address,
+            identity: '—',
+            version:  '—',
+            board:    '—',
+            uptime:   '—',
+            iface:    a.interface || '—',
+            isSelf:   false,
+          });
+        }
+      });
+
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;text-align:center;color:#8ea3b0;">Сусідів не знайдено</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(function(r, idx) {
+        var bg = r.isSelf ? '#0a1a2a' : (idx%2===0 ? '#060d14' : '#080f17');
+        return '<tr style="background:' + bg + ';cursor:pointer;" ' +
+          'title="Клікни щоб підключитись">' +
+          '<td style="padding:8px 12px;color:#4a90d9;font-family:monospace;">' + esc(r.mac) + '</td>' +
+          '<td style="padding:8px 12px;color:#e6edf3;font-family:monospace;">' + esc(r.ip) + '</td>' +
+          '<td style="padding:8px 12px;color:#5fd0a5;font-weight:' + (r.isSelf?'700':'400') + ';">' +
+            esc(r.identity) + (r.isSelf ? ' ⭐' : '') + '</td>' +
+          '<td style="padding:8px 12px;color:#8ea3b0;">' + esc(r.version) + '</td>' +
+          '<td style="padding:8px 12px;color:#8ea3b0;">' + esc(r.board) + '</td>' +
+          '<td style="padding:8px 12px;color:#f0a840;">' + esc(r.uptime) + '</td>' +
+          '<td style="padding:8px 12px;color:#8ea3b0;">' + esc(r.iface) + '</td>' +
+          '<td style="padding:4px 8px;">' +
+            (!r.isSelf && r.ip !== '—' ?
+              '<button class="rm-btn rm-btn-primary" style="font-size:11px;padding:3px 8px;" ' +
+              'onclick="window.__rmAddNeigh(\'' + esc(r.ip) + '\',\'' + esc(r.identity) + '\')">🔌</button>'
+            : '') +
+          '</td>' +
+          '</tr>';
+      }).join('');
+
       window.__rmAddNeigh = function(ip, name) {
         var pass = prompt('Пароль для ' + name + ' (' + ip + '):', '');
-        addRouter({ name: name, ip: ip, port: 80, user: 'admin', pass: pass || '' });
+        if (pass === null) return;
+        addRouter({ name:name, ip:ip, port:80, user:'admin', pass:pass||'' });
       };
     }).catch(function() {
-      cont.innerHTML = '<div style="color:#e05252">Помилка запиту до /ip/neighbor</div>';
+      var tbody = document.getElementById('rm-nb-rows');
+      if (tbody) tbody.innerHTML =
+        '<tr><td colspan="8" style="padding:20px;text-align:center;color:#e05252;">❌ Помилка запиту</td></tr>';
     });
   }
 
@@ -1649,5 +2159,259 @@
   }
 
   console.log('[RouterManager] завантажено — window.RouterManager.open()');
+
+
+/* ═══════════════════════════════════════════════════════════
+   RUIJIE / REYEE MODULE
+   API: POST /cgi-bin/luci/api/cmd?auth=TOKEN
+   Робочі методи: devSta.get(port_status), devSta.get(arp)
+   ═══════════════════════════════════════════════════════════ */
+
+var RuijieAPI = (function() {
+
+  /* ── SSL-tolerant fetch через наш proxy ── */
+  function ruijieRpc(router, method, params) {
+    var url = PROXY + '/ruijie-rpc';
+    return fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        host:   router.ip,
+        port:   router.port || 443,
+        token:  router.ruijieToken || '',
+        method: method,
+        params: params || {},
+      }),
+    }).then(function(r) { return r.json(); });
+  }
+
+  /* ── Тест підключення ── */
+  function testConnection(router) {
+    return ruijieRpc(router, 'devSta.get', {
+      module: 'port_status', noParse: false,
+      async: null, remoteIp: false, device: 'pc',
+    }).then(function(r) {
+      return r && r.code === 0 && r.data && r.data.List;
+    }).catch(function() { return false; });
+  }
+
+  /* ── Порти ── */
+  function getPorts(router) {
+    return ruijieRpc(router, 'devSta.get', {
+      module: 'port_status', noParse: false,
+      async: null, remoteIp: false, device: 'pc',
+    }).then(function(r) {
+      return (r && r.data && r.data.List) ? r.data.List : [];
+    });
+  }
+
+  /* ── ARP таблиця (клієнти) ── */
+  function getArp(router) {
+    return ruijieRpc(router, 'devSta.get', {
+      module: 'arp', noParse: false,
+      async: null, remoteIp: false, device: 'pc',
+    }).then(function(r) {
+      return (r && r.data && r.data.arpList) ? r.data.arpList : [];
+    });
+  }
+
+  return { testConnection: testConnection, getPorts: getPorts, getArp: getArp, rpc: ruijieRpc };
+})();
+
+/* ── Форма підключення Ruijie ── */
+function showRuijieConnectForm() {
+  var cont = document.getElementById('rm-content');
+  if (!cont) return;
+
+  cont.innerHTML = `
+    <div class="rm-connect-form">
+      <h3>🔴 Підключити Ruijie / Reyee</h3>
+
+      <div style="background:#0a1a2a;border:1px solid #2a4a6a;border-radius:8px;
+                  padding:12px 16px;margin-bottom:16px;font-size:12px;color:#8ea3b0;">
+        <b style="color:#4a90d9;">ℹ Як отримати токен:</b><br>
+        1. Відкрий <b>https://${router && router.ip ? router.ip : '192.168.110.1'}</b> в браузері<br>
+        2. Залогінься → <b>F12</b> → Console<br>
+        3. Введи: <code style="color:#5fd0a5;background:#060d14;padding:2px 6px;border-radius:3px;">document.cookie</code><br>
+        4. Скопіюй значення після <code style="color:#5fd0a5;">G1U08Z4031462=</code>
+      </div>
+
+      <div class="rm-field">
+        <label>IP адреса роутера</label>
+        <input id="rj-ip" type="text" value="192.168.110.1" style="font-family:monospace;">
+      </div>
+      <div class="rm-field">
+        <label>Auth Token (з браузера)</label>
+        <input id="rj-token" type="text" placeholder="fe0e193ee2b44b7a8a3eb423e03ca20e"
+          style="font-family:monospace;font-size:12px;">
+        <div style="font-size:11px;color:#4a6070;margin-top:3px;">
+          Токен дійсний поки відкрита сесія в браузері
+        </div>
+      </div>
+      <div class="rm-row">
+        <div class="rm-field">
+          <label>Назва</label>
+          <input id="rj-name" type="text" placeholder="Ruijie офіс">
+        </div>
+        <div class="rm-field">
+          <label>Порт (зазвичай 443)</label>
+          <input id="rj-port" type="number" value="443">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:16px;">
+        <button class="rm-btn rm-btn-primary" id="rj-connect">🔌 Підключити</button>
+        <button class="rm-btn rm-btn-secondary" id="rj-test">🔍 Тест</button>
+      </div>
+      <div id="rj-status" style="margin-top:10px;font-size:12px;color:#8ea3b0;min-height:18px;"></div>
+    </div>
+  `;
+
+  var st = document.getElementById('rj-status');
+
+  document.getElementById('rj-test').addEventListener('click', function() {
+    var ip    = document.getElementById('rj-ip').value.trim();
+    var token = document.getElementById('rj-token').value.trim();
+    var port  = parseInt(document.getElementById('rj-port').value) || 443;
+    if (!ip || !token) { st.textContent = '⚠ Введи IP і токен'; return; }
+    st.textContent = '⏳ Перевіряю...';
+    RuijieAPI.testConnection({ ip:ip, port:port, ruijieToken:token })
+      .then(function(ok) {
+        st.style.color = ok ? '#5fd0a5' : '#e05252';
+        st.textContent = ok ? '✅ Підключення успішне!' : '❌ Не вдалось. Перевір токен.';
+      });
+  });
+
+  document.getElementById('rj-connect').addEventListener('click', function() {
+    var ip    = document.getElementById('rj-ip').value.trim();
+    var token = document.getElementById('rj-token').value.trim();
+    var name  = document.getElementById('rj-name').value.trim() || 'Ruijie';
+    var port  = parseInt(document.getElementById('rj-port').value) || 443;
+    if (!ip || !token) { st.textContent = '⚠ Введи IP і токен'; return; }
+    st.textContent = '⏳ Підключення...';
+    RuijieAPI.testConnection({ ip:ip, port:port, ruijieToken:token })
+      .then(function(ok) {
+        if (!ok) {
+          st.style.color  = '#e05252';
+          st.textContent  = '❌ Токен невірний або роутер недоступний';
+          return;
+        }
+        addRouter({
+          ip: ip, port: port, user: '', pass: '',
+          name: name, ruijieToken: token,
+          type: 'ruijie',
+        });
+        st.style.color = '#5fd0a5';
+        st.textContent = '✅ Ruijie додано!';
+      });
+  });
+}
+
+/* ── Дашборд Ruijie ── */
+function renderRuijieDashboard(router) {
+  var cont = document.getElementById('rm-content');
+  if (!cont) return;
+
+  cont.innerHTML =
+    '<div class="rm-section-title">🔴 Ruijie ' + esc(router.name) +
+    '  <button class="rm-btn rm-btn-secondary" style="margin-left:auto;font-size:11px;" ' +
+    'onclick="renderRuijieDashboard(getActive())">🔄 Оновити</button></div>' +
+    '<div id="rj-ports-wrap"></div>' +
+    '<div id="rj-clients-wrap" style="margin-top:16px;"></div>';
+
+  /* Порти */
+  RuijieAPI.getPorts(router).then(function(ports) {
+    var wrap = document.getElementById('rj-ports-wrap');
+    if (!wrap) return;
+
+    var html = '<div class="rm-section-title" style="font-size:13px;margin-bottom:8px;">🔌 Порти</div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;">';
+
+    ports.forEach(function(p) {
+      var isOn   = p.status === 'on';
+      var color  = isOn ? '#5fd0a5' : '#4a6070';
+      var bg     = isOn ? '#0a2a1a' : '#0a0f14';
+      var border = isOn ? '#1a5a3a' : '#2a3b48';
+      html +=
+        '<div style="background:' + bg + ';border:1px solid ' + border + ';border-radius:8px;' +
+        'padding:12px 16px;min-width:120px;text-align:center;">' +
+          '<div style="color:' + color + ';font-size:20px;margin-bottom:6px;">' +
+            (isOn ? '🟢' : '⚫') +
+          '</div>' +
+          '<div style="color:#e6edf3;font-size:13px;font-weight:600;">' + esc(p.panel_name) + '</div>' +
+          '<div style="color:' + color + ';font-size:11px;margin-top:2px;">' +
+            (isOn ? '● Online' : '● Offline') +
+          '</div>' +
+          (isOn && p.speed ? '<div style="color:#f0a840;font-size:11px;">' + p.speed + ' Mbps</div>' : '') +
+          (isOn && p.duplex && p.duplex !== 'NULL' ?
+            '<div style="color:#8ea3b0;font-size:10px;">' + p.duplex + '</div>' : '') +
+          '<div style="color:#4a6070;font-size:10px;margin-top:4px;font-family:monospace;">' +
+            esc(p.ipaddr) +
+          '</div>' +
+        '</div>';
+    });
+
+    html += '</div>';
+    wrap.innerHTML = html;
+  }).catch(function() {
+    var wrap = document.getElementById('rj-ports-wrap');
+    if (wrap) wrap.innerHTML = '<div style="color:#e05252">❌ Помилка отримання портів</div>';
+  });
+
+  /* ARP клієнти */
+  RuijieAPI.getArp(router).then(function(arps) {
+    var wrap = document.getElementById('rj-clients-wrap');
+    if (!wrap) return;
+
+    /* Фільтруємо WAN */
+    var lanClients = arps.filter(function(a) {
+      return a.intf === 'br-lan';
+    });
+    var wanGw = arps.filter(function(a) {
+      return a.intf === 'br-wan';
+    });
+
+    var html =
+      '<div class="rm-section-title" style="font-size:13px;margin-bottom:8px;">' +
+        '👥 LAN Клієнти <span class="rm-badge">' + lanClients.length + '</span>' +
+      '</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+        '<thead>' +
+          '<tr style="background:#080f17;color:#4a6070;">' +
+            '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid #2a3b48;">MAC</th>' +
+            '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid #2a3b48;">IP</th>' +
+            '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid #2a3b48;">Interface</th>' +
+            '<th style="padding:8px 12px;text-align:left;border-bottom:1px solid #2a3b48;">Status</th>' +
+          '</tr>' +
+        '</thead>' +
+        '<tbody>';
+
+    lanClients.forEach(function(a, i) {
+      var bg = i % 2 === 0 ? '#060d14' : '#080f17';
+      html +=
+        '<tr style="background:' + bg + ';">' +
+          '<td style="padding:8px 12px;color:#4a90d9;font-family:monospace;">' + esc(a.hardware) + '</td>' +
+          '<td style="padding:8px 12px;color:#5fd0a5;font-family:monospace;">' + esc(a.address) + '</td>' +
+          '<td style="padding:8px 12px;color:#8ea3b0;">' + esc(a.intf) + '</td>' +
+          '<td style="padding:8px 12px;"><span style="color:#5fd0a5;font-size:11px;font-weight:600;">● Online</span></td>' +
+        '</tr>';
+    });
+
+    html += '</tbody></table>';
+
+    if (wanGw.length > 0) {
+      html += '<div style="margin-top:8px;font-size:11px;color:#4a6070;">' +
+        '🌐 WAN Gateway: ' + wanGw.map(function(a){
+          return '<span style="font-family:monospace;color:#8ea3b0;">' + esc(a.address) + ' (' + esc(a.hardware) + ')</span>';
+        }).join(', ') + '</div>';
+    }
+
+    wrap.innerHTML = html;
+  }).catch(function() {
+    var wrap = document.getElementById('rj-clients-wrap');
+    if (wrap) wrap.innerHTML = '<div style="color:#e05252">❌ Помилка отримання клієнтів</div>';
+  });
+}
+/* ═══════════════════════════════════════════ END RUIJIE ═══ */
 
 })();

@@ -462,59 +462,71 @@
 
   /* ── MAC Vendor Lookup ── */
   function lookupVendor(node) {
-    if (!node || !node.mac) return;
     var vendorEl = document.getElementById('detail-vendor');
-    if (!vendorEl) return;
-
-    if (node.vendor) {
-      vendorEl.value = node.vendor;
+    if (!vendorEl || !node || !node.mac) {
+      if (vendorEl) vendorEl.value = '—';
       return;
     }
-
-    vendorEl.value = 'Визначаю...';
-    var oui = node.mac.toUpperCase().slice(0, 8).replace(/:/g, '%3A');
-
-    /* Локальний OUI словник */
-    var LOCAL_OUI = {
-      'A8:2B:DD': 'Intel',
-      'D4:CA:6D': 'MikroTik', 'E4:8D:8C': 'MikroTik',
-      '4C:5E:0C': 'MikroTik', '74:4D:28': 'MikroTik',
-      'B8:69:F4': 'MikroTik', '2C:C8:1B': 'MikroTik',
-      '3C:22:FB': 'Apple',    'CC:2D:E0': 'Apple',
-      'AC:DE:48': 'Apple',    'F0:18:98': 'Apple',
+    if (node.vendor) {
+      vendorEl.value = node.vendor;
+      vendorEl.style.color = '#5fd0a5';
+      return;
+    }
+    var mac = (node.mac || '').toUpperCase().replace(/-/g, ':').trim();
+    var oui = mac.slice(0, 8);
+    var OUI = {
+      'A8:2B:DD': 'Intel',      'A4:C3:F0': 'Intel',
+      '8C:8D:28': 'Intel',      'F8:28:19': 'Intel',
+      'D4:CA:6D': 'MikroTik',   'E4:8D:8C': 'MikroTik',
+      '4C:5E:0C': 'MikroTik',   '74:4D:28': 'MikroTik',
+      'B8:69:F4': 'MikroTik',   '2C:C8:1B': 'MikroTik',
+      '3C:22:FB': 'Apple',      'CC:2D:E0': 'Apple',
+      'AC:DE:48': 'Apple',      'F0:18:98': 'Apple',
       'B8:27:EB': 'Raspberry Pi', 'DC:A6:32': 'Raspberry Pi',
-      'EC:FA:BC': 'TP-Link',  '50:C7:BF': 'TP-Link',
-      'C4:E9:84': 'TP-Link',  '18:D6:C7': 'TP-Link',
-      'AC:84:C9': 'Ubiquiti', 'FC:EC:DA': 'Ubiquiti',
-      '78:8A:20': 'Ubiquiti', '44:D9:E7': 'Ubiquiti',
-      '68:72:51': 'Cisco',    'B4:E9:B0': 'Cisco',
-      '28:D2:44': 'Samsung',  '8C:77:12': 'Samsung',
-      '18:FE:34': 'Espressif','24:6F:28': 'Espressif',
-      '18:8B:9D': 'Huawei',   'AC:85:3D': 'Huawei',
+      '00:50:56': 'VMware',     '00:0C:29': 'VMware',
+      '08:00:27': 'VirtualBox', '52:54:00': 'QEMU',
+      'EC:FA:BC': 'TP-Link',    '50:C7:BF': 'TP-Link',
+      'C4:E9:84': 'TP-Link',    '18:D6:C7': 'TP-Link',
+      'AC:84:C9': 'Ubiquiti',   'FC:EC:DA': 'Ubiquiti',
+      '78:8A:20': 'Ubiquiti',   '44:D9:E7': 'Ubiquiti',
+      '68:72:51': 'Cisco',      '00:1B:54': 'Cisco',
+      'B4:E9:B0': 'Cisco',      '70:DB:98': 'Cisco',
+      '18:8B:9D': 'Huawei',     'AC:85:3D': 'Huawei',
+      '28:D2:44': 'Samsung',    '8C:77:12': 'Samsung',
+      '18:FE:34': 'Espressif',  '24:6F:28': 'Espressif',
+      '40:A3:6B': 'Dell',       'F8:DB:88': 'Dell',
+      '00:17:88': 'Philips Hue','10:BF:48': 'Zyxel',
     };
-
-    var oui3 = node.mac.toUpperCase().slice(0, 8);
-    if (LOCAL_OUI[oui3]) {
-      node.vendor    = LOCAL_OUI[oui3];
-      vendorEl.value = LOCAL_OUI[oui3];
+    if (OUI[oui]) {
+      node.vendor = OUI[oui];
+      vendorEl.value = OUI[oui];
+      vendorEl.style.color = '#5fd0a5';
       if (typeof draw === 'function') draw();
       return;
     }
-
-    /* API через proxy */
-    fetch('http://localhost:8888/macvendor/' + oui)
+    vendorEl.value = 'Запит...';
+    var ctrl = new AbortController();
+    setTimeout(function() { ctrl.abort(); }, 4000);
+    fetch('http://localhost:8888/macvendor/' + encodeURIComponent(oui),
+          { signal: ctrl.signal })
       .then(function(r) { return r.text(); })
       .then(function(v) {
         v = (v || '').trim();
-        if (v && v !== 'unknown' && !v.includes('{') && !v.includes('<')) {
-          node.vendor    = v;
+        var bad = (v.length < 2 || v === 'Not Found' || v === 'unknown');
+        if (!bad && v.indexOf('{') === -1 && v.indexOf('<') === -1) {
+          node.vendor = v;
           vendorEl.value = v;
+          vendorEl.style.color = '#5fd0a5';
           if (typeof draw === 'function') draw();
         } else {
           vendorEl.value = 'Невідомий';
+          vendorEl.style.color = '#8ea3b0';
         }
       })
-      .catch(function() { vendorEl.value = 'Офлайн'; });
+      .catch(function() {
+        vendorEl.value = 'OUI: ' + oui;
+        vendorEl.style.color = '#8ea3b0';
+      });
   }
 
   function showDetail(node) {
@@ -632,6 +644,7 @@
         draw();
       }
     });
+    lookupVendor(node);
   }
 
   /* ════════════════════════════════════════
@@ -1061,8 +1074,7 @@
       };
       nodes.push(node);
       selected = node;
-    lookupVendor(node);
-      showDetail(node);
+    showDetail(node);
       updateCount();
       draw();
     });

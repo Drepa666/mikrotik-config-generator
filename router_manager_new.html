@@ -1,0 +1,750 @@
+
+<div id="router-manager-wrap" style="display:flex;flex-direction:column;height:100%;background:#0d1821;">
+
+  <!-- Tabs -->
+  <div style="display:flex;border-bottom:1px solid #1c2a37;background:#080f17;padding:0 16px;">
+    <button class="rm-tab active" data-tab="saved"
+      style="padding:10px 18px;background:transparent;border:none;border-bottom:2px solid #5fd0a5;
+             color:#5fd0a5;cursor:pointer;font-size:13px;font-weight:600;">
+      💾 Збережені
+    </button>
+    <button class="rm-tab" data-tab="neighbors"
+      style="padding:10px 18px;background:transparent;border:none;border-bottom:2px solid transparent;
+             color:#8ea3b0;cursor:pointer;font-size:13px;">
+      📡 Сусіди
+    </button>
+    <button class="rm-tab" data-tab="add"
+      style="padding:10px 18px;background:transparent;border:none;border-bottom:2px solid transparent;
+             color:#8ea3b0;cursor:pointer;font-size:13px;">
+      ➕ Додати
+    </button>
+    <div style="flex:1;"></div>
+    <button id="rm-refresh" title="Оновити"
+      style="padding:8px 12px;background:transparent;border:none;color:#8ea3b0;cursor:pointer;font-size:16px;">
+      🔄
+    </button>
+  </div>
+
+  <!-- Connect form (зверху — завжди видима) -->
+  <div style="padding:12px 16px;background:#060d14;border-bottom:1px solid #1c2a37;">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <div style="flex:1;min-width:180px;">
+        <div style="font-size:10px;color:#4a6070;margin-bottom:3px;">Connect to (IP або MAC)</div>
+        <input id="rm-connect-to" placeholder="192.168.88.1 або 2C:C8:1B:8C:DE:C5"
+          style="width:100%;box-sizing:border-box;padding:7px 10px;background:#0d1821;
+                 border:1px solid #1c2a37;border-radius:6px;color:#e6edf3;font-size:13px;">
+      </div>
+      <div style="width:60px;">
+        <div style="font-size:10px;color:#4a6070;margin-bottom:3px;">Port</div>
+        <input id="rm-port" value="80"
+          style="width:100%;box-sizing:border-box;padding:7px 8px;background:#0d1821;
+                 border:1px solid #1c2a37;border-radius:6px;color:#e6edf3;font-size:13px;">
+      </div>
+      <div style="width:80px;">
+        <div style="font-size:10px;color:#4a6070;margin-bottom:3px;">Логін</div>
+        <input id="rm-user" value="admin"
+          style="width:100%;box-sizing:border-box;padding:7px 8px;background:#0d1821;
+                 border:1px solid #1c2a37;border-radius:6px;color:#e6edf3;font-size:13px;">
+      </div>
+      <div style="width:100px;">
+        <div style="font-size:10px;color:#4a6070;margin-bottom:3px;">Пароль</div>
+        <input id="rm-pass" type="password"
+          style="width:100%;box-sizing:border-box;padding:7px 8px;background:#0d1821;
+                 border:1px solid #1c2a37;border-radius:6px;color:#e6edf3;font-size:13px;">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;padding-top:14px;">
+        <button id="rm-connect-btn"
+          style="padding:8px 16px;background:#5fd0a5;border:none;border-radius:6px;
+                 color:#0d1821;font-weight:700;cursor:pointer;font-size:13px;white-space:nowrap;">
+          🔌 Підключити
+        </button>
+      </div>
+    </div>
+    <div style="margin-top:6px;display:flex;align-items:center;gap:12px;">
+      <label style="display:flex;align-items:center;gap:5px;color:#8ea3b0;font-size:12px;cursor:pointer;">
+        <input type="checkbox" id="rm-remember" style="accent-color:#5fd0a5;">
+        Запам'ятати пароль
+      </label>
+      <label style="display:flex;align-items:center;gap:5px;color:#8ea3b0;font-size:12px;cursor:pointer;">
+        <input type="checkbox" id="rm-save-list" checked style="accent-color:#5fd0a5;">
+        Зберегти в список
+      </label>
+      <div id="rm-status" style="color:#8ea3b0;font-size:12px;"></div>
+    </div>
+  </div>
+
+  <!-- Tab: Збережені -->
+  <div id="rm-tab-saved" class="rm-tab-content" style="flex:1;overflow-y:auto;padding:12px 16px;">
+    <div id="rm-saved-list">
+      <div style="color:#4a6070;text-align:center;padding:40px 0;font-size:13px;">
+        Немає збережених роутерів
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Сусіди -->
+  <div id="rm-tab-neighbors" class="rm-tab-content" style="flex:1;overflow:auto;display:none;">
+    <div style="padding:8px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1c2a37;">
+      <span style="color:#8ea3b0;font-size:12px;" id="rm-nb-status">Натисни 🔄 для пошуку сусідів</span>
+      <button id="rm-nb-scan" style="padding:4px 12px;background:#1c2a37;border:none;border-radius:5px;
+              color:#5fd0a5;cursor:pointer;font-size:12px;">▶ Live</button>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:#080f17;color:#4a6070;text-align:left;">
+          <th style="padding:8px 12px;border-bottom:1px solid #1c2a37;">MAC Address</th>
+          <th style="padding:8px 12px;border-bottom:1px solid #1c2a37;">IP Address</th>
+          <th style="padding:8px 12px;border-bottom:1px solid #1c2a37;">Identity</th>
+          <th style="padding:8px 12px;border-bottom:1px solid #1c2a37;">Version</th>
+          <th style="padding:8px 12px;border-bottom:1px solid #1c2a37;">Board</th>
+          <th style="padding:8px 12px;border-bottom:1px solid #1c2a37;">Uptime</th>
+          <th style="padding:8px 12px;border-bottom:1px solid #1c2a37;">Interface</th>
+        </tr>
+      </thead>
+      <tbody id="rm-nb-tbody">
+        <tr><td colspan="7" style="padding:30px;text-align:center;color:#4a6070;">
+          Натисни 🔄 для сканування мережі
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Tab: Додати -->
+  <div id="rm-tab-add" class="rm-tab-content" style="flex:1;overflow-y:auto;display:none;padding:20px;">
+    <div style="max-width:500px;margin:0 auto;">
+      <h3 style="color:#5fd0a5;margin:0 0 20px;font-size:15px;">➕ Додати роутер вручну</h3>
+      
+      <div style="margin-bottom:12px;">
+        <label style="color:#8ea3b0;font-size:12px;">Назва (необов'язково)</label>
+        <input id="rm-add-name" placeholder="Офіс / Home Router"
+          style="width:100%;box-sizing:border-box;margin-top:4px;padding:8px 12px;
+                 background:#060d14;border:1px solid #1c2a37;border-radius:6px;
+                 color:#e6edf3;font-size:13px;">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 120px;gap:10px;margin-bottom:12px;">
+        <div>
+          <label style="color:#8ea3b0;font-size:12px;">IP адреса роутера</label>
+          <input id="rm-add-ip" placeholder="192.168.88.1"
+            style="width:100%;box-sizing:border-box;margin-top:4px;padding:8px 12px;
+                   background:#060d14;border:1px solid #1c2a37;border-radius:6px;
+                   color:#e6edf3;font-size:13px;">
+        </div>
+        <div>
+          <label style="color:#8ea3b0;font-size:12px;">REST API порт</label>
+          <input id="rm-add-port" value="80"
+            style="width:100%;box-sizing:border-box;margin-top:4px;padding:8px 12px;
+                   background:#060d14;border:1px solid #1c2a37;border-radius:6px;
+                   color:#e6edf3;font-size:13px;">
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        <div>
+          <label style="color:#8ea3b0;font-size:12px;">Логін</label>
+          <input id="rm-add-user" value="admin"
+            style="width:100%;box-sizing:border-box;margin-top:4px;padding:8px 12px;
+                   background:#060d14;border:1px solid #1c2a37;border-radius:6px;
+                   color:#e6edf3;font-size:13px;">
+        </div>
+        <div>
+          <label style="color:#8ea3b0;font-size:12px;">Пароль</label>
+          <input id="rm-add-pass" type="password"
+            style="width:100%;box-sizing:border-box;margin-top:4px;padding:8px 12px;
+                   background:#060d14;border:1px solid #1c2a37;border-radius:6px;
+                   color:#e6edf3;font-size:13px;">
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <label style="color:#8ea3b0;font-size:12px;">SSH порт (для термінала)</label>
+        <input id="rm-add-ssh" value="22"
+          style="width:100%;box-sizing:border-box;margin-top:4px;padding:8px 12px;
+                 background:#060d14;border:1px solid #1c2a37;border-radius:6px;
+                 color:#e6edf3;font-size:13px;">
+      </div>
+
+      <div id="rm-add-status" style="color:#e05252;font-size:12px;margin-bottom:12px;min-height:16px;"></div>
+
+      <div style="display:flex;gap:10px;">
+        <button id="rm-add-save-btn"
+          style="padding:10px 24px;background:#1c2a37;border:none;border-radius:6px;
+                 color:#8ea3b0;cursor:pointer;font-size:13px;">
+          💾 Зберегти
+        </button>
+        <button id="rm-add-connect-btn"
+          style="padding:10px 24px;background:#5fd0a5;border:none;border-radius:6px;
+                 color:#0d1821;font-weight:700;cursor:pointer;font-size:13px;">
+          🔌 Підключити
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<style>
+.rm-tab { transition: all 0.2s; }
+.rm-tab:hover { color: #e6edf3 !important; }
+.rm-tab.active { color: #5fd0a5 !important; border-bottom-color: #5fd0a5 !important; }
+.rm-saved-item {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; border-radius:8px;
+  background:#060d14; border:1px solid #1c2a37;
+  margin-bottom:8px; cursor:pointer; transition:all 0.2s;
+}
+.rm-saved-item:hover { border-color:#5fd0a5; background:#0a1520; }
+.rm-nb-row { cursor:pointer; transition:background 0.15s; }
+.rm-nb-row:hover { background:#0a1520 !important; }
+</style>
+
+<script>
+(function() {
+  var BASE = 'http://localhost:8888';
+
+  /* ── Ініціалізація після DOM ── */
+  function initRouterManager() {
+    loadSaved();
+    bindTabs();
+    bindConnectBtn();
+    bindAddForm();
+    loadFields();
+    autoScanNeighbors();
+  }
+
+  /* ── Tabs ── */
+  function bindTabs() {
+    document.querySelectorAll('.rm-tab').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var tab = this.dataset.tab;
+        document.querySelectorAll('.rm-tab').forEach(function(b) {
+          b.classList.remove('active');
+          b.style.borderBottomColor = 'transparent';
+          b.style.color = '#8ea3b0';
+        });
+        this.classList.add('active');
+        this.style.borderBottomColor = '#5fd0a5';
+        this.style.color = '#5fd0a5';
+        document.querySelectorAll('.rm-tab-content').forEach(function(c) {
+          c.style.display = 'none';
+        });
+        var tabEl = document.getElementById('rm-tab-' + tab);
+        if (tabEl) tabEl.style.display = 'flex' in tabEl.style ? 'block' : 'block';
+        document.getElementById('rm-tab-' + tab).style.display = 'block';
+        if (tab === 'neighbors') scanNeighbors();
+      });
+    });
+
+    /* Refresh button */
+    var refreshBtn = document.getElementById('rm-refresh');
+    if (refreshBtn) refreshBtn.addEventListener('click', function() {
+      var activeTab = document.querySelector('.rm-tab.active');
+      if (activeTab && activeTab.dataset.tab === 'neighbors') {
+        scanNeighbors();
+      } else {
+        loadSaved();
+      }
+    });
+
+    /* Live scan */
+    var nbScan = document.getElementById('rm-nb-scan');
+    if (nbScan) nbScan.addEventListener('click', scanNeighbors);
+  }
+
+  /* ── Завантажуємо збережені поля ── */
+  function loadFields() {
+    try {
+      var f = JSON.parse(localStorage.getItem('rm-connect-fields') || '{}');
+      if (f.to)   document.getElementById('rm-connect-to').value = f.to;
+      if (f.port) document.getElementById('rm-port').value       = f.port;
+      if (f.user) document.getElementById('rm-user').value       = f.user;
+      if (f.pass) document.getElementById('rm-pass').value       = f.pass;
+      if (f.remember) document.getElementById('rm-remember').checked = f.remember;
+    } catch(e) {}
+  }
+
+  function saveFields() {
+    var remember = document.getElementById('rm-remember').checked;
+    try {
+      localStorage.setItem('rm-connect-fields', JSON.stringify({
+        to:       document.getElementById('rm-connect-to').value,
+        port:     document.getElementById('rm-port').value,
+        user:     document.getElementById('rm-user').value,
+        pass:     remember ? document.getElementById('rm-pass').value : '',
+        remember: remember,
+      }));
+    } catch(e) {}
+  }
+
+  /* ── Кнопка Підключити (верхня форма) ── */
+  function bindConnectBtn() {
+    var btn = document.getElementById('rm-connect-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      var to   = (document.getElementById('rm-connect-to').value || '').trim();
+      var port = (document.getElementById('rm-port').value || '80').trim();
+      var user = (document.getElementById('rm-user').value || 'admin').trim();
+      var pass = (document.getElementById('rm-pass').value || '').trim();
+      var st   = document.getElementById('rm-status');
+
+      if (!to) { st.textContent = 'Введи IP або MAC!'; st.style.color = '#e05252'; return; }
+
+      saveFields();
+      st.textContent = 'Підключаюсь до ' + to + '...';
+      st.style.color = '#8ea3b0';
+      btn.disabled   = true;
+
+      /* Визначаємо — MAC чи IP */
+      var isMac = /^([0-9A-Fa-f]{2}[:\-]){5}[0-9A-Fa-f]{2}$/.test(to);
+
+      if (isMac) {
+        /* Підключення по MAC — шукаємо IP через neighbor таблицю */
+        connectByMac(to, port, user, pass, st, btn);
+      } else {
+        connectByIp(to, port, user, pass, st, btn);
+      }
+    });
+  }
+
+  /* ── Підключення по MAC ── */
+  function connectByMac(mac, port, user, pass, st, btn) {
+    var currentIp = (document.getElementById('tm-ip') || {}).value || '192.168.88.1';
+    var hdrs = {
+      'Content-Type':   'application/json',
+      'X-Router-IP':    currentIp,
+      'X-Router-User':  user,
+      'X-Router-Pass':  pass,
+      'X-Router-Port':  '80',
+    };
+
+    st.textContent = 'Шукаю MAC ' + mac + ' в мережі...';
+
+    fetch(BASE + '/rest/ip/neighbor', { method:'GET', headers:hdrs })
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(neighbors) {
+        var macNorm = mac.toUpperCase().replace(/-/g, ':');
+        var found   = null;
+
+        (neighbors || []).forEach(function(nb) {
+          var nbMac = (nb['mac-address'] || '').toUpperCase();
+          if (nbMac === macNorm) found = nb;
+        });
+
+        if (found && (found.address || found['address4'])) {
+          var foundIp = found.address || found['address4'];
+          st.textContent = 'MAC знайдено! IP: ' + foundIp;
+          document.getElementById('rm-connect-to').value = foundIp;
+          connectByIp(foundIp, port, user, pass, st, btn);
+        } else {
+          /* Fallback — ARP таблиця */
+          fetch(BASE + '/rest/ip/arp', { method:'GET', headers:hdrs })
+            .then(function(r) { return r.ok ? r.json() : []; })
+            .then(function(arps) {
+              var macNorm2 = mac.toUpperCase().replace(/-/g, ':');
+              var arpEntry = (arps || []).find(function(a) {
+                return (a['mac-address'] || '').toUpperCase() === macNorm2;
+              });
+              if (arpEntry && arpEntry.address) {
+                st.textContent = 'ARP: знайдено IP: ' + arpEntry.address;
+                connectByIp(arpEntry.address, port, user, pass, st, btn);
+              } else {
+                st.textContent = 'MAC не знайдено в мережі — введи IP';
+                st.style.color = '#e05252';
+                btn.disabled   = false;
+              }
+            });
+        }
+      })
+      .catch(function() {
+        st.textContent = 'Помилка пошуку MAC';
+        st.style.color = '#e05252';
+        btn.disabled   = false;
+      });
+  }
+
+  /* ── Підключення по IP ── */
+  function connectByIp(ip, port, user, pass, st, btn) {
+    var hdrs = {
+      'Content-Type':   'application/json',
+      'X-Router-IP':    ip,
+      'X-Router-User':  user,
+      'X-Router-Pass':  pass,
+      'X-Router-Port':  port,
+    };
+
+    function sf(url) {
+      return fetch(BASE + url, { method:'GET', headers:hdrs })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .catch(function() { return null; });
+    }
+
+    Promise.all([
+      sf('/rest/system/identity'),
+      sf('/rest/system/resource'),
+      sf('/rest/system/routerboard'),
+    ]).then(function(res) {
+      var identity    = res[0] || {};
+      var resource    = res[1] || {};
+      var routerboard = res[2] || {};
+
+      if (!identity.name && !resource.version) {
+        st.textContent = 'Не MikroTik або недоступний';
+        st.style.color = '#f0a840';
+        btn.disabled   = false;
+        return;
+      }
+
+      st.textContent = '✅ ' + (identity.name || ip) + ' — підключено!';
+      st.style.color = '#5fd0a5';
+      btn.disabled   = false;
+
+      /* Зберігаємо в список якщо треба */
+      if (document.getElementById('rm-save-list').checked) {
+        saveRouter({
+          ip:       ip,
+          port:     port,
+          user:     user,
+          pass:     document.getElementById('rm-remember').checked ? pass : '',
+          name:     identity.name || ip,
+          version:  resource.version || '',
+          board:    routerboard['model'] || routerboard['board-name'] || '',
+          uptime:   resource.uptime || '',
+          lastSeen: new Date().toLocaleString(),
+        });
+        loadSaved();
+      }
+
+      /* Заповнюємо поля підключення в Terminal / Config */
+      ['tm-ip','tm-user','tm-pass'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+          if (id === 'tm-ip')   el.value = ip;
+          if (id === 'tm-user') el.value = user;
+          if (id === 'tm-pass') el.value = pass;
+        }
+      });
+
+      /* Відкриваємо таб роутера */
+      openRouterTab(ip, identity.name || ip, {
+        ip: ip, port: port, user: user, pass: pass,
+        name: identity.name || ip,
+        version: resource.version || '',
+        board: routerboard['model'] || '',
+        uptime: resource.uptime || '',
+      });
+    }).catch(function(e) {
+      st.textContent = 'Помилка: ' + (e.message || e);
+      st.style.color = '#e05252';
+      btn.disabled   = false;
+    });
+  }
+
+  /* ── Відкриваємо таб роутера ── */
+  function openRouterTab(ip, name, info) {
+    /* Шукаємо чи вже є таб */
+    var tabBar = document.getElementById('rm-tab-bar');
+    if (!tabBar) return;
+
+    var existTab = tabBar.querySelector('[data-router-ip="' + ip + '"]');
+    if (existTab) {
+      existTab.click();
+      return;
+    }
+
+    /* Створюємо новий таб */
+    var tab = document.createElement('button');
+    tab.className = 'rm-router-tab';
+    tab.dataset.routerIp = ip;
+    tab.innerHTML = '🔌 ' + name + ' <span style="opacity:0.5;font-size:10px;margin-left:4px;">✕</span>';
+    tab.style.cssText = 'padding:6px 14px;background:#1c2a37;border:1px solid #2a3b48;' +
+                        'border-radius:6px;color:#e6edf3;cursor:pointer;font-size:12px;white-space:nowrap;';
+    tabBar.appendChild(tab);
+
+    tab.addEventListener('click', function(e) {
+      if (e.target.tagName === 'SPAN') {
+        tab.remove();
+        return;
+      }
+      showRouterInfo(ip, name, info);
+    });
+
+    showRouterInfo(ip, name, info);
+  }
+
+  /* ── Показуємо інфо роутера ── */
+  function showRouterInfo(ip, name, info) {
+    var content = document.getElementById('rm-router-content');
+    if (!content) return;
+
+    content.innerHTML = '<div style="padding:20px;">' +
+      '<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">' +
+      '<div style="font-size:48px;">🔌</div>' +
+      '<div>' +
+      '<div style="font-size:20px;font-weight:700;color:#5fd0a5;">' + name + '</div>' +
+      '<div style="color:#8ea3b0;font-size:13px;">' + info.ip + ':' + info.port + '</div>' +
+      '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">' +
+      '<div style="background:#060d14;border:1px solid #1c2a37;border-radius:8px;padding:14px;">' +
+      '<div style="color:#4a6070;font-size:11px;">Версія</div>' +
+      '<div style="color:#e6edf3;font-size:14px;font-weight:600;">' + (info.version || '—') + '</div>' +
+      '</div>' +
+      '<div style="background:#060d14;border:1px solid #1c2a37;border-radius:8px;padding:14px;">' +
+      '<div style="color:#4a6070;font-size:11px;">Board</div>' +
+      '<div style="color:#e6edf3;font-size:14px;font-weight:600;">' + (info.board || '—') + '</div>' +
+      '</div>' +
+      '<div style="background:#060d14;border:1px solid #1c2a37;border-radius:8px;padding:14px;">' +
+      '<div style="color:#4a6070;font-size:11px;">Uptime</div>' +
+      '<div style="color:#e6edf3;font-size:14px;font-weight:600;">' + (info.uptime || '—') + '</div>' +
+      '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
+      '<button onclick="rmQuickAction(\'terminal\',\'' + ip + '\',\'' + info.user + '\',\'' + info.pass + '\')" ' +
+      'style="padding:10px 20px;background:#1c2a37;border:1px solid #2a3b48;border-radius:7px;color:#e6edf3;cursor:pointer;">💻 Термінал</button>' +
+      '<button onclick="rmQuickAction(\'config\',\'' + ip + '\',\'' + info.user + '\',\'' + info.pass + '\')" ' +
+      'style="padding:10px 20px;background:#1c2a37;border:1px solid #2a3b48;border-radius:7px;color:#e6edf3;cursor:pointer;">⚙️ Конфігурація</button>' +
+      '<button onclick="rmQuickAction(\'topology\',\'' + ip + '\',\'' + info.user + '\',\'' + info.pass + '\')" ' +
+      'style="padding:10px 20px;background:#1c2a37;border:1px solid #2a3b48;border-radius:7px;color:#e6edf3;cursor:pointer;">🗺️ Топологія</button>' +
+      '</div>' +
+      '</div>';
+  }
+
+  window.rmQuickAction = function(action, ip, user, pass) {
+    if (action === 'terminal') {
+      var tmIp   = document.getElementById('tm-ip');
+      var tmUser = document.getElementById('tm-user');
+      var tmPass = document.getElementById('tm-pass');
+      if (tmIp)   tmIp.value   = ip;
+      if (tmUser) tmUser.value = user;
+      if (tmPass) tmPass.value = pass;
+      var termBtn = document.querySelector('[data-tab="terminal"], [onclick*="terminal"]');
+      if (termBtn) termBtn.click();
+    } else if (action === 'topology') {
+      var topoIp   = document.getElementById('topo-ip');
+      var topoUser = document.getElementById('topo-user');
+      var topoPass = document.getElementById('topo-pass');
+      if (topoIp)   topoIp.value   = ip;
+      if (topoUser) topoUser.value = user;
+      if (topoPass) topoPass.value = pass;
+      var topoBtn = document.querySelector('[data-tab="topology"], [onclick*="topology"]');
+      if (topoBtn) topoBtn.click();
+    }
+  };
+
+  /* ── Scan Neighbors ── */
+  function autoScanNeighbors() {
+    setTimeout(scanNeighbors, 1000);
+  }
+
+  function scanNeighbors() {
+    var status = document.getElementById('rm-nb-status');
+    var tbody  = document.getElementById('rm-nb-tbody');
+    if (!status || !tbody) return;
+
+    status.textContent = 'Сканую сусідів...';
+
+    var currentIp   = (document.getElementById('rm-connect-to') || {}).value || '192.168.88.1';
+    var currentUser = (document.getElementById('rm-user') || {}).value || 'admin';
+    var currentPass = (document.getElementById('rm-pass') || {}).value || '';
+    var currentPort = (document.getElementById('rm-port') || {}).value || '80';
+
+    /* Якщо не IP — беремо з tm-ip */
+    if (!/^\d+\.\d+\.\d+\.\d+$/.test(currentIp)) {
+      currentIp = (document.getElementById('tm-ip') || {}).value || '192.168.88.1';
+    }
+
+    var hdrs = {
+      'Content-Type':   'application/json',
+      'X-Router-IP':    currentIp,
+      'X-Router-User':  currentUser,
+      'X-Router-Pass':  currentPass,
+      'X-Router-Port':  currentPort,
+    };
+
+    Promise.all([
+      fetch(BASE + '/rest/ip/neighbor',  { method:'GET', headers:hdrs })
+        .then(function(r) { return r.ok ? r.json() : []; }).catch(function() { return []; }),
+      fetch(BASE + '/rest/system/identity', { method:'GET', headers:hdrs })
+        .then(function(r) { return r.ok ? r.json() : {}; }).catch(function() { return {}; }),
+      fetch(BASE + '/rest/system/resource', { method:'GET', headers:hdrs })
+        .then(function(r) { return r.ok ? r.json() : {}; }).catch(function() { return {}; }),
+      fetch(BASE + '/rest/system/routerboard', { method:'GET', headers:hdrs })
+        .then(function(r) { return r.ok ? r.json() : {}; }).catch(function() { return {}; }),
+    ]).then(function(res) {
+      var neighbors   = Array.isArray(res[0]) ? res[0] : [];
+      var identity    = res[1] || {};
+      var resource    = res[2] || {};
+      var routerboard = res[3] || {};
+
+      /* Додаємо сам роутер першим рядком */
+      var rows = [];
+      if (identity.name) {
+        rows.push({
+          mac:      '—',
+          ip:       currentIp,
+          identity: identity.name,
+          version:  resource.version || '—',
+          board:    routerboard.model || routerboard['board-name'] || '—',
+          uptime:   resource.uptime || '—',
+          iface:    'local',
+          isSelf:   true,
+        });
+      }
+
+      /* Додаємо сусідів */
+      neighbors.forEach(function(nb) {
+        rows.push({
+          mac:      nb['mac-address'] || '—',
+          ip:       nb.address || nb['address4'] || '—',
+          identity: nb.identity || nb['system-name'] || '—',
+          version:  nb.version || '—',
+          board:    nb['board'] || nb.platform || '—',
+          uptime:   nb['uptime'] || '—',
+          iface:    nb.interface || '—',
+          isSelf:   false,
+        });
+      });
+
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="padding:30px;text-align:center;color:#4a6070;">Сусідів не знайдено</td></tr>';
+        status.textContent = 'Сусідів не знайдено';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(function(r, idx) {
+        var bg = idx % 2 === 0 ? '#060d14' : '#080f17';
+        if (r.isSelf) bg = '#0a1a2a';
+        return '<tr class="rm-nb-row" style="background:' + bg + ';" ' +
+          'onclick="rmNbConnect(\'' + r.ip + '\',\'' + r.mac + '\')">' +
+          '<td style="padding:8px 12px;color:' + (r.isSelf ? '#5fd0a5' : '#4a90d9') + ';font-family:monospace;">' + r.mac + '</td>' +
+          '<td style="padding:8px 12px;color:#e6edf3;font-family:monospace;">' + r.ip + '</td>' +
+          '<td style="padding:8px 12px;color:#5fd0a5;font-weight:600;">' + r.identity + (r.isSelf ? ' ⭐' : '') + '</td>' +
+          '<td style="padding:8px 12px;color:#8ea3b0;">' + r.version + '</td>' +
+          '<td style="padding:8px 12px;color:#8ea3b0;">' + r.board + '</td>' +
+          '<td style="padding:8px 12px;color:#f0a840;">' + r.uptime + '</td>' +
+          '<td style="padding:8px 12px;color:#8ea3b0;">' + r.iface + '</td>' +
+          '</tr>';
+      }).join('');
+
+      status.textContent = 'Знайдено: ' + rows.length + ' пристроїв';
+    }).catch(function() {
+      status.textContent = 'Помилка сканування';
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:30px;text-align:center;color:#e05252;">Роутер недоступний</td></tr>';
+    });
+  }
+
+  window.rmNbConnect = function(ip, mac) {
+    if (ip && ip !== '—') {
+      document.getElementById('rm-connect-to').value = ip;
+    } else if (mac && mac !== '—') {
+      document.getElementById('rm-connect-to').value = mac;
+    }
+    document.getElementById('rm-connect-btn').click();
+  };
+
+  /* ── Збережені роутери ── */
+  function loadSaved() {
+    var list = getSavedRouters();
+    var el   = document.getElementById('rm-saved-list');
+    if (!el) return;
+
+    if (!list.length) {
+      el.innerHTML = '<div style="color:#4a6070;text-align:center;padding:40px 0;font-size:13px;">Немає збережених роутерів<br><span style="font-size:11px;">Підключись до роутера і він з'явиться тут</span></div>';
+      return;
+    }
+
+    el.innerHTML = list.map(function(r, idx) {
+      return '<div class="rm-saved-item" onclick="rmLoadSaved(' + idx + ')">' +
+        '<div style="font-size:28px;">🔌</div>' +
+        '<div style="flex:1;">' +
+        '<div style="color:#e6edf3;font-weight:600;font-size:13px;">' + r.name + '</div>' +
+        '<div style="color:#8ea3b0;font-size:11px;">' + r.ip + ':' + r.port + ' | ' + r.user + '</div>' +
+        (r.board ? '<div style="color:#4a6070;font-size:10px;">' + r.board + ' | ' + (r.lastSeen || '') + '</div>' : '') +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:4px;">' +
+        '<button onclick="event.stopPropagation();rmLoadSaved(' + idx + ')" style="padding:4px 10px;background:#5fd0a5;border:none;border-radius:5px;color:#0d1821;cursor:pointer;font-size:11px;">🔌</button>' +
+        '<button onclick="event.stopPropagation();rmDeleteSaved(' + idx + ')" style="padding:4px 10px;background:#1c2a37;border:none;border-radius:5px;color:#e05252;cursor:pointer;font-size:11px;">🗑</button>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  window.rmLoadSaved = function(idx) {
+    var list = getSavedRouters();
+    var r    = list[idx];
+    if (!r) return;
+    document.getElementById('rm-connect-to').value = r.ip;
+    document.getElementById('rm-port').value        = r.port || '80';
+    document.getElementById('rm-user').value        = r.user || 'admin';
+    document.getElementById('rm-pass').value        = r.pass || '';
+    document.getElementById('rm-connect-btn').click();
+  };
+
+  window.rmDeleteSaved = function(idx) {
+    var list = getSavedRouters();
+    list.splice(idx, 1);
+    localStorage.setItem('rm-saved-routers', JSON.stringify(list));
+    loadSaved();
+  };
+
+  function getSavedRouters() {
+    try { return JSON.parse(localStorage.getItem('rm-saved-routers') || '[]'); } catch(e) { return []; }
+  }
+
+  function saveRouter(info) {
+    var list = getSavedRouters();
+    var idx  = list.findIndex(function(r) { return r.ip === info.ip; });
+    if (idx >= 0) list[idx] = info;
+    else list.unshift(info);
+    if (list.length > 20) list = list.slice(0, 20);
+    localStorage.setItem('rm-saved-routers', JSON.stringify(list));
+  }
+
+  /* ── Форма Додати ── */
+  function bindAddForm() {
+    var connectBtn = document.getElementById('rm-add-connect-btn');
+    var saveBtn    = document.getElementById('rm-add-save-btn');
+    if (!connectBtn) return;
+
+    function getAddFields() {
+      return {
+        ip:   (document.getElementById('rm-add-ip').value   || '').trim(),
+        port: (document.getElementById('rm-add-port').value || '80').trim(),
+        user: (document.getElementById('rm-add-user').value || 'admin').trim(),
+        pass: (document.getElementById('rm-add-pass').value || '').trim(),
+        ssh:  (document.getElementById('rm-add-ssh').value  || '22').trim(),
+        name: (document.getElementById('rm-add-name').value || '').trim(),
+      };
+    }
+
+    connectBtn.addEventListener('click', function() {
+      var f  = getAddFields();
+      var st = document.getElementById('rm-add-status');
+      if (!f.ip) { st.textContent = 'Введи IP!'; return; }
+      document.getElementById('rm-connect-to').value = f.ip;
+      document.getElementById('rm-port').value        = f.port;
+      document.getElementById('rm-user').value        = f.user;
+      document.getElementById('rm-pass').value        = f.pass;
+      document.getElementById('rm-connect-btn').click();
+    });
+
+    saveBtn.addEventListener('click', function() {
+      var f  = getAddFields();
+      var st = document.getElementById('rm-add-status');
+      if (!f.ip) { st.textContent = 'Введи IP!'; return; }
+      saveRouter({ ip:f.ip, port:f.port, user:f.user, pass:f.pass, name:f.name||f.ip, lastSeen:'manual' });
+      loadSaved();
+      st.textContent = '✅ Збережено!';
+      st.style.color = '#5fd0a5';
+      setTimeout(function() { st.textContent = ''; }, 2000);
+    });
+  }
+
+  /* ── Старт ── */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRouterManager);
+  } else {
+    setTimeout(initRouterManager, 200);
+  }
+})();
+</script>

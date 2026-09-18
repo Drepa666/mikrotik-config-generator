@@ -1423,6 +1423,13 @@
     termLog(out, 'Введи команду або вибери з швидких кнопок нижче', 'info');
     termLog(out, '──────────────────────────────────────────', 'info');
 
+    /* ── Глобальний доступ для AI ── */
+    window.rmTerminalSendCmd = function(cmd) {
+      if (!cmd) return;
+      inp.value = cmd;
+      runCommand();
+    };
+
     function runCommand() {
       var cmd = inp.value.trim();
       if (!cmd) return;

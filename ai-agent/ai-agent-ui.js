@@ -541,12 +541,14 @@ AIAgentUI.clearChat = function() {
 /* ── Аудит безпеки ── */
 AIAgentUI.runSecurityAudit = function() {
   if (!AIAgentUI.state.isOpen) AIAgentUI.toggle();
-  AIAgentUI.quickAsk(
-    'Проведи повний аудит безпеки мого MikroTik роутера. ' +
-    'Перевір: firewall правила, відкриті сервіси, паролі, WiFi шифрування, ' +
-    'захист від brute-force, небезпечні налаштування. ' +
-    'Дай оцінку безпеки від 0 до 100 і список конкретних рекомендацій з командами для виправлення.'
-  );
+  if (window.AISecurityAudit) {
+    AISecurityAudit.run();
+  } else {
+    AIAgentUI.quickAsk(
+      'Проведи повний аудит безпеки MikroTik. Перевір firewall, сервіси, паролі, WiFi. ' +
+      'Дай оцінку 0-100 і команди для виправлення.'
+    );
+  }
 };
 
 /* ── Ініціалізація ── */

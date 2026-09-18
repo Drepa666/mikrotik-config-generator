@@ -1,4 +1,216 @@
-/* ══════════════════════════════════════════════════════
+# -*- coding: utf-8 -*-
+import subprocess
+
+# ════════════════════════════════════════════════════════
+# ai-agent/ai-agent-executor.js
+# Виконує команди від AI з підтвердженням
+# ════════════════════════════════════════════════════════
+EXECUTOR_JS = r"""/* ══════════════════════════════════════════════════════
+   AI AGENT EXECUTOR v1.0
+   Парсить команди з відповіді AI → показує → виконує
+   ══════════════════════════════════════════════════════ */
+'use strict';
+
+window.AIExecutor = {
+
+  /* ── Небезпечні команди — потребують підтвердження ── */
+  DANGEROUS: [
+    '/system reboot',
+    '/system reset-configuration',
+    '/ip firewall filter remove',
+    '/ip firewall nat remove',
+    '/user remove',
+    '/interface disable',
+    'action=drop',
+    'action=reject',
+  ],
+
+  /* ── Чи є команда небезпечною ── */
+  isDangerous: function(cmd) {
+    return AIExecutor.DANGEROUS.some(function(d) {
+      return cmd.toLowerCase().includes(d.toLowerCase());
+    });
+  },
+
+  /* ── Виконати одну команду ── */
+  executeOne: function(cmd, onResult) {
+    var router = AIAgent.getRouter();
+    if (!router) {
+      onResult({ ok: false, error: 'Немає підключеного роутера' });
+      return;
+    }
+    AIAgent.ssh(cmd).then(function(d) {
+      onResult({ ok: d.ok !== false, output: d.output || d.error || 'OK' });
+    }).catch(function(e) {
+      onResult({ ok: false, error: String(e) });
+    });
+  },
+
+  /* ── Виконати список команд послідовно ── */
+  executeAll: function(commands, onProgress) {
+    var results = [];
+    var i = 0;
+    function next() {
+      if (i >= commands.length) {
+        onProgress({ done: true, results: results });
+        return;
+      }
+      var cmd = commands[i++];
+      onProgress({ done: false, current: cmd, index: i, total: commands.length });
+      AIExecutor.executeOne(cmd, function(result) {
+        results.push({ cmd: cmd, result: result });
+        next();
+      });
+    }
+    next();
+  },
+
+  /* ── Показати модал підтвердження і виконання ── */
+  showConfirmModal: function(title, commands, description) {
+    var old = document.getElementById('ai-exec-modal');
+    if (old) old.remove();
+
+    var hasDangerous = commands.some(function(c) { return AIExecutor.isDangerous(c); });
+
+    var cmdList = commands.map(function(cmd, i) {
+      var danger = AIExecutor.isDangerous(cmd);
+      return '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px;' +
+        'background:' + (danger ? '#1a0808' : '#060d14') + ';' +
+        'border:1px solid ' + (danger ? '#3a1a1a' : '#1a2a38') + ';' +
+        'border-radius:6px;margin-bottom:6px;">' +
+        '<span style="font-size:14px;flex-shrink:0;">' + (danger ? '⚠️' : '▶') + '</span>' +
+        '<code style="font-size:12px;color:' + (danger ? '#e05252' : '#5fd0a5') + ';' +
+          'white-space:pre-wrap;word-break:break-all;flex:1;">' + cmd + '</code>' +
+      '</div>';
+    }).join('');
+
+    var modal = document.createElement('div');
+    modal.id = 'ai-exec-modal';
+    modal.style.cssText =
+      'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);' +
+      'z-index:99999;display:flex;align-items:center;justify-content:center;';
+
+    modal.innerHTML =
+      '<div style="background:#0d1117;border:1px solid ' + (hasDangerous ? '#3a1a1a' : '#2a3b48') + ';' +
+        'border-radius:14px;width:580px;max-height:85vh;display:flex;flex-direction:column;' +
+        'box-shadow:0 20px 60px rgba(0,0,0,.7);">' +
+
+        /* Header */
+        '<div style="padding:16px 20px;border-bottom:1px solid #1a2a38;display:flex;align-items:center;gap:10px;">' +
+          '<span style="font-size:20px;">' + (hasDangerous ? '⚠️' : '⚡') + '</span>' +
+          '<div>' +
+            '<div style="font-weight:700;color:#e6edf3;font-size:15px;">' + title + '</div>' +
+            '<div style="font-size:11px;color:#4a6070;">' + commands.length + ' команд' +
+              (hasDangerous ? ' · <span style="color:#e05252;">Містить небезпечні операції</span>' : '') +
+            '</div>' +
+          '</div>' +
+          '<button onclick="document.getElementById(\'ai-exec-modal\').remove()" ' +
+            'style="margin-left:auto;background:transparent;border:1px solid #2a3b48;' +
+            'color:#4a6070;border-radius:6px;padding:4px 10px;cursor:pointer;">✕</button>' +
+        '</div>' +
+
+        /* Description */
+        (description ?
+          '<div style="padding:12px 20px;background:#080f17;border-bottom:1px solid #1a2a38;' +
+            'font-size:12px;color:#8ea3b0;line-height:1.6;">' + description + '</div>'
+        : '') +
+
+        /* Commands */
+        '<div style="padding:16px 20px;overflow-y:auto;flex:1;">' +
+          '<div style="font-size:11px;color:#4a6070;margin-bottom:8px;text-transform:uppercase;">Команди для виконання:</div>' +
+          cmdList +
+        '</div>' +
+
+        /* Result area */
+        '<div id="ai-exec-result" style="display:none;padding:12px 20px;' +
+          'border-top:1px solid #1a2a38;max-height:200px;overflow-y:auto;"></div>' +
+
+        /* Buttons */
+        '<div style="padding:14px 20px;border-top:1px solid #1a2a38;display:flex;gap:8px;">' +
+          '<button onclick="document.getElementById(\'ai-exec-modal\').remove()" ' +
+            'style="background:transparent;border:1px solid #2a3b48;color:#8ea3b0;' +
+            'border-radius:8px;padding:10px 20px;cursor:pointer;font-size:13px;">Скасувати</button>' +
+          (hasDangerous ?
+            '<div style="flex:1;background:#1a0808;border:1px solid #3a1a1a;border-radius:8px;' +
+              'padding:8px 12px;font-size:11px;color:#e05252;display:flex;align-items:center;">' +
+              '⚠️ Ці команди можуть вплинути на роботу мережі!' +
+            '</div>' : '<div style="flex:1;"></div>') +
+          '<button onclick="window.AIExecutor.runAll(' + JSON.stringify(commands).replace(/'/g, "\\'") + ')" ' +
+            'style="background:' + (hasDangerous ? 'linear-gradient(135deg,#c03030,#e05252)' : 'linear-gradient(135deg,#5fd0a5,#4ab890)') + ';' +
+            'color:' + (hasDangerous ? '#fff' : '#082018') + ';border:none;' +
+            'border-radius:8px;padding:10px 24px;cursor:pointer;font-size:13px;font-weight:700;">' +
+            (hasDangerous ? '⚠️ Виконати все одно' : '▶ Виконати') +
+          '</button>' +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(modal);
+  },
+
+  /* ── Запустити всі команди ── */
+  runAll: function(commands) {
+    var resultEl = document.getElementById('ai-exec-result');
+    if (resultEl) resultEl.style.display = 'block';
+
+    /* Приховуємо кнопки */
+    var btns = document.querySelector('#ai-exec-modal > div > div:last-child');
+    if (btns) btns.innerHTML =
+      '<div style="color:#4a6070;font-size:12px;">⏳ Виконую команди...</div>';
+
+    var results = [];
+    AIExecutor.executeAll(commands, function(progress) {
+      if (!resultEl) return;
+      if (!progress.done) {
+        resultEl.innerHTML =
+          '<div style="font-size:12px;color:#4a6070;">⏳ [' + progress.index + '/' + progress.total + '] ' + progress.current + '</div>';
+        return;
+      }
+
+      /* Показуємо результати */
+      var html = progress.results.map(function(r) {
+        return '<div style="margin-bottom:8px;padding:8px;background:#060d14;border-radius:6px;' +
+          'border-left:3px solid ' + (r.result.ok ? '#5fd0a5' : '#e05252') + ';">' +
+          '<code style="font-size:11px;color:#4a6070;">' + r.cmd + '</code><br>' +
+          '<span style="font-size:12px;color:' + (r.result.ok ? '#5fd0a5' : '#e05252') + ';">' +
+            (r.result.ok ? '✅ ' : '❌ ') + (r.result.output || r.result.error || 'OK') +
+          '</span>' +
+        '</div>';
+      }).join('');
+
+      var ok = progress.results.filter(function(r){ return r.result.ok; }).length;
+      resultEl.innerHTML =
+        '<div style="font-size:12px;font-weight:700;color:#5fd0a5;margin-bottom:8px;">' +
+          '✅ Виконано: ' + ok + '/' + progress.results.length +
+        '</div>' + html;
+
+      /* Повідомляємо AI про результат */
+      if (window.AIAgentUI) {
+        AIAgentUI.addMessage('system',
+          '⚡ Виконано ' + ok + ' з ' + progress.results.length + ' команд'
+        );
+      }
+
+      /* Кнопка закрити */
+      if (btns) btns.innerHTML =
+        '<button onclick="document.getElementById(\'ai-exec-modal\').remove()" ' +
+          'style="margin-left:auto;background:linear-gradient(135deg,#5fd0a5,#4ab890);' +
+          'color:#082018;border:none;border-radius:8px;padding:10px 24px;cursor:pointer;' +
+          'font-size:13px;font-weight:700;">✓ Готово</button>';
+    });
+  }
+};
+
+console.log('[AIExecutor] Ready ✅');
+"""
+
+with open('ai-agent/ai-agent-executor.js', 'w', encoding='utf-8') as f:
+    f.write(EXECUTOR_JS)
+print('OK: ai-agent-executor.js ✅')
+
+# ════════════════════════════════════════════════════════
+# tools/tool-security.js — повна версія аудиту
+# ════════════════════════════════════════════════════════
+SECURITY_JS = r"""/* ══════════════════════════════════════════════════════
    TOOL: Security Audit v2.0
    Повний аудит MikroTik + звіт + автовиправлення
    ══════════════════════════════════════════════════════ */
@@ -329,12 +541,11 @@ window.AISecurityAudit = {
 
   /* ── Застосувати всі виправлення ── */
   applyFixes: function(fixes) {
-    var rep = document.getElementById('ai-security-report');
-    if (rep) rep.remove();
+    document.getElementById('ai-security-report').remove();
     AIExecutor.showConfirmModal(
       '🔒 Виправлення безпеки',
       fixes,
-      'AI підготував ці команди на основі аудиту. Натисни "Відкрити термінал" — команди виконаються автоматично.'
+      'AI підготував ці команди на основі аудиту. Вони виправлять знайдені вразливості.'
     );
   },
 
@@ -359,3 +570,80 @@ if (window.AIAgent && window.AIAgent.tools) {
 }
 
 console.log('[Security Audit v2.0] Ready ✅');
+"""
+
+with open('ai-agent/tools/tool-security.js', 'w', encoding='utf-8') as f:
+    f.write(SECURITY_JS)
+print('OK: tool-security.js ✅')
+
+# ── Оновлюємо UI — кнопка 🔒 запускає audit ──
+with open('ai-agent/ai-agent-ui.js', 'r', encoding='utf-8') as f:
+    ui = f.read()
+
+# Фіксуємо runSecurityAudit
+old_audit = """AIAgentUI.runSecurityAudit = function() {
+  if (!AIAgentUI.state.isOpen) AIAgentUI.toggle();
+  AIAgentUI.quickAsk(
+    'Проведи повний аудит безпеки мого MikroTik роутера. ' +
+    'Перевір: firewall правила, відкриті сервіси, паролі, WiFi шифрування, ' +
+    'захист від brute-force, небезпечні налаштування. ' +
+    'Дай оцінку безпеки від 0 до 100 і список конкретних рекомендацій з командами для виправлення.'
+  );
+};"""
+
+new_audit = """AIAgentUI.runSecurityAudit = function() {
+  if (!AIAgentUI.state.isOpen) AIAgentUI.toggle();
+  if (window.AISecurityAudit) {
+    AISecurityAudit.run();
+  } else {
+    AIAgentUI.quickAsk(
+      'Проведи повний аудит безпеки MikroTik. Перевір firewall, сервіси, паролі, WiFi. ' +
+      'Дай оцінку 0-100 і команди для виправлення.'
+    );
+  }
+};"""
+
+if old_audit in ui:
+    ui = ui.replace(old_audit, new_audit)
+    print('OK: runSecurityAudit ✅')
+else:
+    print('WARN: runSecurityAudit не знайдено — додаємо')
+    ui = ui.replace(
+        "console.log('[AIAgentUI] Ready ✅');",
+        new_audit + "\n\nconsole.log('[AIAgentUI] Ready ✅');"
+    )
+
+# Оновлюємо addMessage — відображення **bold**
+old_format = "AIAgentUI.formatResponse = function(text) {"
+if old_format in ui:
+    print('OK: formatResponse є ✅')
+
+with open('ai-agent/ai-agent-ui.js', 'w', encoding='utf-8') as f:
+    f.write(ui)
+
+# ── Підключаємо executor в index.html ──
+with open('index.html', 'r', encoding='utf-8') as f:
+    html = f.read()
+
+if 'ai-agent-executor.js' not in html:
+    html = html.replace(
+        '<script src="ai-agent/ai-agent-core.js"></script>',
+        '<script src="ai-agent/ai-agent-executor.js"></script>\n  <script src="ai-agent/ai-agent-core.js"></script>'
+    )
+    with open('index.html', 'w', encoding='utf-8') as f:
+        f.write(html)
+    print('OK: executor в index.html ✅')
+
+# ── Перевірка синтаксису ──
+errors = 0
+for fn in [
+    'ai-agent/ai-agent-executor.js',
+    'ai-agent/tools/tool-security.js',
+    'ai-agent/ai-agent-ui.js',
+]:
+    r = subprocess.run(['node', '--check', fn], capture_output=True, text=True)
+    status = 'OK ✅' if r.returncode == 0 else '❌\n' + r.stderr[:150]
+    print(f'{fn}: {status}')
+    if r.returncode != 0: errors += 1
+
+print(f'\n{"Все OK! ✅" if errors==0 else f"Помилок: {errors} ❌"}')

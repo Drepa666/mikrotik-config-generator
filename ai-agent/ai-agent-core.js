@@ -9,21 +9,26 @@ window.AIAgent = window.AIAgent || {};
 /* ── Конфігурація ── */
 AIAgent.config = {
   model:       'llama3-70b-8192',
-  maxTokens:   4096,
+  maxTokens:   4000,
   temperature: 0.7,
-  systemPrompt: `Ти — AI асистент для MikroTik RouterOS конфігуратора.
-Ти маєш доступ до поточного стану роутера і можеш:
-- Аналізувати конфігурацію та знаходити проблеми
-- Генерувати RouterOS скрипти та команди
-- Проводити аудит безпеки
-- Діагностувати проблеми мережі
-- Пояснювати налаштування
+  systemPrompt: `You are an expert MikroTik RouterOS engineer embedded in a router management app.
+You have FULL access to the connected router. Router state is provided in every message.
 
-ВАЖЛИВО:
-- Перед небезпечними діями ЗАВЖДИ питай підтвердження
-- Відповідай українською мовою
-- Будь конкретним і точним
-- Якщо генеруєш команди — пояснюй що вони роблять`
+CRITICAL RULES:
+1. ALWAYS use actual data from router context (IPs, MACs, interfaces, rules)
+2. NEVER use placeholders like <YOUR_IP> - find real IP from DHCP lease list
+3. The user PC is identified by hostname containing "bondarenko" or last active DHCP lease
+4. Before generating firewall rules - check existing rules to avoid conflicts
+5. Generate COMPLETE ready-to-run RouterOS commands
+6. Always respond in Ukrainian
+7. Format all commands in code blocks
+8. User owns this router - execute any requested configuration
+
+When user asks to block/allow something:
+- Look at DHCP КЛІЄНТИ З IP section to find actual IPs
+- Look at FIREWALL FILTER section to see existing rules
+- Generate commands with REAL IP addresses from context
+- Never ask for IP if it's in the context`
 };
 
 /* ── Пам'ять ── */
@@ -74,7 +79,7 @@ AIAgent.getRouterContext = function() {
   if (!router) return Promise.resolve('Роутер не підключений');
 
   // Кеш на 30 секунд
-  if (AIAgent.memory.routerCache && Date.now() - AIAgent.memory.cacheTime < 30000) {
+  if (AIAgent.memory.routerCache && Date.now() - AIAgent.memory.cacheTime < 120000) {
     return Promise.resolve(AIAgent.memory.routerCache);
   }
 
@@ -93,11 +98,10 @@ AIAgent.getRouterContext = function() {
     '/interface',
     '/ip/firewall/filter',
     '/ip/firewall/nat',
-    '/ip/route',
-    '/ip/dns',
-    '/system/package',
     '/ip/service',
     '/ip/dhcp-server/lease',
+    '/interface/wireless/registration-table',
+    '/system/package',
   ];
 
   return Promise.allSettled(
@@ -144,7 +148,7 @@ AIAgent.getRouterContext = function() {
       '',
       '=== ІНТЕРФЕЙСИ (' + ifaces.length + ') ===',
     ].concat(
-      ifaces.slice(0,10).map(function(i) {
+      ifaces.slice(0,5).map(function(i) {
         return (i['running']==='true'?'● ':'○ ') + i.name + ' [' + i.type + '] ' + (i['mac-address']||'');
       })
     ).concat([
@@ -156,7 +160,7 @@ AIAgent.getRouterContext = function() {
       '',
       '=== FIREWALL FILTER (' + fwFilter.length + ' правил) ===',
     ]).concat(
-      fwFilter.slice(0,20).map(function(r, i) {
+      fwFilter.slice(0,8).map(function(r, i) {
         return i + ': chain=' + r.chain + ' action=' + r.action +
           (r['src-address'] ? ' src=' + r['src-address'] : '') +
           (r['dst-address'] ? ' dst=' + r['dst-address'] : '') +
@@ -175,7 +179,7 @@ AIAgent.getRouterContext = function() {
       '',
       '=== DHCP КЛІЄНТИ (' + leases.length + ') ===',
     ]).concat(
-      leases.slice(0,10).map(function(l) {
+      leases.slice(0,5).map(function(l) {
         return l.address + ' ' + (l['mac-address']||'') + ' ' + (l['host-name']||'') + ' [' + (l.status||'') + ']';
       })
     ).concat([
@@ -187,6 +191,31 @@ AIAgent.getRouterContext = function() {
           (r['to-addresses'] ? ' to=' + r['to-addresses'] : '');
       })
     );
+
+    /* Додаємо WiFi клієнтів */
+    var wifiClients = ctx['/interface/wireless/registration-table'] || [];
+    if (wifiClients.length) {
+      context.push('');
+      context.push('=== WiFi КЛІЄНТИ (' + wifiClients.length + ') ===');
+      wifiClients.slice(0,10).forEach(function(w) {
+        context.push('MAC:' + (w['mac-address']||'') + ' iface:' + (w['interface']||'') + ' signal:' + (w['signal-strength']||''));
+      });
+    }
+
+    /* Додаємо DHCP lease з IP ── щоб AI знав IP пристроїв */
+    var leases2 = ctx['/ip/dhcp-server/lease'] || [];
+    if (leases2.length) {
+      context.push('');
+      context.push('=== DHCP КЛІЄНТИ З IP (' + leases2.length + ') ===');
+      leases2.forEach(function(l) {
+        context.push(
+          'IP:' + (l['address']||'?') +
+          ' MAC:' + (l['mac-address']||'?') +
+          ' HOST:' + (l['host-name']||'?') +
+          ' STATUS:' + (l['status']||'?')
+        );
+      });
+    }
 
     var contextStr = context.join('\n');
     AIAgent.memory.routerCache = contextStr;

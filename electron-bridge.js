@@ -14,7 +14,8 @@
      Замінюємо callAI — тепер через main process
      Немає CORS, немає обмежень браузера
      ══════════════════════════════════════════════════════ */
-  window.callAI = function(prompt, maxTok) {
+  window.callAI = function(prompt, maxTok, options) {
+    options = options || {};
     var provEl  = document.getElementById('ai-prov');
     var keyEl   = document.getElementById('ai-key');
     var modelEl = document.getElementById('ai-model');
@@ -26,11 +27,13 @@
     console.log('[Electron Bridge] callAI -> main process | provider:', prov, '| model:', model || '(default)');
 
     return window.electronAPI.aiRequest({
-      provider: prov,
-      key:      key,
-      model:    model,
-      prompt:   prompt,
-      maxTok:   maxTok || 1024,
+      provider:     prov,
+      key:          key,
+      model:        model,
+      prompt:       prompt,
+      maxTok:       maxTok || 1024,
+      systemPrompt: options.systemPrompt || '',
+      messages:     options.messages     || null,
     }).then(function(result) {
       if (!result.ok) {
         throw new Error(result.error || 'AI помилка');

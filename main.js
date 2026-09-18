@@ -346,13 +346,21 @@ ipcMain.handle('ai-request', async function(event, options) {
       if (provider === 'anthropic') {
         headers['x-api-key']         = key;
         headers['anthropic-version'] = '2023-06-01';
-        bodyObj = { model: finalModel, max_tokens: maxTok, messages: [{ role: 'user', content: prompt }] };
+        var sysP = options.systemPrompt || '';
+        var msgs = [];
+        if (sysP) msgs.push({ role: 'system', content: sysP });
+        msgs.push({ role: 'user', content: prompt });
+        bodyObj = { model: finalModel, max_tokens: maxTok, messages: msgs };
       } else if (provider === 'gemini') {
         urlStr  = cfg.url + '?key=' + key;
         bodyObj = { contents: [{ parts: [{ text: prompt }] }] };
       } else {
         headers['Authorization'] = 'Bearer ' + key;
-        bodyObj = { model: finalModel, max_tokens: maxTok, messages: [{ role: 'user', content: prompt }] };
+        var sysP = options.systemPrompt || '';
+        var msgs = [];
+        if (sysP) msgs.push({ role: 'system', content: sysP });
+        msgs.push({ role: 'user', content: prompt });
+        bodyObj = { model: finalModel, max_tokens: maxTok, messages: msgs };
       }
 
       var bodyStr = JSON.stringify(bodyObj);

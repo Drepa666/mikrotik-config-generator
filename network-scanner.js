@@ -222,7 +222,42 @@ window.nsStartScan = function() {
 
     window.__nsDevices = arr;
     window.nsRender(arr);
-    if (btn) { btn.disabled = false; btn.textContent = '🔄 Оновити'; }
+    if (btn) { btn.textContent = '🏓 Перевірка...'; }
+
+    /* Перевіряємо реальний статус пінгом для ВСІХ пристроїв з IP */
+    var toCheck = arr.filter(function(d){ return d.ip; });
+    var checked = 0;
+
+    if (!toCheck.length) {
+      if (btn) { btn.disabled = false; btn.textContent = '🔄 Оновити'; }
+      return;
+    }
+
+    /* Пінгуємо по 3 паралельно */
+    var idx = 0;
+    function pingNext() {
+      if (idx >= toCheck.length) return;
+      var d = toCheck[idx++];
+      nsSSH('/ping ' + d.ip + ' count=1 interval=200ms')
+        .then(function(res) {
+          var out = res.output || '';
+          /* received=1 або ttl= означає онлайн */
+          d.online = (out.includes('received=1') || out.includes('ttl=')) ? true : false;
+        })
+        .catch(function() { d.online = null; })
+        .finally(function() {
+          checked++;
+          /* Оновлюємо рядок в таблиці */
+          window.nsRender(window.__nsDevices);
+          if (checked >= toCheck.length) {
+            if (btn) { btn.disabled = false; btn.textContent = '🔄 Оновити'; }
+          } else {
+            pingNext();
+          }
+        });
+    }
+    /* 3 паралельних потоки */
+    pingNext(); pingNext(); pingNext();
   });
 };
 

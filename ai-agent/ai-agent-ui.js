@@ -276,17 +276,31 @@ AIAgentUI.createSidebar = function() {
 
     /* Input */
     '<div id="ai-input-area">',
+      /* File preview */
+      '<div id="ai-file-preview" style="display:none;background:#080f17;border:1px solid #2a4a2a;',
+        'border-radius:8px;padding:8px 12px;margin-bottom:8px;flex-wrap:wrap;gap:6px;"></div>',
       '<div id="ai-input-row">',
-        '<textarea id="ai-input" rows="1" placeholder="Запитай AI про мережу..."></textarea>',
+        /* Кнопка прикріпити файл */
+        '<button onclick="window.AIFileUpload.openDialog()" title="Прикріпити файл"',
+          ' style="background:#080f17;border:1px solid #2a3b48;color:#8ea3b0;',
+          'border-radius:8px;width:42px;height:42px;cursor:pointer;font-size:18px;',
+          'flex-shrink:0;">📎</button>',
+        '<textarea id="ai-input" rows="1" placeholder="Запитай AI або прикріпи файл..."></textarea>',
         '<button id="ai-send-btn" onclick="window.AIAgentUI.send()">▶</button>',
       '</div>',
       '<div style="font-size:10px;color:#2a3b48;text-align:center;">',
-        'Groq · llama-3.3-70b · Контекст роутера автоматично',
+        'Groq · llama3-70b · Підтримка TXT, RSC, JSON, PNG, JPG',
       '</div>',
     '</div>',
   ].join('');
 
   document.body.appendChild(sidebar);
+
+  /* Drag & Drop на sidebar */
+  if (window.AIFileUpload) {
+    var msgArea = document.getElementById('ai-messages');
+    window.AIFileUpload.initDragDrop(msgArea);
+  }
 
   /* Enter для відправки */
   var input = document.getElementById('ai-input');
@@ -431,16 +445,24 @@ AIAgentUI.formatResponse = function(text) {
 /* ── Відправити ── */
 AIAgentUI.send = function() {
   var input = document.getElementById('ai-input');
-  var btn   = document.getElementById('ai-send-btn');
   if (!input || AIAgentUI.state.isLoading) return;
 
   var text = input.value.trim();
-  if (!text) return;
+  var file = window.AIFileUpload ? window.AIFileUpload._current : null;
+  if (!text && !file) return;
+  if (!text) text = 'Проаналізуй цей файл і налаштуй роутер відповідно';
+
+  var finalPrompt = file
+    ? window.AIFileUpload.buildPromptWithFile(text, file)
+    : text;
 
   input.value = '';
   input.style.height = 'auto';
-  AIAgentUI.addMessage('user', text);
+
+  var displayText = file ? text + '\n📎 ' + file.name : text;
+  AIAgentUI.addMessage('user', displayText);
   AIAgentUI.setLoading(true);
+  if (window.AIFileUpload) window.AIFileUpload.clearFile();
 
   /* Анімація друку */
   var typing = document.createElement('div');
@@ -452,7 +474,7 @@ AIAgentUI.send = function() {
     container.scrollTop = container.scrollHeight;
   }
 
-  AIAgent.send(text)
+  AIAgent.send(finalPrompt)
     .then(function(response) {
       if (typing.parentNode) typing.remove();
       AIAgentUI.addMessage('assistant', response, { time: true });

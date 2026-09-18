@@ -495,6 +495,7 @@
     { id: 'sep2' },
     { id: 'romon', icon: '🔗', label: 'RoMON' },
     { id: 'neighbors', icon: '🏘️', label: 'Neighbors' },
+    { id: 'net-scanner', icon: '🔍', label: 'Сканер мережі' },
     { id: 'sep3' },
     {
       id: 'queues', icon: '📊', label: 'Queues', children: [
@@ -664,6 +665,7 @@
     if (menu === 'sys-backup')    { renderBackup(); return; }
     if (menu === 'sys-reboot')    { renderReboot(); return; }
     if (menu === 'romon')         { renderRoMON(); return; }
+    if (menu === 'net-scanner') { if(window.renderNetworkScanner) window.renderNetworkScanner(); return; }
     if (menu === 'queues-simple') { if(window.rmCrudQueues)    window.rmCrudQueues();    else cont.innerHTML='<div style="color:#8ea3b0;padding:20px;">Queues Simple</div>'; return; }
     if (menu === 'ppp-secrets')   { if(window.rmCrudPPP)       window.rmCrudPPP();       else cont.innerHTML='<div style="color:#8ea3b0;padding:20px;">PPP Secrets</div>'; return; }
     if (menu === 'vlan-list')     { if(window.rmCrudVLAN)      window.rmCrudVLAN();      else cont.innerHTML='<div style="color:#8ea3b0;padding:20px;">VLANs</div>'; return; }

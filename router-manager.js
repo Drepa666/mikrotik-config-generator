@@ -333,7 +333,7 @@
   /* ══════════════════════════════════════════════════════════
      REST API CALLS
      ══════════════════════════════════════════════════════════ */
-  function restCall(router, method, path, body) {
+  window.restCall = function restCall(router, method, path, body) {
     var url  = PROXY + '/rest' + path;
     var opts = {
       method:  method,
@@ -350,7 +350,7 @@
     return fetch(url, opts).then(function(r) { return r.json(); });
   }
 
-  function sshCall(router, command) {
+  window.sshCall = function sshCall(router, command) {
     return fetch(PROXY + '/ssh/exec', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2447,5 +2447,12 @@ function renderRuijieDashboard(router) {
   });
 }
 /* ═══════════════════════════════════════════ END RUIJIE ═══ */
+
+  /* ── Глобальний доступ для AI агента ── */
+  window.restCall = restCall;
+  window.sshCall  = sshCall;
+  window.getActiveRouter = function() {
+    return state.routers.find(function(r) { return r.id === state.activeRouter; }) || null;
+  };
 
 })();

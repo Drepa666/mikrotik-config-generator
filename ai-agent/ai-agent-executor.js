@@ -26,17 +26,40 @@ window.AIExecutor = {
   },
 
   /* ── Виконати одну команду ── */
-  executeOne: function(cmd, onResult) {
-    var router = AIAgent.getRouter();
-    if (!router) {
-      onResult({ ok: false, error: 'Немає підключеного роутера' });
-      return;
+  parseCommands: function(text) {
+    var cmds = [];
+    var lines = text.split('\n');
+    var inBlock = false;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (line.substring(0,3) === '```') { inBlock = !inBlock; continue; }
+      if (inBlock && line && line.charAt(0) !== '#') cmds.push(line);
     }
-    AIAgent.ssh(cmd).then(function(d) {
-      onResult({ ok: d.ok !== false, output: d.output || d.error || 'OK' });
-    }).catch(function(e) {
-      onResult({ ok: false, error: String(e) });
-    });
+    if (cmds.length === 0) {
+      for (var j = 0; j < lines.length; j++) {
+        var l = lines[j].trim();
+        if (l.charAt(0) === '/') cmds.push(l);
+      }
+    }
+    return cmds;
+  },
+
+  executeOne: function(cmd, onResult) {
+    var router = window.getActiveRouter ? window.getActiveRouter() : null;
+    if (!router) { onResult({ ok: false, error: 'Немає роутера' }); return; }
+    var c = cmd.replace(/\\\\/g, ' ').replace(/\s+/g, ' ').trim();
+    console.log('[Executor] cmd:', c);
+    window.sshCall(router, c)
+      .then(function(d) {
+        var out = typeof d === 'string' ? d
+                : (d && d.text)   ? d.text
+                : (d && d.output) ? d.output
+                : (d && d.result) ? d.result
+                : (d && d.error)  ? d.error
+                : JSON.stringify(d);
+        onResult({ ok: true, output: out || 'OK' });
+      })
+      .catch(function(e) { onResult({ ok: false, error: String(e) }); });
   },
 
   /* ── Виконати список команд послідовно ── */
@@ -59,6 +82,8 @@ window.AIExecutor = {
   },
 
   /* ── Показати модал підтвердження і виконання ── */
+  /* Розбиває текст AI на окремі команди RouterOS */
+
   showConfirmModal: function(title, commands, description) {
     var old = document.getElementById('ai-exec-modal');
     if (old) old.remove();

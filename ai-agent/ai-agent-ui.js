@@ -27,17 +27,29 @@ AIAgentUI.injectStyles = function() {
   style.textContent = `
     #ai-sidebar {
       position: fixed;
-      top: 0; right: -420px;
-      width: 420px; height: 100vh;
+      top: 60px; right: 20px;
+      width: 420px; height: 85vh;
       background: #0a0f1a;
-      border-left: 1px solid #1a2a3a;
-      z-index: 9999;
-      display: flex;
+      border: 1px solid #1a2a3a;
+      border-radius: 12px;
+      z-index: 999999 !important;
+      display: none;
       flex-direction: column;
-      transition: right .3s cubic-bezier(.4,0,.2,1);
-      box-shadow: -4px 0 24px rgba(0,0,0,.5);
+      box-shadow: 0 8px 40px rgba(0,0,0,.7);
+      resize: both;
+      overflow: hidden;
+      min-width: 320px;
+      min-height: 400px;
+      pointer-events: all !important;
     }
-    #ai-sidebar.open { right: 0; }
+    #ai-sidebar.open {
+      display: flex !important;
+    }
+    #ai-drag-handle {
+      cursor: move;
+      user-select: none;
+      -webkit-user-select: none;
+    }
 
     #ai-toggle-btn {
       position: fixed;
@@ -46,7 +58,7 @@ AIAgentUI.injectStyles = function() {
       background: linear-gradient(135deg,#5b4efc,#8b5efc);
       border: none; border-radius: 50%;
       color: #fff; font-size: 22px;
-      cursor: pointer; z-index: 9998;
+      cursor: pointer; z-index: 999998;
       box-shadow: 0 4px 20px rgba(91,78,252,.5);
       transition: transform .2s, box-shadow .2s;
       display: flex; align-items: center; justify-content: center;
@@ -228,8 +240,8 @@ AIAgentUI.createSidebar = function() {
   sidebar.id = 'ai-sidebar';
   sidebar.innerHTML = [
     /* Header */
-    '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;',
-      'border-bottom:1px solid #1a2a38;background:#080f17;flex-shrink:0;">',
+    '<div id="ai-drag-handle" style="display:flex;align-items:center;gap:10px;padding:14px 16px;',
+      'border-bottom:1px solid #1a2a38;background:#080f17;flex-shrink:0;border-radius:12px 12px 0 0;">',
       '<div style="width:32px;height:32px;background:linear-gradient(135deg,#5b4efc,#8b5efc);',
         'border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">🤖</div>',
       '<div>',
@@ -237,18 +249,12 @@ AIAgentUI.createSidebar = function() {
         '<div id="ai-status" style="font-size:11px;color:#5fd0a5;">● Groq Ready</div>',
       '</div>',
       '<div style="margin-left:auto;display:flex;gap:6px;">',
-        '<button onclick="window.AIAgentUI.clearChat()" title="Очистити чат"',
-          ' style="background:transparent;border:1px solid #2a3b48;color:#4a6070;',
-          'border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;">🗑</button>',
-        '<button onclick="window.AIKeystore.showModal()" title="API Ключ"',
-          ' style="background:#1a1a0a;border:1px solid #3a3a1a;color:#f0a840;',
-          'border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;">🔑</button>',
-        '<button onclick="window.AIAgentUI.runSecurityAudit()" title="Аудит безпеки"',
-          ' style="background:#1a0a2a;border:1px solid #3a1a5a;color:#c084fc;',
-          'border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;">🔒</button>',
-        '<button onclick="window.AIAgentUI.toggle()" title="Закрити"',
-          ' style="background:transparent;border:1px solid #2a3b48;color:#4a6070;',
-          'border-radius:6px;padding:4px 8px;cursor:pointer;font-size:14px;">✕</button>',
+        '<button onclick="window.AIAgentUI.clearChat()" title="Очистити чат" style="background:transparent;border:1px solid #2a3b48;color:#4a6070;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;">🗑</button>',
+        '<button onclick="window.AIKeystore.showModal()" title="API Ключ" style="background:#1a1a0a;border:1px solid #3a3a1a;color:#f0a840;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;">🔑</button>',
+        '<button onclick="window.AISecurityAudit.run()" title="Аудит безпеки" style="background:#1a0a2a;border:1px solid #3a1a5a;color:#c084fc;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;">🔒</button>',
+        '<button id="ai-zindex-btn" style="background:transparent;border:1px solid #2a3b48;color:#4a6070;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;">📌</button>',
+        '<button id="ai-minimize-btn" style="background:transparent;border:1px solid #2a3b48;color:#4a6070;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:14px;">🗕</button>',
+        '<button id="ai-close-btn" style="background:transparent;border:1px solid #2a3b48;color:#4a6070;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:14px;">✕</button>',
       '</div>',
     '</div>',
 
@@ -262,7 +268,7 @@ AIAgentUI.createSidebar = function() {
     '<div style="padding:10px 12px 4px;border-bottom:1px solid #1a2a38;flex-shrink:0;">',
       '<div style="font-size:10px;color:#4a6070;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Швидкі дії</div>',
       '<div class="ai-quick-btns" style="padding:0;">',
-        '<button class="ai-quick-btn" onclick="window.AIAgentUI.quickAsk(\'Зроби аудит безпеки роутера\')">🔒 Аудит</button>',
+        '<button class="ai-quick-btn" onclick="window.AISecurityAudit.run()">🔒 Аудит</button>',,
         '<button class="ai-quick-btn" onclick="window.AIAgentUI.quickAsk(\'Проаналізуй поточний стан мережі\')">📊 Аналіз</button>',
         '<button class="ai-quick-btn" onclick="window.AIAgentUI.quickAsk(\'Знайди проблеми в конфігурації\')">🔍 Діагностика</button>',
         '<button class="ai-quick-btn" onclick="window.AIAgentUI.quickAsk(\'Покажи топ пристроїв за трафіком\')">📈 Трафік</button>',
@@ -296,6 +302,15 @@ AIAgentUI.createSidebar = function() {
 
   document.body.appendChild(sidebar);
 
+  /* Вішаємо listeners одразу після додавання в DOM */
+  var _closeBtn = document.getElementById('ai-close-btn');
+  var _minBtn   = document.getElementById('ai-minimize-btn');
+  var _zBtn     = document.getElementById('ai-zindex-btn');
+  if (_closeBtn) _closeBtn.onclick = function() { AIAgentUI.toggle(); };
+  if (_minBtn)   _minBtn.onclick   = function() { AIAgentUI.minimize(); };
+  if (_zBtn)     _zBtn.onclick     = function() { AIAgentUI.toggleZIndex(); };
+  console.log('[AIAgentUI] Buttons OK ✅');
+
   /* Drag & Drop на sidebar */
   if (window.AIFileUpload) {
     var msgArea = document.getElementById('ai-messages');
@@ -318,6 +333,25 @@ AIAgentUI.createSidebar = function() {
     });
   }
 
+  /* Прямі listeners — CSP безпечно */
+  function attachBtnListeners() {
+    var closeBtn = document.getElementById('ai-close-btn');
+    var minBtn   = document.getElementById('ai-minimize-btn');
+    var zBtn     = document.getElementById('ai-zindex-btn');
+    var clearBtn = document.getElementById('ai-clear-btn');
+    var keyBtn   = document.getElementById('ai-key-btn');
+    var secBtn   = document.getElementById('ai-sec-btn');
+
+    if (closeBtn) closeBtn.onclick = function(e) { e.stopPropagation(); AIAgentUI.toggle(); };
+    if (minBtn)   minBtn.onclick   = function(e) { e.stopPropagation(); AIAgentUI.minimize(); };
+    if (zBtn)     zBtn.onclick     = function(e) { e.stopPropagation(); AIAgentUI.toggleZIndex(); };
+    if (clearBtn) clearBtn.onclick = function(e) { e.stopPropagation(); AIAgentUI.clearChat(); };
+    if (keyBtn)   keyBtn.onclick   = function(e) { e.stopPropagation(); window.AIKeystore && AIKeystore.showModal(); };
+    if (secBtn)   secBtn.onclick   = function(e) { e.stopPropagation(); window.AISecurityAudit && AISecurityAudit.run(); };
+    console.log('[AIAgentUI] Listeners attached ✅');
+  }
+  setTimeout(attachBtnListeners, 300);
+
   /* Оновлюємо router bar */
   AIAgentUI.updateRouterBar();
   setInterval(AIAgentUI.updateRouterBar, 5000);
@@ -329,6 +363,20 @@ AIAgentUI.createSidebar = function() {
       'Запитуй про мережу, безпеку, налаштування — відповім і допоможу!'
     );
   }, 500);
+
+  /* Listeners для кнопок — CSP safe */
+  function bindButtons() {
+    var closeBtn = document.getElementById('ai-close-btn');
+    var minBtn   = document.getElementById('ai-minimize-btn');
+    var zBtn     = document.getElementById('ai-zindex-btn');
+    if (closeBtn) { closeBtn.onclick = function() { AIAgentUI.toggle(); }; }
+    if (minBtn)   { minBtn.onclick   = function() { AIAgentUI.minimize(); }; }
+    if (zBtn)     { zBtn.onclick     = function() { AIAgentUI.toggleZIndex(); }; }
+    console.log('[AIAgentUI] Buttons bound:', !!closeBtn, !!minBtn, !!zBtn);
+  }
+  bindButtons();
+  setTimeout(bindButtons, 300);
+  setTimeout(bindButtons, 1000);
 };
 
 /* ── Toggle button ── */
@@ -342,6 +390,9 @@ AIAgentUI.createToggleBtn = function() {
 };
 
 /* ── Toggle sidebar ── */
+window.AIAgentUI_toggle = function() {
+  AIAgentUI.toggle();
+};
 AIAgentUI.toggle = function() {
   var sidebar = document.getElementById('ai-sidebar');
   var btn     = document.getElementById('ai-toggle-btn');
@@ -350,12 +401,113 @@ AIAgentUI.toggle = function() {
   sidebar.classList.toggle('open', AIAgentUI.state.isOpen);
   if (btn) btn.classList.toggle('open', AIAgentUI.state.isOpen);
   if (AIAgentUI.state.isOpen) {
+    /* Завжди піднімаємо на передній план при відкритті */
+    if (sidebar) {
+      sidebar.style.zIndex = '999999';
+      AIAgentUI._zHigh = true;
+      var zBtn = document.getElementById('ai-zindex-btn');
+      if (zBtn) zBtn.style.color = '#f0a840';
+    }
     AIAgentUI.updateRouterBar();
+    AIAgentUI.initDrag();
     setTimeout(function() {
       var input = document.getElementById('ai-input');
       if (input) input.focus();
-    }, 300);
+    }, 100);
   }
+};
+
+/* ── Мінімізація ── */
+AIAgentUI._minimized = false;
+AIAgentUI.minimize = function() {
+  var sidebar  = document.getElementById('ai-sidebar');
+  var minBtn   = document.getElementById('ai-minimize-btn');
+  if (!sidebar) return;
+
+  AIAgentUI._minimized = !AIAgentUI._minimized;
+
+  if (AIAgentUI._minimized) {
+    sidebar.style.height = '54px';
+    sidebar.style.overflow = 'hidden';
+    sidebar.style.resize = 'none';
+    if (minBtn) { minBtn.innerHTML = '🗖'; minBtn.title = 'Розгорнути'; }
+  } else {
+    sidebar.style.height = '85vh';
+    sidebar.style.overflow = 'hidden';
+    sidebar.style.resize = 'both';
+    if (minBtn) { minBtn.innerHTML = '🗕'; minBtn.title = 'Згорнути'; }
+  }
+};;;
+
+/* ── Z-index перемикач ── */
+AIAgentUI._zHigh = true;
+AIAgentUI.toggleZIndex = function() {
+  var sidebar = document.getElementById('ai-sidebar');
+  var btn     = document.getElementById('ai-zindex-btn');
+  if (!sidebar) return;
+  AIAgentUI._zHigh = !AIAgentUI._zHigh;
+  sidebar.style.zIndex = AIAgentUI._zHigh ? '999999' : '100';
+  if (btn) {
+    btn.style.color = AIAgentUI._zHigh ? '#f0a840' : '#4a6070';
+    btn.title = AIAgentUI._zHigh ? 'Відправити на задній план' : 'Підняти на передній план';
+  }
+};
+
+/* ── Drag ── */
+AIAgentUI.initDrag = function() {
+  var sidebar = document.getElementById('ai-sidebar');
+  var handle  = document.getElementById('ai-drag-handle');
+  if (!sidebar || !handle || handle._dragInit) return;
+  handle._dragInit = true;
+
+  var startX, startY, startLeft, startTop;
+
+  handle.addEventListener('mousedown', function(e) {
+    if (e.target.tagName === 'BUTTON') return;
+    e.preventDefault();
+    var rect   = sidebar.getBoundingClientRect();
+    startX     = e.clientX;
+    startY     = e.clientY;
+    startLeft  = rect.left;
+    startTop   = rect.top;
+
+    /* Переводимо з right в left */
+    sidebar.style.right  = 'auto';
+    sidebar.style.left   = startLeft + 'px';
+    sidebar.style.top    = startTop  + 'px';
+
+    function onMove(e) {
+      var dx = e.clientX - startX;
+      var dy = e.clientY - startY;
+      var newLeft = Math.max(0, Math.min(window.innerWidth  - sidebar.offsetWidth,  startLeft + dx));
+      var newTop  = Math.max(0, Math.min(window.innerHeight - sidebar.offsetHeight, startTop  + dy));
+      sidebar.style.left = newLeft + 'px';
+      sidebar.style.top  = newTop  + 'px';
+    }
+
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+      /* Зберігаємо позицію */
+      localStorage.setItem('ai-sidebar-pos', JSON.stringify({
+        left: sidebar.style.left,
+        top:  sidebar.style.top
+      }));
+    }
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+  });
+
+  /* Відновлюємо позицію */
+  try {
+    var pos = JSON.parse(localStorage.getItem('ai-sidebar-pos') || '{}');
+    if (pos.left && pos.top) {
+      sidebar.style.right = 'auto';
+      sidebar.style.left  = pos.left;
+      sidebar.style.top   = pos.top;
+    }
+  } catch(e) {}
 };
 
 /* ── Router bar ── */
@@ -513,9 +665,20 @@ AIAgentUI.executeCmd = function(encoded) {
 /* ── Копіювати команду ── */
 AIAgentUI.copyCmd = function(encoded) {
   var cmd = decodeURIComponent(atob(encoded));
-  navigator.clipboard.writeText(cmd).then(function() {
+  /* Electron fix — textarea fallback */
+  try {
+    var ta = document.createElement('textarea');
+    ta.value = cmd;
+    ta.style.cssText = 'position:fixed;top:-999px;left:-999px;';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    AIAgentUI.addMessage('system', '📋 Скопійовано: ' + cmd.substring(0,40) + '...');
+  } catch(e) {
+    navigator.clipboard.writeText(cmd).catch(function(){});
     AIAgentUI.addMessage('system', '📋 Скопійовано в буфер обміну');
-  });
+  }
 };
 
 /* ── Loading стан ── */
@@ -556,7 +719,55 @@ document.addEventListener('DOMContentLoaded', function() {
   setTimeout(function() {
     if (window.AIAgent) {
       AIAgentUI.init();
-      console.log('[AIAgentUI] Ready ✅');
+      
+AIAgentUI.runCmd = function(encoded) {
+  var cmd = decodeURIComponent(atob(encoded));
+  var cmds = window.AIExecutor ? AIExecutor.parseCommands(cmd) : [cmd];
+  if (cmds.length === 0) cmds = [cmd];
+  if (window.AIExecutor) {
+    AIExecutor.showConfirmModal('Виконати команди (' + cmds.length + ')', cmds, '');
+  }
+};
+console.log('[AIAgentUI] Ready ✅');
+
+      /* Слідкуємо за навігацією — кнопка і sidebar завжди видимі */
+      var observer = new MutationObserver(function() {
+        /* Кнопка */
+        var btn = document.getElementById('ai-toggle-btn');
+        if (!btn) {
+          AIAgentUI.createToggleBtn();
+          btn = document.getElementById('ai-toggle-btn');
+        }
+        if (btn) {
+          btn.style.cssText += ';z-index:9999999!important;display:flex!important;';
+        }
+        /* Sidebar */
+        var sb = document.getElementById('ai-sidebar');
+        if (!sb) {
+          AIAgentUI.createSidebar();
+          if (AIAgentUI.state.isOpen) {
+            var sb2 = document.getElementById('ai-sidebar');
+            if (sb2) sb2.classList.add('open');
+          }
+        } else if (AIAgentUI.state.isOpen) {
+          sb.style.cssText += ';z-index:999999!important;display:flex!important;';
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: false });
+
+      /* Інтервал — backup якщо observer не спрацював */
+      setInterval(function() {
+        var btn = document.getElementById('ai-toggle-btn');
+        if (!btn) {
+          AIAgentUI.createToggleBtn();
+        } else {
+          btn.style.zIndex = '9999999';
+        }
+        var sb = document.getElementById('ai-sidebar');
+        if (sb && AIAgentUI.state.isOpen) {
+          sb.style.zIndex = '999999';
+        }
+      }, 2000);
     }
   }, 1000);
 });

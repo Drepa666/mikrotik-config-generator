@@ -17,16 +17,28 @@ function nsEsc(s) {
 }
 
 function nsRestCall(path) {
-  var r = nsGetRouter();
-  if (!r) return Promise.reject('No router');
+  /* Використовуємо window.restCall з router-manager.js */
+  if (window.restCall && window.getActiveRouter) {
+    var r = window.getActiveRouter();
+    if (!r) return Promise.reject('No router');
+    return window.restCall(r, 'GET', path)
+      .then(function(d) { return Array.isArray(d) ? d : (d ? [d] : []); });
+  }
+  /* Fallback */
+  var r2 = window.getActiveRouter ? window.getActiveRouter() : null;
+  if (!r2) return Promise.reject('No router');
   return fetch('http://localhost:8888/rest' + path, {
     headers: {
-      'x-router-ip':   r.ip,
-      'x-router-port': String(r.port || 80),
-      'x-router-user': r.user || 'admin',
-      'x-router-pass': r.pass || '',
+      'x-router-ip':   r2.ip,
+      'x-router-port': String(r2.port || 80),
+      'x-router-user': r2.user || 'admin',
+      'x-router-pass': r2.pass || '',
+      'Authorization': 'Basic ' + btoa((r2.user||'admin') + ':' + (r2.pass||'')),
     }
-  }).then(function(res){ return res.json(); });
+  }).then(function(r) {
+    if (!r.ok) return [];
+    return r.json().then(function(d) { return Array.isArray(d) ? d : []; });
+  }).catch(function() { return []; });
 }
 
 function nsSSH(cmd) {
@@ -154,10 +166,11 @@ window.nsStartScan = function() {
     nsRestCall('/ip/neighbor').catch(function(){ return []; }),
     nsRestCall('/interface/wireless/registration-table').catch(function(){ return []; }),
   ]).then(function(results) {
-    var arpList      = results[0].value || [];
-    var dhcpList     = results[1].value || [];
-    var neighborList = results[2].value || [];
-    var wifiList     = results[3].value || [];
+    function safeList(r) { return (r && r.status==='fulfilled' && Array.isArray(r.value)) ? r.value : []; }
+    var arpList      = safeList(results[0]);
+    var dhcpList     = safeList(results[1]);
+    var neighborList = safeList(results[2]);
+    var wifiList     = safeList(results[3]);
     var devices = {};
 
     arpList.forEach(function(e) {

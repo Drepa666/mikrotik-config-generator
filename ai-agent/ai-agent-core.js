@@ -8,7 +8,7 @@ window.AIAgent = window.AIAgent || {};
 
 /* ── Конфігурація ── */
 AIAgent.config = {
-  model:       'llama3-70b-8192',
+  model:       '', /* Модель вказана в main.js — не чіпати! */
   maxTokens:   4000,
   temperature: 0.7,
   systemPrompt: `You are an expert MikroTik RouterOS engineer embedded in a router management app.
@@ -75,178 +75,115 @@ AIAgent.memory = {
 
 /* ── Збір контексту роутера ── */
 AIAgent.getRouterContext = function() {
-  var router = AIAgent.getRouter();
-  if (!router) return Promise.resolve('Роутер не підключений');
-
-  // Кеш на 30 секунд
-  if (AIAgent.memory.routerCache && Date.now() - AIAgent.memory.cacheTime < 120000) {
+  if (AIAgent.memory.routerCache &&
+      Date.now() - AIAgent.memory.cacheTime < 120000) {
     return Promise.resolve(AIAgent.memory.routerCache);
   }
-
-  var h = {
-    'x-router-ip':   router.ip,
-    'x-router-port': String(router.port || 80),
-    'x-router-user': router.user || 'admin',
-    'x-router-pass': router.pass || '',
-  };
+  var router = window.getActiveRouter ? window.getActiveRouter() : null;
+  if (!router) return Promise.resolve("Маршрутизатор не пiдключено.");
 
   var endpoints = [
-    '/system/identity',
-    '/system/resource',
-    '/system/routerboard',
-    '/ip/address',
-    '/interface',
-    '/ip/firewall/filter',
-    '/ip/firewall/nat',
-    '/ip/service',
-    '/ip/dhcp-server/lease',
-    '/interface/wireless/registration-table',
-    '/system/package',
+    "/system/identity",
+    "/system/resource",
+    "/ip/address",
+    "/interface",
+    "/ip/firewall/filter",
+    "/ip/firewall/nat",
+    "/ip/service",
+    "/ip/dhcp-server/lease",
   ];
 
   return Promise.allSettled(
     endpoints.map(function(ep) {
-      return fetch('http://localhost:8888/rest' + ep, { headers: h })
-        .then(function(r) { return r.json(); })
-        .then(function(data) { return { ep: ep, data: data }; })
-        .catch(function() { return { ep: ep, data: null }; });
+      return window.restCall(router, "GET", ep)
+        .then(function(d) {
+          return { ep: ep, data: Array.isArray(d) ? d : (d ? [d] : []) };
+        })
+        .catch(function() { return { ep: ep, data: [] }; });
     })
   ).then(function(results) {
     var ctx = {};
     results.forEach(function(r) {
-      if (r.value && r.value.data) ctx[r.value.ep] = r.value.data;
+      if (r.status === "fulfilled") ctx[r.value.ep] = r.value.data;
     });
 
-    var identity  = (ctx['/system/identity'] || {}).name || 'Unknown';
-    var resource  = ctx['/system/resource'] || {};
-    var board     = ctx['/system/routerboard'] || {};
-    var addresses = ctx['/ip/address'] || [];
-    var ifaces    = ctx['/interface'] || [];
-    var fwFilter  = ctx['/ip/firewall/filter'] || [];
-    var fwNat     = ctx['/ip/firewall/nat'] || [];
-    var routes    = ctx['/ip/route'] || [];
-    var services  = ctx['/ip/service'] || [];
-    var leases    = ctx['/ip/dhcp-server/lease'] || [];
-    var packages  = ctx['/system/package'] || [];
+    var lines = [];
+    var identity = (ctx["/system/identity"] || [])[0] || {};
+    var resource = (ctx["/system/resource"] || [])[0] || {};
+    lines.push("=== ROUTER ===");
+    lines.push("name: "    + (identity.name          || "?"));
+    lines.push("version: " + (resource.version       || "?"));
+    lines.push("cpu: "     + (resource["cpu-load"]   || "?") + "%");
+    lines.push("ram: "     + (resource["free-memory"]|| "?"));
 
-    var routerOS = '';
-    if (Array.isArray(packages)) {
-      var sysPkg = packages.find(function(p){ return p.name === 'routeros'; });
-      routerOS = sysPkg ? sysPkg.version : (resource.version || 'Unknown');
-    }
+    var ifaces = ctx["/interface"] || [];
+    lines.push("\n=== INTERFACES (" + ifaces.length + ") ===");
+    ifaces.forEach(function(i) {
+      lines.push(i.name + " type:" + (i.type||"?") +
+        " mac:" + (i["mac-address"]||"?") +
+        " run:" + (i.running||"false"));
+    });
 
-    var context = [
-      '=== РОУТЕР ===',
-      'Ім\'я: ' + identity,
-      'Модель: ' + (board['model'] || resource['board-name'] || 'Unknown'),
-      'RouterOS: ' + routerOS,
-      'CPU: ' + (resource['cpu'] || '?') + ' ' + (resource['cpu-load'] || '0') + '% load',
-      'RAM: ' + Math.round((resource['total-memory']||0)/1024/1024) + 'MB total, ' +
-               Math.round((resource['free-memory']||0)/1024/1024) + 'MB free',
-      'Uptime: ' + (resource['uptime'] || 'Unknown'),
-      'Architecture: ' + (resource['architecture-name'] || 'Unknown'),
-      '',
-      '=== ІНТЕРФЕЙСИ (' + ifaces.length + ') ===',
-    ].concat(
-      ifaces.slice(0,5).map(function(i) {
-        return (i['running']==='true'?'● ':'○ ') + i.name + ' [' + i.type + '] ' + (i['mac-address']||'');
-      })
-    ).concat([
-      '',
-      '=== IP АДРЕСИ (' + addresses.length + ') ===',
-    ]).concat(
-      addresses.map(function(a) { return a.address + ' on ' + a.interface; })
-    ).concat([
-      '',
-      '=== FIREWALL FILTER (' + fwFilter.length + ' правил) ===',
-    ]).concat(
-      fwFilter.slice(0,8).map(function(r, i) {
-        return i + ': chain=' + r.chain + ' action=' + r.action +
-          (r['src-address'] ? ' src=' + r['src-address'] : '') +
-          (r['dst-address'] ? ' dst=' + r['dst-address'] : '') +
-          (r['protocol'] ? ' proto=' + r['protocol'] : '') +
-          (r['dst-port'] ? ' dport=' + r['dst-port'] : '') +
-          (r['comment'] ? ' #' + r['comment'] : '');
-      })
-    ).concat([
-      '',
-      '=== СЕРВІСИ ===',
-    ]).concat(
-      services.map(function(s) {
-        return s.name + ':' + (s.port||'?') + ' ' + (s.disabled==='true'?'ВИМК':'УВІМК');
-      })
-    ).concat([
-      '',
-      '=== DHCP КЛІЄНТИ (' + leases.length + ') ===',
-    ]).concat(
-      leases.slice(0,5).map(function(l) {
-        return l.address + ' ' + (l['mac-address']||'') + ' ' + (l['host-name']||'') + ' [' + (l.status||'') + ']';
-      })
-    ).concat([
-      '',
-      '=== NAT (' + fwNat.length + ' правил) ===',
-    ]).concat(
-      fwNat.slice(0,5).map(function(r) {
-        return 'chain=' + r.chain + ' action=' + r.action +
-          (r['to-addresses'] ? ' to=' + r['to-addresses'] : '');
-      })
-    );
+    var addrs = ctx["/ip/address"] || [];
+    lines.push("\n=== IP ADDRESSES (" + addrs.length + ") ===");
+    addrs.forEach(function(a) {
+      lines.push(a.address + " iface:" + a.interface);
+    });
 
-    /* Додаємо WiFi клієнтів */
-    var wifiClients = ctx['/interface/wireless/registration-table'] || [];
-    if (wifiClients.length) {
-      context.push('');
-      context.push('=== WiFi КЛІЄНТИ (' + wifiClients.length + ') ===');
-      wifiClients.slice(0,10).forEach(function(w) {
-        context.push('MAC:' + (w['mac-address']||'') + ' iface:' + (w['interface']||'') + ' signal:' + (w['signal-strength']||''));
-      });
-    }
+    var fw = ctx["/ip/firewall/filter"] || [];
+    lines.push("\n=== FIREWALL (" + fw.length + ") ===");
+    fw.slice(0, 15).forEach(function(r, i) {
+      lines.push(i + ": chain=" + (r.chain||"?") +
+        " action=" + (r.action||"?") +
+        " comment=" + (r.comment||""));
+    });
 
-    /* Додаємо DHCP lease з IP ── щоб AI знав IP пристроїв */
-    var leases2 = ctx['/ip/dhcp-server/lease'] || [];
-    if (leases2.length) {
-      context.push('');
-      context.push('=== DHCP КЛІЄНТИ З IP (' + leases2.length + ') ===');
-      leases2.forEach(function(l) {
-        context.push(
-          'IP:' + (l['address']||'?') +
-          ' MAC:' + (l['mac-address']||'?') +
-          ' HOST:' + (l['host-name']||'?') +
-          ' STATUS:' + (l['status']||'?')
-        );
-      });
-    }
+    var leases = ctx["/ip/dhcp-server/lease"] || [];
+    lines.push("\n=== DHCP CLIENTS (" + leases.length + ") ===");
+    leases.forEach(function(l) {
+      lines.push("IP:" + (l.address||"?") +
+        " MAC:" + (l["mac-address"]||"?") +
+        " HOST:" + (l["host-name"]||"?") +
+        " STATUS:" + (l.status||"?"));
+    });
 
-    var contextStr = context.join('\n');
-    AIAgent.memory.routerCache = contextStr;
+    var svcs = ctx["/ip/service"] || [];
+    lines.push("\n=== SERVICES ===");
+    svcs.filter(function(s){ return s.disabled !== "true"; }).forEach(function(s) {
+      lines.push(s.name + " port:" + (s.port||"?"));
+    });
+
+    var nat = ctx["/ip/firewall/nat"] || [];
+    lines.push("\n=== NAT (" + nat.length + ") ===");
+    nat.slice(0, 10).forEach(function(r) {
+      lines.push("chain=" + (r.chain||"?") + " action=" + (r.action||"?"));
+    });
+
+    var str = lines.join("\n");
+    console.log("[AIAgent] Context OK:", lines.length, "lines");
+    AIAgent.memory.routerCache = str;
     AIAgent.memory.cacheTime   = Date.now();
-    return contextStr;
+    return str;
   });
-};
+};;;
 
 /* ── Отримати роутер ── */
 AIAgent.getRouter = function() {
-  try {
-    var routers  = JSON.parse(localStorage.getItem('rm-routers') || '[]');
-    var activeId = localStorage.getItem('rm-active-router');
-    return routers.find(function(r){ return r.id === activeId; }) || routers[0] || null;
-  } catch(e) { return null; }
-};
+  return window.getActiveRouter ? window.getActiveRouter() : null;
+};;;
 
 /* ── Виконати SSH команду ── */
 AIAgent.ssh = function(cmd) {
-  var router = AIAgent.getRouter();
-  if (!router) return Promise.reject('Немає підключеного роутера');
-  return fetch('http://localhost:8888/ssh/exec', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      host: router.ip, port: router.sshPort || 22,
-      username: router.user, password: router.pass,
-      command: cmd
-    })
-  }).then(function(r) { return r.json(); });
-};
+  var router = window.getActiveRouter ? window.getActiveRouter() : null;
+  if (!router) return Promise.reject('Немає роутера');
+  if (!window.sshCall) return Promise.reject('sshCall недоступний');
+  return window.sshCall(router, cmd)
+    .then(function(d) {
+      console.log('[AIAgent.ssh] raw result:', JSON.stringify(d).substring(0,200));
+      /* sshCall повертає {ok, output} або рядок */
+      return d;
+    });
+};;
 
 /* ── Головна функція: надіслати повідомлення ── */
 AIAgent.send = function(userMessage, options) {
@@ -262,13 +199,7 @@ AIAgent.send = function(userMessage, options) {
       }
 
       /* Додаємо інформацію про доступні інструменти */
-      var tools = AIAgent.tools ? AIAgent.tools.list() : [];
-      if (tools.length) {
-        systemContent += '\n\n=== ДОСТУПНІ ІНСТРУМЕНТИ ===\n';
-        tools.forEach(function(t) {
-          systemContent += t.icon + ' ' + t.name + ': ' + t.description + '\n';
-        });
-      }
+      /* Не передаємо tools в промпт — модель не підтримує tool_choice */
 
       AIAgent.memory.add('user', userMessage);
 

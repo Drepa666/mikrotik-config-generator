@@ -179,10 +179,18 @@ window.SwitchScanner = {
       var arpOnlyCount = SwitchScanner._devices.filter(function(d){
         return d.online && d.source === 'ARP';
       }).length;
+      var _total   = SwitchScanner._devices.length;
+      var _green   = SwitchScanner._devices.filter(function(d){
+        return d.online && d.source && 
+          (d.source.includes('DHCP')||d.source.includes('LLDP')||d.source.includes('WiFi'));
+      }).length;
+      var _yellow  = SwitchScanner._devices.filter(function(d){
+        return d.online && d.source === 'ARP';
+      }).length;
       SwitchScanner.setStatus(
-        'Знайдено: ' + SwitchScanner._devices.length +
-        ' | 🟢 ' + confirmedCount + ' онлайн' +
-        ' | 🟡 ' + arpOnlyCount + ' ARP',
+        'Всього: ' + _total +
+        '  🟢 ' + _green + ' онлайн' +
+        '  🟡 ' + _yellow + ' ARP only',
         '#5fd0a5'
       );
       SwitchScanner.renderTable(SwitchScanner._devices);
@@ -315,10 +323,13 @@ window.SwitchScanner = {
       var hasDHCP = d.source && d.source.includes('DHCP');
       var hasLLDP = d.source && d.source.includes('LLDP');
       var hasWiFi = d.source && d.source.includes('WiFi');
-      var dotColor = !d.online     ? '#e08080'  /* 🔴 офлайн */
-                   : (hasDHCP || hasLLDP || hasWiFi)
-                   ? '#5fd0a5'    /* 🟢 підтверджено онлайн */
-                   : '#f0a840';  /* 🟡 тільки ARP — можливо онлайн */
+      var hasDHCP  = d.source && (d.source.includes('DHCP') || d.source.includes('LLDP') || d.source.includes('WiFi'));
+      var dotColor = !d.online  ? '#e08080'
+                   : hasDHCP    ? '#5fd0a5'
+                   : '#f0a840';
+      var dotTitle = !d.online  ? 'Офлайн'
+                   : hasDHCP    ? 'Онлайн (підтверджено)'
+                   : 'ARP (нещодавно активний)'  /* 🟡 тільки ARP — можливо онлайн */
       var dotTitle = !d.online     ? 'Офлайн'
                    : (hasDHCP || hasLLDP || hasWiFi)
                    ? 'Онлайн (підтверджено)'
@@ -641,19 +652,20 @@ window.SwitchScanner = {
     SwitchScanner.setStatus('⏳ Сканування ' + subnet + '.0/24...', '#c084fc');
     SwitchScanner.clearTable();
 
-    /* Через backend — прямий ARP/ping scan */
-    fetch(SwitchScanner._PROXY + '/direct-scan', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        subnet:    subnet,
-        snmp:      snmpCommunity,
-        ports:     [80, 443, 22, 23, 161, 502, 8080, 8443],
-        timeout:   3000,
-      }),
-    })
-    .then(function(r) { return r.json(); })
+    /* Electron IPC — прямий ARP/ping scan */
+    var _ipc = window.electronAPI || (window.require && window.require('electron').ipcRenderer);
+    if (!_ipc || !_ipc.invoke) {
+      SwitchScanner.setStatus('❌ IPC недоступний', '#e08080');
+      SwitchScanner._scanning = false;
+      return;
+    }
+    _ipc.invoke('direct-scan', { subnet: subnet, timeout: 2000 })
     .then(function(data) {
+      if (data && data.ok === false) {
+        SwitchScanner.setStatus('❌ ' + (data.error||'Помилка сканування'), '#e08080');
+        SwitchScanner._scanning = false;
+        return;
+      }
       var devs = Array.isArray(data) ? data
                : Array.isArray(data.devices) ? data.devices : [];
 

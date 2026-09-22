@@ -409,3 +409,135 @@ ipcMain.handle('ai-request', async function(event, options) {
     }
   });
 });
+
+/* ══════════════════════════════════════════════════════
+   Direct Network Scan — ARP + Ping без роутера
+   ══════════════════════════════════════════════════════ */
+ipcMain.handle('direct-scan', async function(event, opts) {
+  var subnet  = (opts && opts.subnet)  || '192.168.1';
+  var timeout = (opts && opts.timeout) || 1500;
+
+  return new Promise(function(resolve) {
+    var devices = {};
+
+    /* ── Крок 1: системний ARP (-a) ── */
+    try {
+      var arpOut = execSync('arp -a', {timeout: 5000}).toString();
+      /*
+        Windows: Interface: 192.168.1.100 --- 0xe
+          Internet Address  Physical Address  Type
+          192.168.1.1       aa-bb-cc-dd-ee-ff dynamic
+        Linux/Mac: ? (192.168.1.1) at aa:bb:cc:dd:ee:ff [ether] on eth0
+      */
+      var lines = arpOut.split('\n');
+      lines.forEach(function(line) {
+        /* Windows формат */
+        var winMatch = line.match(
+          /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+([0-9a-fA-F]{2}[-:][0-9a-fA-F]{2}[-:][0-9a-fA-F]{2}[-:][0-9a-fA-F]{2}[-:][0-9a-fA-F]{2}[-:][0-9a-fA-F]{2})\s+(\w+)/
+        );
+        if (winMatch) {
+          var ip  = winMatch[1];
+          var mac = winMatch[2].toUpperCase().replace(/-/g, ':');
+          var typ = winMatch[3]; /* dynamic / static */
+          if (ip && mac && mac !== 'FF:FF:FF:FF:FF:FF' && !ip.endsWith('.255')) {
+            devices[ip] = {
+              ip:      ip,
+              mac:     mac,
+              online:  true,
+              source:  'ARP',
+              dynamic: typ === 'dynamic',
+            };
+          }
+        }
+        /* Linux/Mac формат */
+        var linMatch = line.match(
+          /\((\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\)\s+at\s+([0-9a-fA-F:]+)/
+        );
+        if (linMatch) {
+          var ip2  = linMatch[1];
+          var mac2 = linMatch[2].toUpperCase();
+          if (ip2 && mac2 && !ip2.endsWith('.255')) {
+            devices[ip2] = { ip: ip2, mac: mac2, online: true, source: 'ARP', dynamic: true };
+          }
+        }
+      });
+      console.log('[DirectScan] ARP знайдено:', Object.keys(devices).length);
+    } catch(e) {
+      console.error('[DirectScan] ARP помилка:', e.message);
+    }
+
+    /* ── Крок 2: Ping sweep — перевіряємо весь /24 ── */
+    var parts  = subnet.split('.');
+    if (parts.length >= 3) {
+      var base   = parts.slice(0, 3).join('.');
+      var total  = 0;
+      var done   = 0;
+      var TARGET = 254; /* .1 — .254 */
+
+      for (var i = 1; i <= TARGET; i++) {
+        (function(host) {
+          total++;
+          var ip = base + '.' + host;
+          var sock = new net.Socket();
+          var responded = false;
+
+          sock.setTimeout(timeout);
+          sock.on('connect', function() {
+            responded = true;
+            if (!devices[ip]) {
+              devices[ip] = { ip: ip, mac: '', online: true, source: 'Ping' };
+            } else {
+              devices[ip].online = true;
+            }
+            sock.destroy();
+          });
+          sock.on('error', function() {
+            /* Порт закритий але хост може існувати */
+            sock.destroy();
+          });
+          sock.on('timeout', function() { sock.destroy(); });
+          sock.on('close', function() {
+            done++;
+            if (done >= total) finalize();
+          });
+          /* Перевіряємо порт 80 */
+          sock.connect(80, ip);
+        })(i);
+      }
+
+      /* Якщо ping sweep завис — фіналізуємо через timeout+2s */
+      setTimeout(function() {
+        if (done < total) {
+          console.log('[DirectScan] Timeout, done:', done, '/', total);
+          finalize();
+        }
+      }, timeout + 2000);
+
+    } else {
+      finalize();
+    }
+
+    function finalize() {
+      var result = Object.values(devices).filter(function(d) {
+        return d.ip && !d.ip.endsWith('.0') && !d.ip.endsWith('.255');
+      });
+      /* Сортуємо по IP */
+      result.sort(function(a, b) {
+        var ao = a.ip.split('.').map(Number);
+        var bo = b.ip.split('.').map(Number);
+        for (var i = 0; i < 4; i++) if (ao[i] !== bo[i]) return ao[i] - bo[i];
+        return 0;
+      });
+      console.log('[DirectScan] Фінал:', result.length, 'пристроїв');
+      resolve({ ok: true, devices: result });
+    }
+  });
+});
+
+/* ── Direct Topology — будуємо топологію зі scan результатів ── */
+ipcMain.handle('direct-topology', async function(event, opts) {
+  /* Просто проксі до direct-scan + topology build на frontend */
+  return ipcMain.listeners && ipcMain._events['direct-scan']
+    ? await ipcMain.emit('direct-scan', null, opts)
+    : { ok: false, error: 'direct-scan not ready' };
+});

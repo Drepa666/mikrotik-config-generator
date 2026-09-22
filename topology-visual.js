@@ -75,6 +75,12 @@
     '<button id="topo-fit-btn" title="Вписати в екран" style="background:transparent;border:1px solid #2a3b48;color:#8ea3b0;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;">\u26F6 Fit</button>' +
     '<button id="topo-export-btn" title="Зберегти PNG" style="background:transparent;border:1px solid #2a3b48;color:#8ea3b0;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;">\uD83D\uDCF8 PNG</button>' +
     '<button id="topo-save-btn" title="Зберегти топологію" style="background:transparent;border:1px solid #5fd0a5;color:#5fd0a5;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;">\uD83D\uDCBE Зберегти</button>' +
+    '<button id="topo-switch-scan-btn"' +
+    ' title="Сканувати мережу напряму і побудувати топологію"' +
+    ' style="background:linear-gradient(135deg,#1a1a3a,#2a1a5a);' +
+    'border:1px solid #5a3a9a;color:#c084fc;padding:5px 10px;' +
+    'border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">' +
+    '🔌 Switch Scan</button>' +
     '<button id="topo-close" style="background:transparent;border:1px solid #2a3b48;color:#8ea3b0;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:12px;">\u2715</button>' +
     '</div></div>' +
 
@@ -1092,6 +1098,14 @@
   /* ════════════════════════════════════════
      ЗБЕРЕГТИ / ЗАВАНТАЖИТИ
   ════════════════════════════════════════ */
+  /* Switch Scan button */
+  var switchScanBtn = document.getElementById('topo-switch-scan-btn');
+  if (switchScanBtn) {
+    switchScanBtn.addEventListener('click', function() {
+      TopoVisual.runSwitchScan();
+    });
+  }
+
   document.getElementById('topo-save-btn').addEventListener('click', function() {
     var data = JSON.stringify({ nodes:nodes, edges:edges }, null, 2);
     try {
@@ -1212,4 +1226,252 @@
   }, 1000);
 
   console.log('[topology-visual] v1 ready');
+
+  /* ══ Switch Scan → Visual Topology ══ */
+  function runSwitchScan() {
+    /* Діалог вибору підмережі */
+    var subnet = prompt(
+      'Підмережа для сканування:\n' +
+      'Наприклад: 192.168.1 (сканує 192.168.1.1-254)\n' +
+      'Або 10.1.51 для вашої мережі',
+      '192.168.88'
+    );
+    if (!subnet) return;
+
+    /* Показуємо статус */
+    var statusEl = document.createElement('div');
+    statusEl.style.cssText = [
+      'position:fixed','bottom:60px','left:50%',
+      'transform:translateX(-50%)',
+      'background:#0d1117','border:1px solid #5a3a9a',
+      'border-radius:10px','padding:16px 24px',
+      'color:#c084fc','font-size:13px','font-weight:600',
+      'z-index:9999999','text-align:center',
+      'box-shadow:0 4px 20px rgba(0,0,0,.6)',
+    ].join(';');
+    statusEl.innerHTML =
+      '🔍 Сканування мережі ' + subnet + '.0/24...<br>' +
+      '<span style="color:#4a6070;font-size:11px;">' +
+        'ARP таблиця + ping sweep (до 30 сек)' +
+      '</span>';
+    document.body.appendChild(statusEl);
+
+    /* Викликаємо IPC */
+    var _ipc = window.electronAPI ||
+      (window.require && window.require('electron').ipcRenderer);
+
+    if (!_ipc || !_ipc.invoke) {
+      statusEl.innerHTML = '❌ Electron IPC недоступний';
+      statusEl.style.borderColor = '#e08080';
+      statusEl.style.color = '#e08080';
+      setTimeout(function(){ statusEl.remove(); }, 3000);
+      return;
+    }
+
+    _ipc.invoke('direct-scan', { subnet: subnet, timeout: 2000 })
+      .then(function(data) {
+        statusEl.remove();
+        if (!data || data.ok === false) {
+          alert('Помилка сканування: ' + (data && data.error));
+          return;
+        }
+        var devs = Array.isArray(data.devices) ? data.devices : [];
+        if (devs.length === 0) {
+          alert('Пристроїв не знайдено в підмережі ' + subnet + '.0/24');
+          return;
+        }
+        /* Додаємо vendor/type через OUILookup */
+        devs.forEach(function(d) {
+          if (window.OUILookup && d.mac) {
+            d.vendor   = OUILookup.lookup(d.mac);
+            var dt     = OUILookup.getDeviceType(d.vendor, [], d.hostname||'');
+            d.typeIcon = dt.icon;
+            d.devType  = dt.type;
+          } else {
+            d.vendor   = '';
+            d.typeIcon = '❓';
+            d.devType  = 'Unknown';
+          }
+        });
+        buildSwitchTopology(devs, subnet);
+      })
+      .catch(function(e) {
+        statusEl.remove();
+        alert('IPC помилка: ' + e);
+      });
+  }
+
+  /* ── Будуємо топологію зі scan результатів ── */
+  function buildSwitchTopology(devs, subnet) {
+    /* Очищаємо поточну топологію */
+    if (nodes.length > 0) {
+      if (!confirm('Поточна топологія буде замінена. Продовжити?')) return;
+    }
+    nodes = [];
+    links = [];
+
+    var W = 1200;
+    var H = 700;
+    var CX = W / 2;
+    var CY = H / 2;
+
+    /* ── Визначаємо шлюз (gateway) ── */
+    var gateway = devs.find(function(d) {
+      return d.ip && (d.ip.endsWith('.1') || d.ip.endsWith('.254'));
+    }) || devs[0];
+
+    if (!gateway) return;
+
+    /* ── Шлюз — центральний вузол ── */
+    var gwType = (gateway.devType||'').toLowerCase().includes('mikrotik')
+      ? 'router' : 'switch';
+    var gwNode = {
+      id:     'sw-gw',
+      x:      CX,
+      y:      CY - 200,
+      type:   gwType,
+      label:  gateway.vendor || gateway.ip,
+      ip:     gateway.ip,
+      mac:    gateway.mac,
+      vendor: gateway.vendor || '',
+      note:   gateway.typeIcon + ' Gateway | ' + gateway.ip,
+    };
+    nodes.push(gwNode);
+
+    /* ── Клієнти по колу навколо шлюзу ── */
+    var clients = devs.filter(function(d){ return d !== gateway; });
+
+    /* Групуємо по типу */
+    var switches = clients.filter(function(d) {
+      var t = (d.devType||'').toLowerCase();
+      return t.includes('switch') || t.includes('cisco') ||
+             t.includes('tp-link') || t.includes('ubiquiti');
+    });
+    var others = clients.filter(function(d) {
+      return !switches.includes(d);
+    });
+
+    /* Спочатку додаємо свічі */
+    switches.forEach(function(sw, i) {
+      var angle = (i / Math.max(switches.length, 1)) * Math.PI * 2;
+      var R = 250;
+      var swNode = {
+        id:     'sw-' + sw.ip.replace(/\./g,'_'),
+        x:      CX + R * Math.cos(angle),
+        y:      CY - 200 + R * Math.sin(angle) + 100,
+        type:   'switch',
+        label:  sw.vendor || sw.ip,
+        ip:     sw.ip,
+        mac:    sw.mac,
+        vendor: sw.vendor || '',
+        note:   sw.typeIcon + ' ' + sw.devType + ' | ' + sw.ip,
+      };
+      nodes.push(swNode);
+      links.push({
+        from: gwNode.id, to: swNode.id,
+        label: '', dashed: false,
+      });
+    });
+
+    /* Якщо немає свічів але є клієнти — ймовірно некерований свіч */
+    var hasInferred = false;
+    if (switches.length === 0 && others.length > 2) {
+      var infNode = {
+        id:     'sw-inferred',
+        x:      CX,
+        y:      CY,
+        type:   'switch',
+        label:  'Некерований Switch',
+        ip:     '',
+        mac:    '',
+        vendor: '',
+        note:   '⚠️ Автовизначено по кількості пристроїв',
+      };
+      nodes.push(infNode);
+      links.push({
+        from: gwNode.id, to: infNode.id,
+        label: '', dashed: true,
+      });
+      hasInferred = true;
+    }
+
+    /* Клієнти по колу */
+    var R2 = switches.length > 0 ? 350 : 280;
+    others.forEach(function(d, i) {
+      var angle = (i / Math.max(others.length, 1)) * Math.PI * 2 - Math.PI/2;
+      var devType = (d.devType||'Unknown').toLowerCase();
+      var nodeType = devType.includes('camera') ? 'device'
+                   : devType.includes('pc')     ? 'pc'
+                   : devType.includes('phone')  ? 'phone'
+                   : devType.includes('server') ? 'server'
+                   : devType.includes('ap')     ? 'ap'
+                   : 'device';
+
+      var devNode = {
+        id:     'dev-' + d.ip.replace(/\./g,'_'),
+        x:      CX + R2 * Math.cos(angle),
+        y:      CY + 100 + R2 * Math.sin(angle),
+        type:   nodeType,
+        label:  d.hostname || d.vendor || d.ip,
+        ip:     d.ip,
+        mac:    d.mac,
+        vendor: d.vendor || '',
+        note:   (d.typeIcon||'❓') + ' ' + (d.devType||'') + ' | ' + d.ip,
+      };
+      nodes.push(devNode);
+
+      /* Підключаємо до свіча або шлюзу */
+      var parentId = hasInferred
+        ? 'sw-inferred'
+        : (switches.length > 0
+          ? ('sw-' + switches[0].ip.replace(/\./g,'_'))
+          : gwNode.id);
+
+      links.push({ from: parentId, to: devNode.id, label: '', dashed: false });
+    });
+
+    /* Оновлюємо OUI онлайн для Unknown */
+    if (window.OUILookup && OUILookup.lookupOnline) {
+      nodes.filter(function(n){ return n.mac && !n.vendor; })
+           .forEach(function(n, i) {
+        setTimeout(function() {
+          OUILookup.lookupOnline(n.mac, function(v) {
+            if (v && v !== 'Unknown') {
+              n.vendor = v;
+              n.note = n.note.replace('❓', '');
+              redraw();
+            }
+          });
+        }, i * 600);
+      });
+    }
+
+    /* Рендеримо */
+    redraw();
+
+    /* Повідомлення */
+    var msg = document.createElement('div');
+    msg.style.cssText = [
+      'position:fixed','bottom:60px','left:50%',
+      'transform:translateX(-50%)',
+      'background:#0d1117','border:1px solid #5fd0a5',
+      'border-radius:10px','padding:14px 24px',
+      'color:#5fd0a5','font-size:13px','font-weight:600',
+      'z-index:9999999','text-align:center',
+    ].join(';');
+    msg.innerHTML =
+      '✅ Топологія побудована!<br>' +
+      '<span style="color:#4a6070;font-size:11px;">' +
+        nodes.length + ' вузлів, ' + links.length + ' зв'язків | ' +
+        'Підмережа: ' + subnet + '.0/24' +
+      '</span>';
+    document.body.appendChild(msg);
+    setTimeout(function(){ msg.remove(); }, 4000);
+  }
+
+  /* Публічний API */
+  window.TopoVisual = window.TopoVisual || {};
+  window.TopoVisual.runSwitchScan = runSwitchScan;
+  window.TopoVisual.buildSwitchTopology = buildSwitchTopology;
+
 })();

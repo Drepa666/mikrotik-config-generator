@@ -75,6 +75,7 @@
     '<button id="topo-fit-btn" title="Вписати в екран" style="background:transparent;border:1px solid #2a3b48;color:#8ea3b0;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;">\u26F6 Fit</button>' +
     '<button id="topo-export-btn" title="Зберегти PNG" style="background:transparent;border:1px solid #2a3b48;color:#8ea3b0;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;">\uD83D\uDCF8 PNG</button>' +
     '<button id="topo-save-btn" title="Зберегти топологію" style="background:transparent;border:1px solid #5fd0a5;color:#5fd0a5;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;">\uD83D\uDCBE Зберегти</button>' +
+    '<button id="topo-switch-scan-btn" style="background:linear-gradient(135deg,#1a1a3a,#2a1a5a);border:1px solid #5a3a9a;color:#c084fc;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">🔌 Switch Scan</button>' +
     '<button id="topo-switch-scan-btn"' +
     ' title="Сканувати мережу напряму і побудувати топологію"' +
     ' style="background:linear-gradient(135deg,#1a1a3a,#2a1a5a);' +
@@ -1106,6 +1107,9 @@
     });
   }
 
+  var _swScanBtn = document.getElementById('topo-switch-scan-btn');
+  if (_swScanBtn) _swScanBtn.addEventListener('click', runSwitchScan);
+
   document.getElementById('topo-save-btn').addEventListener('click', function() {
     var data = JSON.stringify({ nodes:nodes, edges:edges }, null, 2);
     try {
@@ -1474,4 +1478,180 @@
   window.TopoVisual.runSwitchScan = runSwitchScan;
   window.TopoVisual.buildSwitchTopology = buildSwitchTopology;
 
+
+  /* == Switch Scan -> Visual Topology == */
+  function runSwitchScan() {
+    var subnet = prompt(
+      'Subnet (e.g. 192.168.88 or 10.1.51):',
+      '192.168.88'
+    );
+    if (!subnet) return;
+
+    var statusEl = document.createElement('div');
+    statusEl.style.cssText = [
+      'position:fixed','bottom:60px','left:50%',
+      'transform:translateX(-50%)',
+      'background:#0d1117','border:1px solid #5a3a9a',
+      'border-radius:10px','padding:16px 24px',
+      'color:#c084fc','font-size:13px','font-weight:600',
+      'z-index:9999999','text-align:center',
+      'box-shadow:0 4px 20px rgba(0,0,0,.6)',
+    ].join(';');
+    statusEl.textContent = '🔍 Scanning ' + subnet + '.0/24...';
+    document.body.appendChild(statusEl);
+
+    var _ipc = window.electronAPI ||
+      (window.require && window.require('electron').ipcRenderer);
+
+    if (!_ipc || !_ipc.invoke) {
+      statusEl.textContent = '❌ Electron IPC not available';
+      statusEl.style.color = '#e08080';
+      setTimeout(function(){ statusEl.remove(); }, 3000);
+      return;
+    }
+
+    _ipc.invoke('direct-scan', { subnet: subnet, timeout: 2000 })
+      .then(function(data) {
+        statusEl.remove();
+        if (!data || data.ok === false) {
+          alert('Scan error: ' + (data && data.error || 'unknown'));
+          return;
+        }
+        var devs = Array.isArray(data.devices) ? data.devices : [];
+        if (devs.length === 0) {
+          alert('No devices found in ' + subnet + '.0/24');
+          return;
+        }
+        devs.forEach(function(d) {
+          if (window.OUILookup && d.mac) {
+            d.vendor  = OUILookup.lookup(d.mac);
+            var dt    = OUILookup.getDeviceType(d.vendor, [], d.hostname || '');
+            d.typeIcon = dt.icon;
+            d.devType  = dt.type;
+          } else {
+            d.vendor = ''; d.typeIcon = '?'; d.devType = 'Unknown';
+          }
+        });
+        buildSwitchTopology(devs, subnet);
+      })
+      .catch(function(e) {
+        statusEl.remove();
+        alert('IPC error: ' + e);
+      });
+  }
+
+  function buildSwitchTopology(devs, subnet) {
+    if (nodes.length > 0) {
+      if (!confirm('Replace current topology with scan results?')) return;
+    }
+    nodes = []; links = [];
+
+    var CX = 600; var CY = 400;
+
+    /* Gateway */
+    var gw = devs.find(function(d) {
+      return d.ip && (d.ip.endsWith('.1') || d.ip.endsWith('.254'));
+    }) || devs[0];
+    if (!gw) return;
+
+    var gwNode = {
+      id: 'gw', x: CX, y: 150,
+      type: 'switch',
+      label: gw.vendor || gw.ip,
+      ip: gw.ip, mac: gw.mac, vendor: gw.vendor || '',
+      note: (gw.typeIcon || '') + ' ' + gw.ip,
+    };
+    nodes.push(gwNode);
+
+    /* Switches */
+    var switches = devs.filter(function(d) {
+      if (d === gw) return false;
+      var t = (d.devType || '').toLowerCase();
+      return t.includes('switch') || t.includes('cisco') || t.includes('tp-link');
+    });
+
+    switches.forEach(function(sw, i) {
+      var angle = (i / Math.max(switches.length, 1)) * Math.PI * 2;
+      var swNode = {
+        id: 'sw_' + i, x: CX + 250 * Math.cos(angle), y: CY + 250 * Math.sin(angle),
+        type: 'switch', label: sw.vendor || sw.ip,
+        ip: sw.ip, mac: sw.mac, vendor: sw.vendor || '',
+        note: (sw.typeIcon || '') + ' ' + sw.ip,
+      };
+      nodes.push(swNode);
+      links.push({ from: 'gw', to: swNode.id, label: '', dashed: false });
+    });
+
+    /* Inferred switch */
+    var others = devs.filter(function(d){ return d !== gw && !switches.includes(d); });
+    var parentId = 'gw';
+    if (switches.length === 0 && others.length > 2) {
+      nodes.push({
+        id: 'sw_inf', x: CX, y: CY,
+        type: 'switch', label: 'Unmanaged Switch',
+        ip: '', mac: '', vendor: '',
+        note: 'Auto-detected',
+      });
+      links.push({ from: 'gw', to: 'sw_inf', label: '', dashed: true });
+      parentId = 'sw_inf';
+    } else if (switches.length > 0) {
+      parentId = 'sw_0';
+    }
+
+    /* Clients */
+    var R = 320;
+    others.forEach(function(d, i) {
+      var angle = (i / Math.max(others.length, 1)) * Math.PI * 2 - Math.PI / 2;
+      var t = (d.devType || '').toLowerCase();
+      var ntype = t.includes('camera') ? 'device'
+                : t.includes('pc')     ? 'pc'
+                : t.includes('phone')  ? 'phone'
+                : t.includes('server') ? 'server'
+                : 'device';
+      var devNode = {
+        id: 'dev_' + i,
+        x: CX + R * Math.cos(angle),
+        y: CY + 120 + R * Math.sin(angle),
+        type: ntype,
+        label: d.hostname || d.vendor || d.ip,
+        ip: d.ip, mac: d.mac, vendor: d.vendor || '',
+        note: (d.typeIcon || '?') + ' ' + (d.devType || '') + ' | ' + d.ip,
+      };
+      nodes.push(devNode);
+      links.push({ from: parentId, to: devNode.id, label: '', dashed: false });
+    });
+
+    /* Online OUI lookup */
+    if (window.OUILookup && OUILookup.lookupOnline) {
+      nodes.filter(function(n){ return n.mac && !n.vendor; })
+           .forEach(function(n, i) {
+        setTimeout(function() {
+          OUILookup.lookupOnline(n.mac, function(v) {
+            if (v && v !== 'Unknown') { n.vendor = v; redraw(); }
+          });
+        }, i * 600);
+      });
+    }
+
+    redraw();
+
+    /* Success message */
+    var msg = document.createElement('div');
+    msg.style.cssText = [
+      'position:fixed','bottom:60px','left:50%',
+      'transform:translateX(-50%)',
+      'background:#0d1117','border:1px solid #5fd0a5',
+      'border-radius:10px','padding:14px 24px',
+      'color:#5fd0a5','font-size:13px','font-weight:600',
+      'z-index:9999999','text-align:center',
+    ].join(';');
+    msg.textContent = '✅ Topology built: ' + nodes.length +
+      ' nodes, ' + links.length + ' links | ' + subnet + '.0/24';
+    document.body.appendChild(msg);
+    setTimeout(function(){ msg.remove(); }, 4000);
+  }
+
+  window.TopoVisual = window.TopoVisual || {};
+  window.TopoVisual.runSwitchScan       = runSwitchScan;
+  window.TopoVisual.buildSwitchTopology = buildSwitchTopology;
 })();

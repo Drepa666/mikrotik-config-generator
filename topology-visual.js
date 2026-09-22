@@ -75,13 +75,7 @@
     '<button id="topo-fit-btn" title="Вписати в екран" style="background:transparent;border:1px solid #2a3b48;color:#8ea3b0;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;">\u26F6 Fit</button>' +
     '<button id="topo-export-btn" title="Зберегти PNG" style="background:transparent;border:1px solid #2a3b48;color:#8ea3b0;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;">\uD83D\uDCF8 PNG</button>' +
     '<button id="topo-save-btn" title="Зберегти топологію" style="background:transparent;border:1px solid #5fd0a5;color:#5fd0a5;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;">\uD83D\uDCBE Зберегти</button>' +
-    '<button id="topo-switch-scan-btn" style="background:linear-gradient(135deg,#1a1a3a,#2a1a5a);border:1px solid #5a3a9a;color:#c084fc;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">🔌 Switch Scan</button>' +
-    '<button id="topo-switch-scan-btn"' +
-    ' title="Сканувати мережу напряму і побудувати топологію"' +
-    ' style="background:linear-gradient(135deg,#1a1a3a,#2a1a5a);' +
-    'border:1px solid #5a3a9a;color:#c084fc;padding:5px 10px;' +
-    'border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">' +
-    '🔌 Switch Scan</button>' +
+    '<button id="topo-switch-scan-btn" title="Scan network and build topology" style="background:linear-gradient(135deg,#1a1a3a,#2a1a5a);border:1px solid #5a3a9a;color:#c084fc;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;margin-left:4px;">🔌 Switch Scan</button>' +
     '<button id="topo-close" style="background:transparent;border:1px solid #2a3b48;color:#8ea3b0;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:12px;">\u2715</button>' +
     '</div></div>' +
 
@@ -1099,17 +1093,6 @@
   /* ════════════════════════════════════════
      ЗБЕРЕГТИ / ЗАВАНТАЖИТИ
   ════════════════════════════════════════ */
-  /* Switch Scan button */
-  var switchScanBtn = document.getElementById('topo-switch-scan-btn');
-  if (switchScanBtn) {
-    switchScanBtn.addEventListener('click', function() {
-      TopoVisual.runSwitchScan();
-    });
-  }
-
-  var _swScanBtn = document.getElementById('topo-switch-scan-btn');
-  if (_swScanBtn) _swScanBtn.addEventListener('click', runSwitchScan);
-
   document.getElementById('topo-save-btn').addEventListener('click', function() {
     var data = JSON.stringify({ nodes:nodes, edges:edges }, null, 2);
     try {
@@ -1231,288 +1214,35 @@
 
   console.log('[topology-visual] v1 ready');
 
-  /* ══ Switch Scan → Visual Topology ══ */
-  function runSwitchScan() {
-    /* Діалог вибору підмережі */
-    var subnet = prompt(
-      'Підмережа для сканування:\n' +
-      'Наприклад: 192.168.1 (сканує 192.168.1.1-254)\n' +
-      'Або 10.1.51 для вашої мережі',
-      '192.168.88'
-    );
-    if (!subnet) return;
-
-    /* Показуємо статус */
-    var statusEl = document.createElement('div');
-    statusEl.style.cssText = [
-      'position:fixed','bottom:60px','left:50%',
-      'transform:translateX(-50%)',
-      'background:#0d1117','border:1px solid #5a3a9a',
-      'border-radius:10px','padding:16px 24px',
-      'color:#c084fc','font-size:13px','font-weight:600',
-      'z-index:9999999','text-align:center',
-      'box-shadow:0 4px 20px rgba(0,0,0,.6)',
-    ].join(';');
-    statusEl.innerHTML =
-      '🔍 Сканування мережі ' + subnet + '.0/24...<br>' +
-      '<span style="color:#4a6070;font-size:11px;">' +
-        'ARP таблиця + ping sweep (до 30 сек)' +
-      '</span>';
-    document.body.appendChild(statusEl);
-
-    /* Викликаємо IPC */
-    var _ipc = window.electronAPI ||
-      (window.require && window.require('electron').ipcRenderer);
-
-    if (!_ipc || !_ipc.invoke) {
-      statusEl.innerHTML = '❌ Electron IPC недоступний';
-      statusEl.style.borderColor = '#e08080';
-      statusEl.style.color = '#e08080';
-      setTimeout(function(){ statusEl.remove(); }, 3000);
-      return;
-    }
-
-    _ipc.invoke('direct-scan', { subnet: subnet, timeout: 2000 })
-      .then(function(data) {
-        statusEl.remove();
-        if (!data || data.ok === false) {
-          alert('Помилка сканування: ' + (data && data.error));
-          return;
-        }
-        var devs = Array.isArray(data.devices) ? data.devices : [];
-        if (devs.length === 0) {
-          alert('Пристроїв не знайдено в підмережі ' + subnet + '.0/24');
-          return;
-        }
-        /* Додаємо vendor/type через OUILookup */
-        devs.forEach(function(d) {
-          if (window.OUILookup && d.mac) {
-            d.vendor   = OUILookup.lookup(d.mac);
-            var dt     = OUILookup.getDeviceType(d.vendor, [], d.hostname||'');
-            d.typeIcon = dt.icon;
-            d.devType  = dt.type;
-          } else {
-            d.vendor   = '';
-            d.typeIcon = '❓';
-            d.devType  = 'Unknown';
-          }
-        });
-        buildSwitchTopology(devs, subnet);
-      })
-      .catch(function(e) {
-        statusEl.remove();
-        alert('IPC помилка: ' + e);
-      });
-  }
-
-  /* ── Будуємо топологію зі scan результатів ── */
-  function buildSwitchTopology(devs, subnet) {
-    /* Очищаємо поточну топологію */
-    if (nodes.length > 0) {
-      if (!confirm('Поточна топологія буде замінена. Продовжити?')) return;
-    }
-    nodes = [];
-    links = [];
-
-    var W = 1200;
-    var H = 700;
-    var CX = W / 2;
-    var CY = H / 2;
-
-    /* ── Визначаємо шлюз (gateway) ── */
-    var gateway = devs.find(function(d) {
-      return d.ip && (d.ip.endsWith('.1') || d.ip.endsWith('.254'));
-    }) || devs[0];
-
-    if (!gateway) return;
-
-    /* ── Шлюз — центральний вузол ── */
-    var gwType = (gateway.devType||'').toLowerCase().includes('mikrotik')
-      ? 'router' : 'switch';
-    var gwNode = {
-      id:     'sw-gw',
-      x:      CX,
-      y:      CY - 200,
-      type:   gwType,
-      label:  gateway.vendor || gateway.ip,
-      ip:     gateway.ip,
-      mac:    gateway.mac,
-      vendor: gateway.vendor || '',
-      note:   gateway.typeIcon + ' Gateway | ' + gateway.ip,
-    };
-    nodes.push(gwNode);
-
-    /* ── Клієнти по колу навколо шлюзу ── */
-    var clients = devs.filter(function(d){ return d !== gateway; });
-
-    /* Групуємо по типу */
-    var switches = clients.filter(function(d) {
-      var t = (d.devType||'').toLowerCase();
-      return t.includes('switch') || t.includes('cisco') ||
-             t.includes('tp-link') || t.includes('ubiquiti');
-    });
-    var others = clients.filter(function(d) {
-      return !switches.includes(d);
-    });
-
-    /* Спочатку додаємо свічі */
-    switches.forEach(function(sw, i) {
-      var angle = (i / Math.max(switches.length, 1)) * Math.PI * 2;
-      var R = 250;
-      var swNode = {
-        id:     'sw-' + sw.ip.replace(/\./g,'_'),
-        x:      CX + R * Math.cos(angle),
-        y:      CY - 200 + R * Math.sin(angle) + 100,
-        type:   'switch',
-        label:  sw.vendor || sw.ip,
-        ip:     sw.ip,
-        mac:    sw.mac,
-        vendor: sw.vendor || '',
-        note:   sw.typeIcon + ' ' + sw.devType + ' | ' + sw.ip,
-      };
-      nodes.push(swNode);
-      links.push({
-        from: gwNode.id, to: swNode.id,
-        label: '', dashed: false,
-      });
-    });
-
-    /* Якщо немає свічів але є клієнти — ймовірно некерований свіч */
-    var hasInferred = false;
-    if (switches.length === 0 && others.length > 2) {
-      var infNode = {
-        id:     'sw-inferred',
-        x:      CX,
-        y:      CY,
-        type:   'switch',
-        label:  'Некерований Switch',
-        ip:     '',
-        mac:    '',
-        vendor: '',
-        note:   '⚠️ Автовизначено по кількості пристроїв',
-      };
-      nodes.push(infNode);
-      links.push({
-        from: gwNode.id, to: infNode.id,
-        label: '', dashed: true,
-      });
-      hasInferred = true;
-    }
-
-    /* Клієнти по колу */
-    var R2 = switches.length > 0 ? 350 : 280;
-    others.forEach(function(d, i) {
-      var angle = (i / Math.max(others.length, 1)) * Math.PI * 2 - Math.PI/2;
-      var devType = (d.devType||'Unknown').toLowerCase();
-      var nodeType = devType.includes('camera') ? 'device'
-                   : devType.includes('pc')     ? 'pc'
-                   : devType.includes('phone')  ? 'phone'
-                   : devType.includes('server') ? 'server'
-                   : devType.includes('ap')     ? 'ap'
-                   : 'device';
-
-      var devNode = {
-        id:     'dev-' + d.ip.replace(/\./g,'_'),
-        x:      CX + R2 * Math.cos(angle),
-        y:      CY + 100 + R2 * Math.sin(angle),
-        type:   nodeType,
-        label:  d.hostname || d.vendor || d.ip,
-        ip:     d.ip,
-        mac:    d.mac,
-        vendor: d.vendor || '',
-        note:   (d.typeIcon||'❓') + ' ' + (d.devType||'') + ' | ' + d.ip,
-      };
-      nodes.push(devNode);
-
-      /* Підключаємо до свіча або шлюзу */
-      var parentId = hasInferred
-        ? 'sw-inferred'
-        : (switches.length > 0
-          ? ('sw-' + switches[0].ip.replace(/\./g,'_'))
-          : gwNode.id);
-
-      links.push({ from: parentId, to: devNode.id, label: '', dashed: false });
-    });
-
-    /* Оновлюємо OUI онлайн для Unknown */
-    if (window.OUILookup && OUILookup.lookupOnline) {
-      nodes.filter(function(n){ return n.mac && !n.vendor; })
-           .forEach(function(n, i) {
-        setTimeout(function() {
-          OUILookup.lookupOnline(n.mac, function(v) {
-            if (v && v !== 'Unknown') {
-              n.vendor = v;
-              n.note = n.note.replace('❓', '');
-              redraw();
-            }
-          });
-        }, i * 600);
-      });
-    }
-
-    /* Рендеримо */
-    redraw();
-
-    /* Повідомлення */
-    var msg = document.createElement('div');
-    msg.style.cssText = [
-      'position:fixed','bottom:60px','left:50%',
-      'transform:translateX(-50%)',
-      'background:#0d1117','border:1px solid #5fd0a5',
-      'border-radius:10px','padding:14px 24px',
-      'color:#5fd0a5','font-size:13px','font-weight:600',
-      'z-index:9999999','text-align:center',
-    ].join(';');
-    msg.innerHTML =
-      '✅ Топологія побудована!<br>' +
-      '<span style="color:#4a6070;font-size:11px;">' +
-        nodes.length + ' вузлів, ' + links.length + ' зв'язків | ' +
-        'Підмережа: ' + subnet + '.0/24' +
-      '</span>';
-    document.body.appendChild(msg);
-    setTimeout(function(){ msg.remove(); }, 4000);
-  }
-
-  /* Публічний API */
-  window.TopoVisual = window.TopoVisual || {};
-  window.TopoVisual.runSwitchScan = runSwitchScan;
-  window.TopoVisual.buildSwitchTopology = buildSwitchTopology;
-
-
   /* == Switch Scan -> Visual Topology == */
   function runSwitchScan() {
-    var subnet = prompt(
-      'Subnet (e.g. 192.168.88 or 10.1.51):',
-      '192.168.88'
-    );
-    if (!subnet) return;
+    var subnet = prompt('Subnet to scan (e.g. 192.168.88 or 10.1.51):', '192.168.88');
+    if (!subnet || !subnet.trim()) return;
+    subnet = subnet.trim();
 
-    var statusEl = document.createElement('div');
-    statusEl.style.cssText = [
-      'position:fixed','bottom:60px','left:50%',
-      'transform:translateX(-50%)',
-      'background:#0d1117','border:1px solid #5a3a9a',
-      'border-radius:10px','padding:16px 24px',
-      'color:#c084fc','font-size:13px','font-weight:600',
-      'z-index:9999999','text-align:center',
-      'box-shadow:0 4px 20px rgba(0,0,0,.6)',
-    ].join(';');
-    statusEl.textContent = '🔍 Scanning ' + subnet + '.0/24...';
-    document.body.appendChild(statusEl);
+    var st = document.createElement('div');
+    st.id = 'sw-scan-status';
+    st.style.cssText = 'position:fixed;bottom:60px;left:50%;transform:translateX(-50%);'
+      + 'background:#0d1117;border:2px solid #5a3a9a;border-radius:10px;'
+      + 'padding:16px 28px;color:#c084fc;font-size:13px;font-weight:700;'
+      + 'z-index:9999999;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.7);';
+    st.innerHTML = '🔍 Scanning ' + subnet + '.0/24...<br>'
+      + '<span style="color:#4a6070;font-size:11px;">ARP + ping sweep</span>';
+    document.body.appendChild(st);
 
-    var _ipc = window.electronAPI ||
-      (window.require && window.require('electron').ipcRenderer);
+    var _ipc = window.electronAPI
+      || (window.require && window.require('electron').ipcRenderer);
 
     if (!_ipc || !_ipc.invoke) {
-      statusEl.textContent = '❌ Electron IPC not available';
-      statusEl.style.color = '#e08080';
-      setTimeout(function(){ statusEl.remove(); }, 3000);
+      st.textContent = '❌ IPC not available';
+      st.style.borderColor = '#e08080';
+      setTimeout(function(){ st.remove(); }, 3000);
       return;
     }
 
     _ipc.invoke('direct-scan', { subnet: subnet, timeout: 2000 })
       .then(function(data) {
-        statusEl.remove();
+        st.remove();
         if (!data || data.ok === false) {
           alert('Scan error: ' + (data && data.error || 'unknown'));
           return;
@@ -1522,10 +1252,11 @@
           alert('No devices found in ' + subnet + '.0/24');
           return;
         }
+        /* Vendor lookup */
         devs.forEach(function(d) {
           if (window.OUILookup && d.mac) {
-            d.vendor  = OUILookup.lookup(d.mac);
-            var dt    = OUILookup.getDeviceType(d.vendor, [], d.hostname || '');
+            d.vendor   = OUILookup.lookup(d.mac);
+            var dt     = OUILookup.getDeviceType(d.vendor, [], d.hostname || '');
             d.typeIcon = dt.icon;
             d.devType  = dt.type;
           } else {
@@ -1535,55 +1266,67 @@
         buildSwitchTopology(devs, subnet);
       })
       .catch(function(e) {
-        statusEl.remove();
+        st.remove();
         alert('IPC error: ' + e);
       });
   }
 
   function buildSwitchTopology(devs, subnet) {
     if (nodes.length > 0) {
-      if (!confirm('Replace current topology with scan results?')) return;
+      if (!confirm('Replace current topology?')) return;
     }
     nodes = []; links = [];
 
-    var CX = 600; var CY = 400;
+    var CX = 600; var CY = 420;
 
-    /* Gateway */
+    /* Gateway — .1 or .254 */
     var gw = devs.find(function(d) {
       return d.ip && (d.ip.endsWith('.1') || d.ip.endsWith('.254'));
     }) || devs[0];
-    if (!gw) return;
+    if (!gw) { alert('Cannot detect gateway'); return; }
 
-    var gwNode = {
-      id: 'gw', x: CX, y: 150,
-      type: 'switch',
+    var gwType = (gw.devType || '').toLowerCase().includes('router')
+      ? 'router' : 'switch';
+
+    nodes.push({
+      id: 'gw', x: CX, y: 140, type: gwType,
       label: gw.vendor || gw.ip,
-      ip: gw.ip, mac: gw.mac, vendor: gw.vendor || '',
-      note: (gw.typeIcon || '') + ' ' + gw.ip,
-    };
-    nodes.push(gwNode);
+      ip: gw.ip, mac: gw.mac || '',
+      vendor: gw.vendor || '',
+      note: (gw.typeIcon || '') + ' ' + gw.ip
+        + (gw.mac ? ' | ' + gw.mac : ''),
+    });
 
-    /* Switches */
+    /* Managed switches */
     var switches = devs.filter(function(d) {
       if (d === gw) return false;
       var t = (d.devType || '').toLowerCase();
-      return t.includes('switch') || t.includes('cisco') || t.includes('tp-link');
+      return t.includes('switch') || t.includes('cisco')
+          || t.includes('tp-link') || t.includes('ubiquiti');
     });
 
     switches.forEach(function(sw, i) {
       var angle = (i / Math.max(switches.length, 1)) * Math.PI * 2;
       var swNode = {
-        id: 'sw_' + i, x: CX + 250 * Math.cos(angle), y: CY + 250 * Math.sin(angle),
-        type: 'switch', label: sw.vendor || sw.ip,
-        ip: sw.ip, mac: sw.mac, vendor: sw.vendor || '',
+        id: 'sw_' + i,
+        x: CX + 260 * Math.cos(angle),
+        y: CY + 260 * Math.sin(angle),
+        type: 'switch',
+        label: sw.vendor || sw.ip,
+        ip: sw.ip, mac: sw.mac || '',
+        vendor: sw.vendor || '',
         note: (sw.typeIcon || '') + ' ' + sw.ip,
       };
       nodes.push(swNode);
       links.push({ from: 'gw', to: swNode.id, label: '', dashed: false });
     });
 
-    /* Inferred switch */
-    var others = devs.filter(function(d){ return d !== gw && !switches.includes(d); });
+    /* Other devices */
+    var others = devs.filter(function(d) {
+      return d !== gw && switches.indexOf(d) < 0;
+    });
+
+    /* If no switches found — add inferred unmanaged switch */
     var parentId = 'gw';
     if (switches.length === 0 && others.length > 2) {
       nodes.push({
@@ -1598,30 +1341,30 @@
       parentId = 'sw_0';
     }
 
-    /* Clients */
-    var R = 320;
+    var R = 330;
     others.forEach(function(d, i) {
       var angle = (i / Math.max(others.length, 1)) * Math.PI * 2 - Math.PI / 2;
       var t = (d.devType || '').toLowerCase();
       var ntype = t.includes('camera') ? 'device'
-                : t.includes('pc')     ? 'pc'
                 : t.includes('phone')  ? 'phone'
                 : t.includes('server') ? 'server'
-                : 'device';
-      var devNode = {
+                : t.includes('ap')     ? 'ap'
+                : 'pc';
+      nodes.push({
         id: 'dev_' + i,
         x: CX + R * Math.cos(angle),
-        y: CY + 120 + R * Math.sin(angle),
+        y: CY + 130 + R * Math.sin(angle),
         type: ntype,
         label: d.hostname || d.vendor || d.ip,
-        ip: d.ip, mac: d.mac, vendor: d.vendor || '',
-        note: (d.typeIcon || '?') + ' ' + (d.devType || '') + ' | ' + d.ip,
-      };
-      nodes.push(devNode);
-      links.push({ from: parentId, to: devNode.id, label: '', dashed: false });
+        ip: d.ip, mac: d.mac || '',
+        vendor: d.vendor || '',
+        note: (d.typeIcon || '?') + ' ' + (d.devType || '') + ' | ' + d.ip
+          + (d.mac ? ' | ' + d.mac : ''),
+      });
+      links.push({ from: parentId, to: 'dev_' + i, label: '', dashed: false });
     });
 
-    /* Online OUI lookup */
+    /* Online OUI for unknowns */
     if (window.OUILookup && OUILookup.lookupOnline) {
       nodes.filter(function(n){ return n.mac && !n.vendor; })
            .forEach(function(n, i) {
@@ -1635,18 +1378,14 @@
 
     redraw();
 
-    /* Success message */
+    /* Success toast */
     var msg = document.createElement('div');
-    msg.style.cssText = [
-      'position:fixed','bottom:60px','left:50%',
-      'transform:translateX(-50%)',
-      'background:#0d1117','border:1px solid #5fd0a5',
-      'border-radius:10px','padding:14px 24px',
-      'color:#5fd0a5','font-size:13px','font-weight:600',
-      'z-index:9999999','text-align:center',
-    ].join(';');
-    msg.textContent = '✅ Topology built: ' + nodes.length +
-      ' nodes, ' + links.length + ' links | ' + subnet + '.0/24';
+    msg.style.cssText = 'position:fixed;bottom:60px;left:50%;transform:translateX(-50%);'
+      + 'background:#0d1117;border:2px solid #5fd0a5;border-radius:10px;'
+      + 'padding:14px 28px;color:#5fd0a5;font-size:13px;font-weight:700;'
+      + 'z-index:9999999;text-align:center;';
+    msg.textContent = '✅ Topology: ' + nodes.length + ' nodes, '
+      + links.length + ' links | ' + subnet + '.0/24';
     document.body.appendChild(msg);
     setTimeout(function(){ msg.remove(); }, 4000);
   }

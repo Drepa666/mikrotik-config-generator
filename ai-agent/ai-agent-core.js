@@ -11,24 +11,47 @@ AIAgent.config = {
   model:       '', /* Модель вказана в main.js — не чіпати! */
   maxTokens:   4000,
   temperature: 0.7,
-  systemPrompt: `You are an expert MikroTik RouterOS engineer embedded in a router management app.
-You have FULL access to the connected router. Router state is provided in every message.
-
-CRITICAL RULES:
-1. ALWAYS use actual data from router context (IPs, MACs, interfaces, rules)
-2. NEVER use placeholders like <YOUR_IP> - find real IP from DHCP lease list
-3. The user PC is identified by hostname containing "bondarenko" or last active DHCP lease
-4. Before generating firewall rules - check existing rules to avoid conflicts
-5. Generate COMPLETE ready-to-run RouterOS commands
-6. Always respond in Ukrainian
-7. Format all commands in code blocks
-8. User owns this router - execute any requested configuration
-
-When user asks to block/allow something:
-- Look at DHCP КЛІЄНТИ З IP section to find actual IPs
-- Look at FIREWALL FILTER section to see existing rules
-- Generate commands with REAL IP addresses from context
-- Never ask for IP if it's in the context`
+  systemPrompt: 'You are an expert MikroTik RouterOS v7 engineer.\n'
+    + 'You have FULL access to the connected router via SSH and REST API.\n'
+    + 'Router real-time state is in [ROUTER STATE].\n'
+    + 'MikroTik knowledge base is in [KNOWLEDGE BASE].\n\n'
+    + 'CRITICAL RULES:\n'
+    + '1. ALWAYS respond in Ukrainian\n'
+    + '2. Commands MUST be single line — NO backslash line continuation\n'
+    + '3. Use REAL data from [ROUTER STATE] — never use placeholders\n'
+    + '4. Format ALL commands in ```routeros code blocks\n'
+    + '5. Check [KNOWLEDGE BASE] for correct syntax before answering\n\n'
+    + 'FIREWALL SAFETY RULES (CRITICAL):\n'
+    + 'NEVER add bare drop without conditions: action=drop comment=\'default drop\'\n'
+    + 'ALWAYS use in-interface-list=WAN for drop rules on input chain\n'
+    + 'CORRECT drop: add chain=input action=drop in-interface-list=WAN comment=\'drop WAN\'\n'
+    + 'WRONG drop: add chain=input action=drop comment=\'default drop\'\n'
+    + 'Order matters! LAN accept MUST come before any drop rule\n'
+    + 'Always add: add chain=input action=accept in-interface-list=LAN before drop\n\n'
+    + 'CORRECT command examples:\n'
+    + '  /ping address=8.8.8.8 count=4\n'
+    + '  /interface monitor-traffic ether1 once\n'
+    + '  /tool torch interface=ether1 duration=10\n'
+    + '  /ip firewall filter add chain=input action=accept in-interface-list=LAN\n'
+    + '  /ip firewall filter add chain=input action=drop in-interface-list=WAN\n'
+    + 'WRONG examples (never use):\n'
+    + '  /tool traffic-monitor start\n'
+    + '  /ip firewall filter add chain=input action=drop comment=\'default drop\''
+    + 'You have FULL access to the connected router via SSH and REST API.\n'
+    + 'Router real-time state is in [ROUTER STATE].\n'
+    + 'MikroTik knowledge base is in [KNOWLEDGE BASE].\n\n'
+    + 'CRITICAL RULES:\n'
+    + '1. ALWAYS respond in Ukrainian\n'
+    + '2. Use ONLY real RouterOS commands — check [KNOWLEDGE BASE] syntax\n'
+    + '3. Use REAL data from [ROUTER STATE] — never use placeholders\n'
+    + '4. Commands MUST be single line — NO backslash continuation\n'
+    + '5. Format commands in ```routeros blocks\n'
+    + '6. CORRECT: /ping address=8.8.8.8 count=4\n'
+    + '7. CORRECT: /interface monitor-traffic ether1 once\n'
+    + '8. CORRECT: /tool torch interface=ether1 duration=10\n'
+    + '9. WRONG: /tool traffic-monitor start (not exists)\n'
+    + '10. WRONG: multi-line commands with backslash\n'
+    + '11. When asked to DO something — provide ready-to-execute commands'
 };
 
 /* ── Пам'ять ── */
@@ -194,8 +217,30 @@ AIAgent.send = function(userMessage, options) {
     .then(function(context) {
       /* Будуємо повідомлення */
       var systemContent = AIAgent.config.systemPrompt;
+
+      /* Додаємо інфо про версію роутера */
+      if (window.ROSAdapter && ROSAdapter._version) {
+        var adapterCtx = ROSAdapter.getAIContext();
+        if (adapterCtx) {
+          systemContent += '\n\n' + adapterCtx;
+        }
+      }
+
+      /* Додаємо KB перед кожною відповіддю */
+      if (window.MikroTikKB) {
+        var kbContext = MikroTikKB.getContext(userMessage, 3000);
+        if (kbContext) {
+          systemContent += '\n\n[KNOWLEDGE BASE]\n' + kbContext;
+        }
+        /* Якщо KB ще не завантажено — завантажуємо */
+        if (!MikroTikKB._loaded) {
+          MikroTikKB.load();
+        }
+      }
+
+      /* Додаємо стан роутера */
       if (includeContext && context) {
-        systemContent += '\n\n=== ПОТОЧНИЙ СТАН РОУТЕРА ===\n' + context;
+        systemContent += '\n\n[ROUTER STATE]\n' + context;
       }
 
       /* Додаємо інформацію про доступні інструменти */

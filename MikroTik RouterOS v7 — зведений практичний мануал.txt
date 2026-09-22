@@ -1,0 +1,1831 @@
+Мануал готово — опубліковано вище.
+
+Коротка пряма відповідь
+
+Зробив один великий структурований документ по RouterOS v7 (25 розділів, від архітектури пакетного потоку до готових .rsc-шаблонів). Але одразу чесно про головне обмеження: механічно «злити» весь help.mikrotik.com + весь форум в один файл неможливо — це тисячі сторінок документації й сотні тисяч тем форуму, плюс це чужий захищений контент. Тому документ — це витяжка практичних знань у форматі, придатному для копіювання, з картою офіційних джерел для поглиблення.
+
+Що всередині
+CLI, find/where, safe-mode, export/import та специфіка .rsc
+Bridge VLAN filtering з трьома класичними помилками, через які втрачають доступ
+Firewall: packet flow, еталонний базовий набір, raw, anti-bruteforce, fasttrack-пастка
+NAT (включно з hairpin і netmap), QoS (simple/PCQ/queue tree)
+VPN: WireGuard, IPsec S2S та IKEv2 road-warrior, L2TP, EoIP
+Multi-WAN: рекурсивні маршрути, PCC, VRRP, netwatch
+Скриптова мова, scheduler, fetch, приклади
+Чеклист безпеки, процедура апгрейду, таблиця «симптом → причина»
+Окремо під ваш генератор конфігів
+
+Розділ 21 зроблено саме під програмну генерацію .rsc: таблиця числових меж (distance 1–255, vlan-id 1–4094, vrid 1–255, ASN, порти), формати й regex для MAC/CIDR/WG-ключів, і — головне — коректний порядок екранування (\ → " → $ → control chars), з поясненням, чому екранування не рятує структуровані поля. Там же описано саме той вектор, що фігурував у вашому код-ревʼю: MAC з імпортованого JSON, який завершується ; /user add ... group=full.
+
+Ризики та обмеження
+Версійна прив'язка: орієнтир — 7.23.x (остання stable на серпень 2026 — 7.23.3). Меню MikroTik змінює між мінорними релізами, тому кожну команду варто звіряти через ? у CLI.
+Кілька місць я свідомо сформулював обережно, бо не можу перевірити точний синтаксис у вашому релізі: поля client-* у WireGuard peers, типи перевірок netwatch, співвідношення /container і нового меню /app. Вони позначені в тексті як «перевірте на своїй версії».
+Приклади не враховують специфіку моделі (switch chip, hw-offload, LTE, регуляторний домен Wi-Fi).
+Трюк зі «страхувальним ребутом» (4.4) працює лише в парі з /system backup load — RouterOS зберігає зміни одразу, на відміну від Cisco.
+Наступні кроки
+Якщо потрібно — можу розгорнути будь-який розділ у повноцінну главу (наприклад, BGP-фільтри v7 або CAPsMAN).
+Можу перетворити розділ 21 на готовий модуль валідації для вашого PWA — єдине джерело правди замість трьох дублів, які знайшло ревʼю.
+Якщо хочете, зроблю зворотний артефакт: набір «золотих» .rsc-шаблонів, які ваш генератор має відтворювати байт-у-байт — це хороша основа для регресійних тестів.  MikroTik RouterOS v7 — зведений практичний мануал
+Версія документа: 1.0 · Складено: вересень 2026 Цільова платформа: RouterOS 7.x (актуальна stable-гілка на момент складання — 7.23.x)
+
+0. Про цей документ: що це і чого тут немає
+Чесно про обсяг. Офіційна документація help.mikrotik.com — це кілька тисяч сторінок, а форум forum.mikrotik.com — сотні тисяч тем. Механічно «зібрати їх усі в один файл» неможливо і юридично (авторське право MikroTik), і технічно (обсяг більший за будь-який один документ). Тому цей мануал — структурована витяжка практичних знань: те, що реально використовується у 95% конфігурацій, у форматі, придатному для копіювання в .rsc.
+
+Що всередині:
+
+робочий синтаксис команд RouterOS v7 з прикладами;
+типові архітектурні схеми (VLAN, firewall, VPN, failover);
+підводні камені, через які ламаються конфіги;
+довідник діапазонів і форматів значень — корисний для валідації в генераторах конфігів;
+карта офіційної документації з посиланнями на розділи.
+Чого немає і що треба перевіряти окремо:
+
+повних таблиць параметрів кожної команди — вони є тільки в офіційному Help;
+специфіки конкретних моделей (switch chip, PoE, LTE-модеми, регуляторні домени) — це завжди per-model;
+гарантії, що синтаксис не змінився у вашій версії — MikroTik змінює меню між мінорними релізами (приклади: перехід /interface wireless → /interface wifi, поява меню /app поверх /container).
+Правило №1 при роботі з цим мануалом: перед застосуванням перевіряйте команду на своїй версії через вбудовану довідку: /ip firewall filter add ? або /interface/wireguard/peers/print detail.
+
+1. Карта офіційних джерел
+Джерело	URL	Для чого
+Documentation (Help)	help.mikrotik.com/docs/	Головне джерело істини. Замінило стару Wiki. Розділи: RouterOS, RouterBOARD, Hardware, SwOS, The Dude
+Форум	forum.mikrotik.com	Нестандартні кейси, баги, release notes у темах «V7.x.x [stable] is released!»
+Download / Changelog	mikrotik.com/download	Пакети .npk, Netinstall, changelog по кожній версії
+Хмарні бекапи / оновлення	/system/package/update на пристрої	Канали: stable, long-term, testing, development
+MUM / академія	mikrotik.com/training	MTCNA/MTCRE/MTCINE матеріали
+Про канали оновлень (важливо для продакшену):
+
+long-term — тільки виправлення безпеки і критичних багів; найконсервативніший;
+stable — рекомендований для більшості; нові фічі приходять сюди;
+testing / development — не для продакшену.
+2. Базова архітектура RouterOS
+2.1 Пакети (packages)
+RouterOS модульний. /system/package/print покаже встановлені. Ключові:
+
+Пакет	Призначення
+routeros	ядро системи (в v7 більшість функцій вбудовано сюди)
+wireless	старий стек Wi-Fi (/interface wireless, старий CAPsMAN)
+wifi-qcom / wifi-qcom-ac / wifi-mediatek	новий стек Wi-Fi (/interface wifi), Wi-Fi 5/6/7
+container	запуск OCI-контейнерів
+user-manager	RADIUS-сервер
+iot, lora, gps, zerotier, tailscale	додаткові
+/system package print
+/system package enable wifi-qcom
+/system package disable wireless
+/system reboot
+wireless і wifi-qcom не можуть працювати одночасно на одному пристрої — тільки один стек активний.
+
+2.2 Шлях пакета (packet flow) — мінімально необхідна модель
+Для firewall/QoS критично розуміти порядок:
+
+Вхід  → [raw prerouting] → [conntrack] → [mangle prerouting] → [dst-nat]
+      → routing decision
+        ├─ на роутер   → [mangle input]   → [filter input]   → локальний процес
+        └─ транзит     → [mangle forward] → [filter forward] → [mangle postrouting] → [src-nat] → вихід
+Локально згенерований → routing → [mangle output] → [filter output] → [mangle postrouting] → [src-nat]
+Практичні наслідки:
+
+dst-nat відбувається ДО маршрутизації → правила forward бачать уже підмінену адресу призначення (внутрішню);
+src-nat/masquerade — ПІСЛЯ forward → у forward видно оригінальну адресу джерела;
+raw працює до conntrack → сюди кидають дроп сміття/DDoS, щоб не навантажувати таблицю з'єднань;
+маркування маршрутів (mark-routing) працює тільки у prerouting (для транзиту) і output (для трафіку самого роутера).
+2.3 Hardware offload
+Bridge, switch chip, fasttrack і IPsec можуть оброблятись апаратно. Наслідок: трафік, який пішов в offload, може не потрапляти у firewall/queue. Якщо правило «не спрацьовує» — перше, що перевіряють, це hw=yes на bridge-портах і fasttrack.
+
+3. Доступ до пристрою
+Спосіб	Порт	Нотатки
+Winbox	TCP 8291	основний GUI; є Winbox 4 з підтримкою macOS/Linux
+WebFig	TCP 80/443	/ip service → www, www-ssl
+SSH	TCP 22	єдиний рекомендований CLI-доступ ззовні
+Telnet	TCP 23	вимкнути
+FTP	TCP 21	вимкнути
+API	TCP 8728 (plain) / 8729 (TLS)	для автоматизації; бінарний протокол
+REST API	через www-ssl	https://router/rest/ip/address
+MAC-Telnet / MAC-Winbox	L2	рятує, коли зламали IP-конфіг
+Serial / Netinstall	—	останній рубіж відновлення
+# мінімальний безпечний набір сервісів
+/ip service disable telnet,ftp,api,www
+/ip service set ssh port=22 address=10.0.0.0/24
+/ip service set winbox address=10.0.0.0/24
+/ip service set api-ssl certificate=api-cert disabled=no
+3.1 REST API (швидкий старт)
+/certificate add name=ca-tmp common-name=ca-tmp key-usage=key-cert-sign,crl-sign
+/certificate sign ca-tmp
+/certificate add name=web common-name=router.lan
+/certificate sign web ca=ca-tmp
+/ip service set www-ssl certificate=web disabled=no
+Запит: curl -k -u admin:pass https://192.168.88.1/rest/interface Зміна: curl -k -u admin:pass -X PATCH https://.../rest/ip/address/*1 -d '{"address":"10.0.0.1/24"}' -H "content-type: application/json"
+
+4. CLI: синтаксис, який треба знати напам'ять
+4.1 Структура команди
+/шлях/до/меню дія параметр=значення параметр=значення
+Еквівалентні форми:
+
+/ip/firewall/filter/add chain=input action=drop
+/ip firewall filter add chain=input action=drop
+4.2 Пошук і масові операції
+# find повертає список внутрішніх ID
+/ip address print where interface=ether1
+/ip firewall filter remove [find comment="tmp"]
+/interface set [find type=ether] mtu=1500
+/ip dhcp-server lease print where dynamic=no
+
+# оператори у where: = ! < > ~ (regex), and/or/not
+/log print where message~"login failure"
+/ip route print where dst-address in 10.0.0.0/8
+4.3 Порядок правил і переміщення
+Firewall, mangle, queue tree, routing rules — порядково залежні.
+
+/ip firewall filter move [find comment="allow-vpn"] destination=0
+/ip firewall filter print stats          # лічильники пакетів/байтів
+/ip firewall filter reset-counters-all
+4.4 Safe mode — обов'язково при віддаленій роботі
+У терміналі: Ctrl+X (увімк./вимк.). Якщо сесія обривається — усі зміни, зроблені в safe mode, відкочуються автоматично.
+Safe mode має обмежений буфер змін; великі конфіги можуть його переповнити.
+Додатковий страхувальний прийом:
+/system scheduler add name=rollback start-time=startup interval=0 \
+  on-event="/system reset-configuration no-defaults=no skip-backup=no" disabled=yes
+# або простіше:
+/system scheduler add name=panic interval=5m on-event="/system reboot"
+# ...застосовуєте ризиковані зміни, перевіряєте зв'язок, потім:
+/system scheduler remove panic
+(Роутер перезавантажиться і підніметься зі старої конфігурації, якщо ви не встигли зняти таймер — за умови, що зміни не збережені у startup-конфігурації. Для RouterOS зміни зберігаються одразу, тому цей трюк працює лише в парі з /system backup load у скрипті.)
+
+4.5 Export / Import — основа роботи з .rsc
+/export                          # уся конфігурація, тільки non-default значення
+/export file=backup-2026-09-21   # у файл .rsc
+/export compact                  # стисло
+/export verbose                  # усі параметри, включно з дефолтними
+/export terse                    # один рядок на команду — зручно для diff
+/export show-sensitive           # ВКЛЮЧИТИ паролі/ключі (за замовчуванням приховані!)
+/ip firewall export file=fw      # експорт окремої гілки
+/import file-name=config.rsc
+/import file-name=config.rsc verbose=yes
+Критично про .rsc:
+
+/export за замовчуванням ховає секрети (show-sensitive вимкнено з v7). Конфіг, відновлений з такого файлу, матиме порожні PSK/паролі/приватні ключі.
+/import виконується порядково і зупиняється на першій помилці — частина конфігурації залишиться застосованою. Для ідемпотентності обгортайте:
+:do { /ip address add address=10.0.0.1/24 interface=ether1 } on-error={ :log warning "addr exists" }
+.rsc не портується між архітектурами так само погано, як бінарний backup — це його перевага. Бінарний /system backup прив'язаний до заліза; .rsc — текстовий і переносний (але імена інтерфейсів відрізняються!).
+Перед імпортом на «чистий» пристрій:
+/system reset-configuration no-defaults=yes skip-backup=yes
+# після перезавантаження:
+/import file-name=config.rsc
+4.6 Backup vs Export
+/system backup	/export
+Формат	бінарний	текстовий .rsc
+Містить	усе, включно з ключами, сертифікатами, користувачами	тільки конфіг; секрети — за show-sensitive
+Переносимість	тільки та сама модель/архітектура	між пристроями (з правками)
+Редагування	ні	так
+/system backup save name=fullbackup password=SuperSecret encryption=aes-sha256
+/system backup load name=fullbackup password=SuperSecret
+5. Перший запуск і скидання
+5.1 Default configuration (defconf)
+Нові пристрої мають defconf-скрипт: bridge для LAN-портів, DHCP-сервер 192.168.88.0/24, WAN на ether1 з DHCP-клієнтом, базовий firewall.
+
+/system default-configuration print
+/system reset-configuration no-defaults=yes     # повне очищення
+/system reset-configuration keep-users=yes
+/system reset-configuration run-after-reset=myconfig.rsc
+5.2 Netinstall
+Для «цегли», забутого пароля, зміни архітектури пакетів. Потрібен ПК у тій самій L2-мережі, Etherboot/reset-кнопка. Netinstall завжди повністю стирає конфігурацію і файли.
+
+5.3 Мінімальний стартовий шаблон
+/system identity set name=RTR-OFFICE
+/user add name=netadmin group=full password="..." comment="primary admin"
+/user set admin disabled=yes
+/ip service disable telnet,ftp,api,www
+/system clock set time-zone-name=Europe/Kyiv
+/system ntp client set enabled=yes
+/system ntp client servers add address=time.cloudflare.com
+/ip dns set servers=1.1.1.1,9.9.9.9 allow-remote-requests=no
+/ip neighbor discovery-settings set discover-interface-list=LAN
+/tool mac-server set allowed-interface-list=LAN
+/tool mac-server mac-winbox set allowed-interface-list=LAN
+/tool bandwidth-server set enabled=no
+/ip cloud set ddns-enabled=no
+6. Інтерфейси, bridge і VLAN
+6.1 Interface lists — фундамент чистого конфігу
+/interface list add name=WAN
+/interface list add name=LAN
+/interface list member add list=WAN interface=ether1
+/interface list member add list=LAN interface=bridge1
+Далі у firewall використовуємо in-interface-list=WAN замість імен — конфіг стає переносним.
+
+6.2 Bridge
+/interface bridge add name=bridge1 protocol-mode=rstp
+/interface bridge port add bridge=bridge1 interface=ether2
+/interface bridge port add bridge=bridge1 interface=ether3
+/ip address add address=192.168.10.1/24 interface=bridge1
+protocol-mode=none|stp|rstp|mstp — у домашній мережі часто rstp; у провайдерських схемах STP вимикають свідомо.
+hw=yes на порту = апаратний offload через switch chip (тільки для портів одного чипа).
+6.3 VLAN — три робочі схеми
+A. VLAN на фізичному інтерфейсі (router-on-a-stick):
+
+/interface vlan add name=vlan10 vlan-id=10 interface=ether1
+/ip address add address=10.10.10.1/24 interface=vlan10
+B. Bridge VLAN filtering (правильний спосіб для комутації):
+
+/interface bridge add name=bridge1 vlan-filtering=no
+/interface bridge port add bridge=bridge1 interface=ether2 pvid=10
+/interface bridge port add bridge=bridge1 interface=ether3 pvid=20
+/interface bridge port add bridge=bridge1 interface=ether10           # trunk, pvid=1
+
+/interface bridge vlan add bridge=bridge1 vlan-ids=10 tagged=bridge1,ether10 untagged=ether2
+/interface bridge vlan add bridge=bridge1 vlan-ids=20 tagged=bridge1,ether10 untagged=ether3
+
+/interface vlan add name=v10 vlan-id=10 interface=bridge1
+/interface vlan add name=v20 vlan-id=20 interface=bridge1
+/ip address add address=10.10.10.1/24 interface=v10
+/ip address add address=10.10.20.1/24 interface=v20
+
+/interface bridge set bridge1 vlan-filtering=yes      # ОСТАННІМ рядком!
+Три класичні помилки, через які «пропадає доступ»:
+
+vlan-filtering=yes увімкнено до створення bridge VLAN — ви відрізаєте себе. Завжди останнім кроком і тільки в safe mode.
+Забули додати bridge1 у tagged= для VLAN, на якому живе IP-адреса роутера. Сам bridge — це теж порт.
+Управляючий VLAN не збігається з pvid порту, з якого ви під'єднані.
+C. Switch chip VLAN (/interface ethernet switch) — застаріла схема для старих чипів; у v7 рекомендовано bridge VLAN filtering з hw=yes.
+
+6.4 Bonding
+/interface bonding add name=bond1 slaves=ether5,ether6 mode=802.3ad \
+  transmit-hash-policy=layer-2-and-3 lacp-rate=30secs
+Режими: balance-rr, active-backup, balance-xor, broadcast, 802.3ad (LACP, потрібна підтримка на комутаторі), balance-tlb, balance-alb.
+
+6.5 MTU / L2MTU
+mtu — L3 payload (зазвичай 1500).
+l2mtu — максимальний Ethernet-фрейм; для VLAN/MPLS/tunnel потрібен запас.
+Для VLAN поверх ether: l2mtu батьківського має бути ≥ l2mtu VLAN + 4.
+Симптом невідповідності: ping проходить, HTTPS/SSH «підвисають» → класична MTU/MSS-проблема.
+/ip firewall mangle add chain=forward action=change-mss new-mss=clamp-to-pmtu \
+  protocol=tcp tcp-flags=syn out-interface-list=WAN
+7. IP-рівень
+7.1 Адресація
+/ip address add address=192.168.10.1/24 interface=bridge1 comment="LAN gw"
+/ip address print detail
+network= обчислюється автоматично; вказувати не треба.
+
+7.2 DHCP-сервер
+/ip pool add name=pool-lan ranges=192.168.10.100-192.168.10.200
+/ip dhcp-server add name=dhcp-lan interface=bridge1 address-pool=pool-lan lease-time=1d
+/ip dhcp-server network add address=192.168.10.0/24 gateway=192.168.10.1 \
+  dns-server=192.168.10.1 domain=lan.local
+/ip dhcp-server enable dhcp-lan
+
+# статична прив'язка
+/ip dhcp-server lease add address=192.168.10.50 mac-address=AA:BB:CC:DD:EE:FF \
+  server=dhcp-lan comment="printer"
+
+# опції (наприклад, TFTP-сервер для IP-телефонії)
+/ip dhcp-server option add name=tftp code=66 value="s'10.0.0.5'"
+/ip dhcp-server option sets add name=voip options=tftp
+7.3 DHCP-клієнт (WAN)
+/ip dhcp-client add interface=ether1 use-peer-dns=no use-peer-ntp=no \
+  add-default-route=yes default-route-distance=1
+7.4 DNS
+/ip dns set servers=1.1.1.1,9.9.9.9 allow-remote-requests=yes cache-size=4096
+/ip dns static add name=nas.lan address=192.168.10.20
+/ip dns static add regexp=".*\\.doubleclick\\.net" address=0.0.0.0
+DoH (DNS over HTTPS):
+
+/tool fetch url=https://curl.se/ca/cacert.pem
+/certificate import file-name=cacert.pem passphrase=""
+/ip dns set use-doh-server=https://cloudflare-dns.com/dns-query verify-doh-cert=yes
+⚠ allow-remote-requests=yes без firewall-правила робить роутер відкритим DNS-резолвером → участь в DNS-амплифікаційних атаках. Обов'язково блокуйте UDP/TCP 53 з WAN.
+
+7.5 ARP
+/interface set bridge1 arp=reply-only
+/ip arp add address=192.168.10.50 mac-address=AA:BB:CC:DD:EE:FF interface=bridge1
+arp=reply-only + статичні записи = простий контроль доступу L2 (обходиться, але відсікає випадкових).
+
+8. Маршрутизація
+8.1 Статичні маршрути
+/ip route add dst-address=0.0.0.0/0 gateway=192.168.1.1 distance=1 comment="ISP1"
+/ip route add dst-address=0.0.0.0/0 gateway=10.20.30.1 distance=2 comment="ISP2 backup"
+/ip route add dst-address=172.16.0.0/16 gateway=192.168.10.254
+/ip route add dst-address=10.99.0.0/24 type=blackhole
+Ключові параметри:
+
+distance — адміністративна відстань, діапазон 1–255; менше = пріоритетніше;
+check-gateway=ping|arp — прибирає маршрут, якщо шлюз не відповідає;
+scope / target-scope — для рекурсивних маршрутів (за замовчуванням 30/10);
+routing-table= — таблиця (VRF або policy routing);
+vrf-interface= — для VRF-сценаріїв;
+pref-src= — адреса джерела для трафіку, згенерованого роутером.
+8.2 Рекурсивна маршрутизація (правильний failover)
+check-gateway=ping перевіряє лише сусідній шлюз. Якщо ISP «живий», а його аплінк мертвий — маршрут залишиться. Рішення — рекурсія через публічний хост:
+
+/ip route add dst-address=8.8.8.8 gateway=192.168.1.1 scope=10 comment="probe ISP1"
+/ip route add dst-address=1.1.1.1 gateway=10.20.30.1 scope=10 comment="probe ISP2"
+
+/ip route add dst-address=0.0.0.0/0 gateway=8.8.8.8 target-scope=10 distance=1 check-gateway=ping
+/ip route add dst-address=0.0.0.0/0 gateway=1.1.1.1 target-scope=10 distance=2 check-gateway=ping
+Обов'язково додайте NAT/маршрут так, щоб probe-адреси ходили тільки своїм каналом, інакше перевірка втратить сенс.
+
+8.3 ECMP (балансування)
+/ip route add dst-address=0.0.0.0/0 gateway=192.168.1.1,10.20.30.1 distance=1
+ECMP балансує по з'єднаннях, не по пакетах. Мінус: сесії можуть «стрибати» після зміни таблиці conntrack — для HTTPS-банкінгу це проблема. Для передбачуваності краще PCC-mangle або policy routing.
+
+8.4 Policy routing (окремі таблиці)
+/routing table add name=via-isp2 fib
+
+/ip firewall mangle add chain=prerouting src-address=192.168.10.0/25 \
+  action=mark-routing new-routing-mark=via-isp2 passthrough=no in-interface=bridge1
+
+/ip route add dst-address=0.0.0.0/0 gateway=10.20.30.1 routing-table=via-isp2
+
+# альтернатива без mangle — routing rules
+/routing rule add src-address=192.168.10.0/25 action=lookup-only-in-table table=via-isp2
+8.5 VRF
+/ip vrf add name=CUST-A interfaces=ether4,vlan100
+/ip address add address=172.20.0.1/24 interface=vlan100
+/ip route add dst-address=0.0.0.0/0 gateway=172.20.0.254 routing-table=CUST-A
+VRF ізолює таблиці маршрутизації. Для доступу між VRF потрібні route leaking або firewall-міст.
+
+8.6 Динамічна маршрутизація (коротко)
+OSPF (v7-синтаксис принципово відрізняється від v6!):
+
+/routing ospf instance add name=default router-id=10.0.0.1
+/routing ospf area add name=backbone area-id=0.0.0.0 instance=default
+/routing ospf interface-template add interfaces=bridge1 area=backbone \
+  type=ptp cost=10 auth=md5 auth-key="secret" auth-id=1
+/routing ospf interface-template add interfaces=bridge2 area=backbone passive=yes
+BGP (v7-синтаксис):
+
+/routing bgp template set default as=65001 router-id=10.0.0.1
+/routing bgp connection add name=upstream remote.address=192.0.2.1 remote.as=65000 \
+  local.role=ebgp templates=default address-families=ip \
+  output.filter-chain=bgp-out input.filter=bgp-in
+
+/routing filter rule add chain=bgp-out rule="if (dst in 203.0.113.0/24) { accept } reject"
+У v7 фільтри — це скриптова мова (/routing filter rule), а не набір полів як у v6. Це найчастіша причина болю при міграції.
+
+9. Firewall
+9.1 Ланцюги і таблиці
+Таблиця	Ланцюги	Призначення
+filter	input, forward, output	дозволити/заборонити
+nat	srcnat, dstnat	трансляція адрес
+mangle	prerouting, input, forward, output, postrouting	маркування, MSS, TTL, DSCP
+raw	prerouting, output	до conntrack — дешевий дроп
+Дії: accept, drop, reject, jump, return, log, passthrough, fasttrack-connection, add-src-to-address-list, add-dst-to-address-list, tarpit, dst-nat, src-nat, masquerade, netmap, redirect, mark-connection, mark-packet, mark-routing, change-mss, change-ttl, change-dscp, notrack, sniff-tzsp.
+
+9.2 Еталонний базовий набір (можна копіювати)
+/ip firewall address-list
+add list=RFC1918 address=10.0.0.0/8
+add list=RFC1918 address=172.16.0.0/12
+add list=RFC1918 address=192.168.0.0/16
+add list=MGMT address=192.168.10.0/24 comment="admin subnet"
+
+/ip firewall filter
+# --- INPUT ---
+add chain=input action=accept connection-state=established,related comment="est,rel"
+add chain=input action=drop connection-state=invalid comment="invalid"
+add chain=input action=accept protocol=icmp limit=10,20:packet comment="icmp rate-limited"
+add chain=input action=accept src-address-list=MGMT comment="mgmt access"
+add chain=input action=accept in-interface-list=LAN comment="LAN to router"
+add chain=input action=drop in-interface-list=WAN comment="drop all from WAN"
+add chain=input action=drop comment="default drop"
+
+# --- FORWARD ---
+add chain=forward action=fasttrack-connection connection-state=established,related \
+    hw-offload=yes comment="fasttrack"
+add chain=forward action=accept connection-state=established,related
+add chain=forward action=drop connection-state=invalid
+add chain=forward action=accept in-interface-list=LAN out-interface-list=WAN comment="LAN->WAN"
+add chain=forward action=accept connection-nat-state=dstnat comment="port forwards"
+add chain=forward action=drop comment="default drop"
+
+/ip firewall nat
+add chain=srcnat action=masquerade out-interface-list=WAN comment="NAT out"
+Про fasttrack: різко знижує навантаження CPU, але fasttrack-нуті пакети не проходять через mangle/queue/filter. Якщо потрібен QoS — виключіть відповідний трафік з fasttrack або не вмикайте його зовсім.
+
+9.3 RAW — для великого сміттєвого трафіку
+/ip firewall raw
+add chain=prerouting action=drop src-address-list=RFC1918 in-interface-list=WAN comment="bogons in"
+add chain=prerouting action=drop dst-address-list=RFC1918 in-interface-list=WAN
+add chain=prerouting action=notrack dst-port=53 protocol=udp in-interface-list=LAN
+9.4 Захист від брутфорсу SSH/Winbox (класичний ланцюжок)
+/ip firewall filter
+add chain=input protocol=tcp dst-port=22 src-address-list=ssh_blacklist action=drop
+add chain=input protocol=tcp dst-port=22 connection-state=new \
+    action=add-src-to-address-list address-list=ssh_stage3 address-list-timeout=1m \
+    src-address-list=ssh_stage2
+add chain=input protocol=tcp dst-port=22 connection-state=new \
+    action=add-src-to-address-list address-list=ssh_stage2 address-list-timeout=1m \
+    src-address-list=ssh_stage1
+add chain=input protocol=tcp dst-port=22 connection-state=new \
+    action=add-src-to-address-list address-list=ssh_stage1 address-list-timeout=1m
+add chain=input protocol=tcp dst-port=22 src-address-list=ssh_stage3 \
+    action=add-src-to-address-list address-list=ssh_blacklist address-list-timeout=10d
+Порядок рядків тут критичний — вони мають йти саме так (blacklist → stage3 → stage2 → stage1).
+
+9.5 Connection tracking
+/ip firewall connection tracking set enabled=auto tcp-established-timeout=1d
+/ip firewall connection print where protocol=tcp
+connection-state: new, established, related, invalid, untracked. connection-nat-state: srcnat, dstnat — незамінне для правил під port forwarding.
+
+9.6 Layer7 — з обережністю
+/ip firewall layer7-protocol дуже дорогий по CPU і працює лише на перших пакетах з'єднання. Для блокування сайтів краще: DNS-static, address-list з FQDN (/ip firewall address-list add list=X address=example.com — RouterOS сам резолвить), або TLS-SNI matcher (tls-host= у firewall filter).
+
+/ip firewall filter add chain=forward action=reject protocol=tcp dst-port=443 \
+  tls-host="*.example.com"
+10. NAT
+10.1 Masquerade vs src-nat
+/ip firewall nat add chain=srcnat action=masquerade out-interface-list=WAN
+# статична зовнішня адреса — краще src-nat (дешевше, стабільніше при reconnect)
+/ip firewall nat add chain=srcnat action=src-nat to-addresses=203.0.113.10 out-interface=ether1
+masquerade при падінні інтерфейсу скидає conntrack-записи; src-nat — ні.
+
+10.2 Port forwarding (dst-nat)
+/ip firewall nat add chain=dstnat action=dst-nat in-interface-list=WAN \
+  protocol=tcp dst-port=8080 to-addresses=192.168.10.20 to-ports=80 comment="web srv"
+Не забудьте forward-правило (або connection-nat-state=dstnat accept як вище).
+
+10.3 Hairpin NAT (доступ до свого сервера із внутрішньої мережі по зовнішньому імені)
+/ip firewall nat add chain=dstnat action=dst-nat protocol=tcp dst-port=443 \
+  dst-address=203.0.113.10 to-addresses=192.168.10.20
+/ip firewall nat add chain=srcnat action=masquerade protocol=tcp dst-port=443 \
+  src-address=192.168.10.0/24 dst-address=192.168.10.20
+10.4 1:1 NAT (netmap)
+/ip firewall nat add chain=dstnat action=netmap dst-address=203.0.113.16/28 \
+  to-addresses=192.168.10.16/28
+/ip firewall nat add chain=srcnat action=netmap src-address=192.168.10.16/28 \
+  to-addresses=203.0.113.16/28
+11. QoS
+11.1 Simple queue — швидко і зрозуміло
+/queue simple add name=user-50 target=192.168.10.50/32 max-limit=20M/20M
+/queue simple add name=guest target=192.168.20.0/24 max-limit=50M/50M \
+  queue=pcq-upload-default/pcq-download-default
+Порядок: simple queue обробляються зверху вниз, перша збіжність виграє.
+
+11.2 PCQ — справедливий розподіл між користувачами
+/queue type add name=pcq-dl kind=pcq pcq-classifier=dst-address pcq-rate=0 pcq-limit=50
+/queue type add name=pcq-ul kind=pcq pcq-classifier=src-address pcq-rate=0 pcq-limit=50
+/queue simple add name=fair target=192.168.10.0/24 max-limit=100M/100M \
+  queue=pcq-ul/pcq-dl
+pcq-rate=0 = ділити порівну; pcq-rate=5M = жорсткий стель на користувача.
+
+11.3 Queue tree + mangle (повноцінний QoS)
+/ip firewall mangle
+add chain=prerouting action=mark-connection new-connection-mark=voip-c \
+    protocol=udp port=5060,10000-20000 passthrough=yes
+add chain=prerouting action=mark-packet new-packet-mark=voip-p connection-mark=voip-c passthrough=no
+
+/queue tree add name=WAN-out parent=ether1 max-limit=100M
+/queue tree add name=voip parent=WAN-out packet-mark=voip-p limit-at=10M max-limit=20M priority=1
+/queue tree add name=rest parent=WAN-out packet-mark=no-mark priority=8
+Правила: limit-at = гарантія, max-limit = стеля, priority 1 (найвищий) – 8.
+
+Queue tree на global бачить весь трафік; на конкретному інтерфейсі — лише вихідний з нього. І пам'ятайте про fasttrack (п. 9.2).
+
+12. VPN
+12.1 WireGuard — дефолтний вибір у v7
+Сервер:
+
+/interface wireguard add name=wg0 listen-port=13231 mtu=1420
+/ip address add address=10.10.0.1/24 interface=wg0
+
+/interface wireguard peers add interface=wg0 \
+  public-key="CLIENT_PUB_KEY=" allowed-address=10.10.0.2/32 comment="laptop"
+
+/ip firewall filter add chain=input action=accept protocol=udp dst-port=13231 comment="wg in"
+/ip firewall filter add chain=forward action=accept in-interface=wg0 out-interface-list=LAN
+Публічний ключ роутера: /interface wireguard print detail.
+
+Site-to-site:
+
+# на стороні А
+/interface wireguard peers add interface=wg0 public-key="B_PUB=" \
+  endpoint-address=203.0.113.20 endpoint-port=13231 \
+  allowed-address=10.10.0.2/32,192.168.20.0/24 persistent-keepalive=25s
+/ip route add dst-address=192.168.20.0/24 gateway=wg0
+Нюанси:
+
+allowed-address виконує роль і crypto-routing, і фільтра — вказуйте всі мережі за пірером;
+persistent-keepalive потрібен, якщо сторона за NAT;
+MTU 1420 — стартова точка; при проблемах з HTTPS зменшуйте або додайте MSS-clamping;
+у новіших релізах з'явились зручності для генерації клієнтських конфігів/QR — перевірте наявність полів client-* у вашій версії (/interface/wireguard/peers/add ?).
+12.2 IPsec site-to-site (IKEv2)
+/ip ipsec profile add name=p-s2s enc-algorithm=aes-256 hash-algorithm=sha256 \
+  dh-group=modp2048 lifetime=1d
+
+/ip ipsec proposal add name=pr-s2s auth-algorithms=sha256 \
+  enc-algorithms=aes-256-cbc,aes-256-gcm pfs-group=modp2048 lifetime=30m
+
+/ip ipsec peer add name=peer-b address=203.0.113.20/32 exchange-mode=ike2 profile=p-s2s
+/ip ipsec identity add peer=peer-b auth-method=pre-shared-key secret="STRONG_PSK"
+
+/ip ipsec policy add peer=peer-b tunnel=yes proposal=pr-s2s \
+  src-address=192.168.10.0/24 dst-address=192.168.20.0/24
+
+# ОБОВ'ЯЗКОВО: виключити VPN-трафік з NAT
+/ip firewall nat add chain=srcnat action=accept place-before=0 \
+  src-address=192.168.10.0/24 dst-address=192.168.20.0/24
+Пропуск останнього правила — причина №1 «тунель піднявся, але трафік не ходить».
+
+Порти для firewall: UDP 500, UDP 4500 (NAT-T), протокол 50 (ESP). Діагностика: /ip ipsec active-peers print, /ip ipsec installed-sa print, /log print where topics~"ipsec".
+
+12.3 IKEv2 road-warrior (mode-config)
+/ip ipsec mode-config add name=rw-cfg address-pool=vpn-pool address-prefix-length=32 \
+  split-include=192.168.10.0/24 static-dns=192.168.10.1 system-dns=no
+/ip pool add name=vpn-pool ranges=10.50.0.10-10.50.0.100
+
+/ip ipsec policy group add name=rw
+/ip ipsec profile add name=rw-prof enc-algorithm=aes-256 hash-algorithm=sha256 dh-group=modp2048
+/ip ipsec peer add name=rw exchange-mode=ike2 passive=yes profile=rw-prof
+
+/ip ipsec identity add peer=rw auth-method=digital-signature certificate=server-cert \
+  generate-policy=port-strict mode-config=rw-cfg policy-template-group=rw
+/ip ipsec policy add group=rw template=yes dst-address=10.50.0.0/24 src-address=0.0.0.0/0 \
+  proposal=pr-s2s
+Потрібні сертифікати (/certificate) з правильними SAN — інакше iOS/macOS/Windows клієнти не підключаться.
+
+12.4 L2TP/IPsec (сумісність з усім)
+/interface l2tp-server server set enabled=yes use-ipsec=required ipsec-secret="PSK" \
+  default-profile=vpn-profile authentication=mschap2
+/ppp profile add name=vpn-profile local-address=10.60.0.1 remote-address=vpn-pool \
+  dns-server=192.168.10.1 change-tcp-mss=yes
+/ppp secret add name=user1 password="..." service=l2tp profile=vpn-profile
+Порти: UDP 500, 1701, 4500.
+
+12.5 OpenVPN (OVPN)
+RouterOS історично підтримував лише TCP; у v7 додано UDP. Нюанси сумісності з клієнтами високі — використовуйте WireGuard, якщо немає вимоги на OVPN.
+
+/interface ovpn-server server set enabled=yes certificate=server-cert \
+  auth=sha256 cipher=aes256-gcm mode=ip default-profile=vpn-profile require-client-certificate=yes
+12.6 SSTP
+Проходить крізь будь-який HTTPS-проксі (TCP 443), але тільки Windows нативно.
+
+12.7 L2-тунелі: EoIP, GRE, VXLAN
+/interface eoip add name=eoip1 remote-address=203.0.113.20 tunnel-id=100 \
+  ipsec-secret="PSK" allow-fast-path=no
+/interface bridge port add bridge=bridge1 interface=eoip1
+EoIP прозоро розтягує L2 — і разом з ним broadcast-штормів. Завжди думайте про STP і MTU.
+
+12.8 ZeroTier / Tailscale
+Доступні як пакети/контейнери на пристроях з достатньою пам'яттю. Зручно для швидкого mesh-доступу без публічної IP. Перевіряйте доступність пакета для вашої архітектури.
+
+13. Wi-Fi
+13.1 Два стеки — не переплутайте
+Старий	Новий
+Меню	/interface wireless	/interface wifi
+Пакет	wireless	wifi-qcom, wifi-qcom-ac, wifi-mediatek
+Контролер	/caps-man	/interface wifi capsman
+Підтримка	802.11 a/b/g/n/ac	ac / ax (Wi-Fi 6) / be (Wi-Fi 7)
+13.2 Новий стек: автономна точка
+/interface wifi security add name=sec-home authentication-types=wpa2-psk,wpa3-psk \
+  passphrase="StrongPassphrase" ft=yes ft-over-ds=yes
+/interface wifi configuration add name=cfg-home ssid="Home" security=sec-home \
+  country="Ukraine" mode=ap
+/interface wifi set wifi1 configuration=cfg-home disabled=no
+/interface bridge port add bridge=bridge1 interface=wifi1
+13.3 CAPsMAN (новий)
+# на контролері
+/interface wifi capsman set enabled=yes interfaces=bridge1 \
+  package-path=/ upgrade-policy=suggest-same-version
+/interface wifi provisioning add action=create-dynamic-enabled \
+  supported-bands=2ghz-ax,5ghz-ax master-configuration=cfg-home
+
+# на точці (CAP)
+/interface wifi cap set enabled=yes discovery-interfaces=bridge1 slaves-datapath=bridge1
+13.4 Практичні поради
+country= обов'язково — від нього залежать дозволені канали й потужність (і законність);
+не ставте максимальну потужність: зростає зона, але не швидкість, а SNR у клієнта не покращується;
+2.4 ГГц — тільки канали 1/6/11, ширина 20 МГц;
+5 ГГц — уникайте DFS-каналів там, де поруч радари/аеропорт, інакше будуть раптові перемикання;
+для роумінгу: однаковий SSID/security, ft=yes (802.11r), правильно налаштований access-list для відсікання слабких клієнтів.
+14. Multi-WAN і відмовостійкість
+14.1 Три рівні резервування
+Маршрут з distance + check-gateway — найпростіше, але «сліпе» (див. 8.2).
+Рекурсивні маршрути — перевірка реальної доступності Інтернету.
+Netwatch + скрипти — довільна логіка (перемикання, сповіщення, зміна NAT).
+14.2 Netwatch
+/tool netwatch add host=8.8.8.8 interval=10s timeout=1s \
+  up-script="/ip route enable [find comment=ISP1]" \
+  down-script="/ip route disable [find comment=ISP1]; /log warning \"ISP1 down\""
+У новіших версіях netwatch підтримує типи перевірок (type=simple|http-get|https-get) — перевіряйте /tool netwatch add ? на своїй версії.
+
+14.3 VRRP (резервування самого роутера)
+/interface vrrp add name=vrrp1 interface=bridge1 vrid=10 priority=200 \
+  preemption-mode=yes authentication=ah password="secret"
+/ip address add address=192.168.10.254/24 interface=vrrp1
+На backup-роутері — та сама конфігурація з priority=100. Клієнти отримують 192.168.10.254 як шлюз.
+
+14.4 PCC (балансування по з'єднаннях)
+/ip firewall mangle
+add chain=prerouting in-interface-list=LAN connection-mark=no-mark \
+    per-connection-classifier=both-addresses:2/0 action=mark-connection new-connection-mark=to-isp1
+add chain=prerouting in-interface-list=LAN connection-mark=no-mark \
+    per-connection-classifier=both-addresses:2/1 action=mark-connection new-connection-mark=to-isp2
+add chain=prerouting connection-mark=to-isp1 action=mark-routing new-routing-mark=isp1 in-interface-list=LAN
+add chain=prerouting connection-mark=to-isp2 action=mark-routing new-routing-mark=isp2 in-interface-list=LAN
+Не забудьте: окремі routing-table, маршрути в них, NAT по out-interface, і правила для трафіку самого роутера (chain=output).
+
+15. Інструменти діагностики
+Інструмент	Команда	Коли
+Torch	/tool torch interface=ether1 src-address=0.0.0.0/0	«хто жере канал прямо зараз»
+Sniffer	/tool sniffer set filter-interface=ether1 file-name=cap; /tool sniffer start	дамп для Wireshark
+Ping / Traceroute	/ping 8.8.8.8 src-address=... interface=...	базова зв'язність
+Bandwidth test	/tool bandwidth-test address=10.0.0.2 protocol=tcp direction=both user=...	пропускна здатність між MikroTik
+Profile	/system resource cpu print, /tool profile duration=10	що саме вантажить CPU
+Netwatch	/tool netwatch	моніторинг
+Graphing	/tool graphing interface add interface=all	історія трафіку
+Traffic generator	/tool traffic-generator	навантажувальні тести
+Ping speed / Flood	/tool flood-ping	стрес
+Interface monitor	/interface ethernet monitor ether1	швидкість/дуплекс/лінк
+Log	/log print follow where topics~"firewall"	усе інше
+Налаштування логування в зовнішній syslog:
+
+/system logging action add name=remote target=remote remote=192.168.10.5 remote-port=514
+/system logging add topics=error,critical,warning action=remote
+/system logging add topics=firewall action=remote
+Профілювання CPU — найкорисніша команда при «роутер гальмує»:
+
+/tool profile duration=10
+Покаже розподіл по процесах: firewall, networking, encrypting, queue, management, unclassified.
+
+16. Скриптова мова RouterOS
+16.1 Основи
+:local name "value"          # локальна змінна (у межах скрипта)
+:global counter 0            # глобальна (живе до перезавантаження)
+:set counter ($counter + 1)
+:put $counter
+:log info "message $name"
+Типи: num, str, bool, ip, ip6, ip-prefix, time, array, id, nil.
+
+16.2 Керуючі конструкції
+:if ($x > 5) do={ :put "big" } else={ :put "small" }
+:for i from=1 to=10 do={ :put $i }
+:foreach ifc in=[/interface find type=ether] do={
+    :put [/interface get $ifc name]
+}
+:while ($i < 10) do={ :set i ($i + 1) }
+:do { ... } on-error={ :log error "failed" }
+:delay 5s
+16.3 Робота з конфігурацією
+:local wanIp [/ip address get [find interface=ether1] address]
+:local gw [/ip route get [find dst-address="0.0.0.0/0"] gateway]
+/ip firewall address-list add list=blocked address=1.2.3.4 timeout=1h
+:if ([:len [/ip firewall address-list find list=blocked address=1.2.3.4]] = 0) do={ ... }
+16.4 Корисні функції
+[:len $array]           [:typeof $x]        [:tostr $x]      [:tonum $x]
+[:pick $str 0 5]        [:find $str "ab"]   [:resolve "example.com"]
+[:timestamp]            [:rndnum from=1 to=100]
+[:toarray "a,b,c"]      [:tobool "yes"]     [:convert ... ]
+16.5 Планувальник і події
+/system script add name=backup-daily source={
+    :local ts [/system clock get date]
+    /system backup save name=("auto-" . $ts)
+    /export file=("auto-" . $ts)
+}
+/system scheduler add name=nightly start-time=03:00:00 interval=1d on-event=backup-daily
+/system scheduler add name=on-boot start-time=startup on-event="/log info \"booted\""
+16.6 Fetch (HTTP-клієнт) та e-mail
+/tool fetch url="https://example.com/list.txt" mode=https dst-path=list.txt
+/tool fetch url="https://api.example.com/hook" http-method=post \
+  http-data="{\"status\":\"up\"}" http-header-field="Content-Type: application/json" keep-result=no
+
+/tool e-mail set server=smtp.example.com port=587 start-tls=yes \
+  from=router@example.com user=router@example.com password="..."
+/tool e-mail send to="admin@example.com" subject="Backup" file=auto.backup body="see attachment"
+16.7 Приклад: динамічний DNS-апдейтер
+/system script add name=ddns source={
+    :local host "router.example.com"
+    :local current [/ip address get [find interface=ether1] address]
+    :set current [:pick $current 0 [:find $current "/"]]
+    :global lastIp
+    :if ($current != $lastIp) do={
+        /tool fetch url=("https://dyn.example.com/update?host=" . $host . "&ip=" . $current) keep-result=no
+        :set lastIp $current
+        :log info ("DDNS updated: " . $current)
+    }
+}
+/system scheduler add name=ddns interval=5m on-event=ddns
+17. Контейнери / Apps
+RouterOS вміє запускати OCI-контейнери (container package; потрібні arm/arm64/x86 і достатньо диску/RAM). У новіших релізах 7.2x з'явилось меню /app — набір готових застосунків поверх контейнерного рушія (з опціями на кшталт заборони вихідного трафіку контейнера).
+
+/system device-mode update container=yes      # потребує фізичного підтвердження (reset/power)
+
+/interface veth add name=veth1 address=172.17.0.2/24 gateway=172.17.0.1
+/interface bridge add name=docker
+/ip address add address=172.17.0.1/24 interface=docker
+/interface bridge port add bridge=docker interface=veth1
+/ip firewall nat add chain=srcnat action=masquerade src-address=172.17.0.0/24
+
+/container config set registry-url=https://registry-1.docker.io tmpdir=usb1/tmp
+/container add remote-image=library/nginx:latest interface=veth1 root-dir=usb1/nginx \
+  logging=yes start-on-boot=yes
+/container start 0
+Контейнери на пристроях з 16–64 МБ флеш — не варіант. Мінімум: USB/NVMe-накопичувач і ≥256 МБ RAM.
+
+18. Безпека: практичний чеклист
+Доступ
+
+ admin вимкнено або перейменовано; створено окремого адміністратора зі складним паролем
+ /ip service — вимкнено telnet, ftp, api, www; ssh/winbox обмежені address=
+ Winbox/SSH недоступні з WAN (або тільки через VPN)
+ SSH: /ip ssh set strong-crypto=yes forwarding-enabled=no, ключі замість паролів (/user ssh-keys import)
+ /user aaa або RADIUS для централізованої автентифікації (де є сенс)
+Мережа
+
+ default drop в input і forward
+ DNS: allow-remote-requests=yes лише разом з блокуванням 53/udp+tcp з WAN
+ /ip neighbor discovery-settings set discover-interface-list=LAN
+ /tool mac-server і mac-winbox — тільки LAN
+ /tool bandwidth-server set enabled=no
+ /ip proxy, /ip socks, /ip upnp — вимкнено, якщо не використовуються
+ /ip cloud set ddns-enabled=no (якщо не потрібно)
+ RoMON вимкнено або обмежено
+ /ip settings set rp-filter=strict (де топологія дозволяє)
+ /ip firewall service-port — вимкнути непотрібні ALG (особливо sip, який часто ламає телефонію)
+Обслуговування
+
+ Регулярне оновлення RouterOS і RouterBOOT (/system routerboard upgrade)
+ Автоматичні бекапи (.rsc + бінарний) на зовнішнє сховище
+ Логи на віддалений syslog
+ /system device-mode print — обмеження можливостей пристрою (container, traffic-gen, scheduler тощо)
+/ip ssh set strong-crypto=yes allow-none-crypto=no host-key-type=ed25519
+/ip settings set rp-filter=strict tcp-syncookies=yes
+/system routerboard settings set auto-upgrade=no
+/system note set show-at-login=yes note="Authorized access only"
+19. Оновлення і відновлення
+19.1 Порядок правильного апгрейду
+/export file=pre-upgrade + /system backup save name=pre-upgrade
+Скопіювати файли з роутера на зовнішнє сховище
+/system package update check-for-updates → download → install
+Після перезавантаження: /system routerboard upgrade (RouterBOOT) → /system reboot
+Перевірити: /system package print, /log print, ключові сервіси
+/system package update set channel=stable
+/system package update check-for-updates
+/system package update install
+19.2 Відкат
+/system package downgrade          # якщо .npk старої версії завантажено у Files
+Або Netinstall з потрібною версією.
+
+19.3 Міграція v6 → v7 — на що дивитись
+OSPF і BGP переписані повністю (див. 8.6) — конфіг не переноситься автоматично коректно у складних випадках;
+/interface wireless → рекомендовано /interface wifi (потребує ручної перебудови);
+зміни у /routing filter (тепер скриптова мова);
+/ip route — нові параметри таблиць і VRF;
+деякі меню перейменовано (/ip firewall service-port, /system health тощо).
+Не оновлюйте v6 → v7 «в один крок» на віддаленому критичному пристрої без консолі або другого каналу доступу.
+
+20. Типові проблеми і швидка діагностика
+Симптом	Найімовірніша причина	Перевірка
+Ping працює, сайти не відкриваються	DNS або MTU	/ip dns print, MSS-clamping
+Тунель up, трафік не ходить	NAT не виключено для VPN-підмереж	правило accept у srcnat перед masquerade
+Правило firewall «не працює»	fasttrack / hw-offload / порядок правил	print stats, вимкнути fasttrack тимчасово
+Після vlan-filtering=yes втрачено доступ	bridge не в tagged для mgmt VLAN	safe mode, MAC-Winbox
+Високий CPU	firewall без conntrack-оптимізації, queue, L7	/tool profile duration=10
+Wi-Fi «повільний»	ширина каналу, завади, потужність, legacy-клієнти	/interface wifi registration-table print
+Розриви PPPoE	MTU/MRU, keepalive, ISP	/log print where topics~"pppoe"
+Маршрут неактивний	check-gateway спрацював / scope-конфлікт	/ip route print detail where active=no
+Port forward не працює	немає forward-правила, hairpin, ISP CGNAT	/ip firewall nat print stats
+Годинник/сертифікати	NTP не налаштовано	/system clock print
+Універсальний алгоритм:
+
+L1: /interface ethernet monitor — є лінк, дуплекс, помилки?
+L2: /ip arp print, /interface bridge host print — бачимо MAC?
+L3: /ping з src-address, /tool traceroute
+Firewall: print stats — які лічильники ростуть
+Conntrack: /ip firewall connection print where ...
+Дамп: /tool sniffer → Wireshark
+21. Довідник діапазонів і форматів (для валідації)
+Цей розділ корисний, якщо ви генеруєте .rsc програмно — саме тут виникає більшість помилок і ризиків ін'єкції.
+
+21.1 Числові межі
+Параметр	Діапазон
+distance (route)	1–255
+vlan-id	1–4094
+TCP/UDP порт	0–65535 (практично 1–65535)
+vrid (VRRP)	1–255
+mtu (ethernet)	68–(залежить від моделі, часто до 9216)
+priority (queue tree)	1–8
+pcq-limit	1–2000 (пакети)
+ASN (BGP)	1–4294967295
+tunnel-id (EoIP)	0–65535
+lease-time	формат часу: 1d, 30m, 1h30m
+limit (firewall)	count,burst:mode напр. 10,20:packet
+21.2 Формати
+Тип	Формат / приклад	Регулярний вираз (орієнтовний)
+IPv4	192.168.1.1	4 октети 0–255
+CIDR	192.168.1.0/24	префікс 0–32
+IPv6	2001:db8::1/64	префікс 0–128
+MAC	AA:BB:CC:DD:EE:FF	^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$
+Ім'я інтерфейсу	без пробілів краще; якщо з пробілами — обов'язкові лапки	—
+Діапазон портів	80,443,8000-8100	—
+WireGuard ключ	base64, 44 символи, закінчується =	^[A-Za-z0-9+/]{43}=$
+Час	1d2h3m4s, 00:05:00	—
+21.3 Екранування в .rsc — критично для безпеки
+RouterOS console трактує подвійні лапки як рядок з підстановкою. Усередині "...":
+
+$ починає підстановку змінної → має бути екранований як \$;
+\ — екранувальний символ → \\;
+" → \";
+символи керування: \n, \r, \t, \_ (пробіл), \a, \b, \f, \v;
+довільний байт: \XX (hex).
+Поза лапками руйнівними є: пробіл, ; (розділювач команд), перенос рядка, { }, [ ].
+
+Мінімальний коректний порядок екранування (важливий саме порядок!):
+
+1) \  →  \\
+2) "  →  \"
+3) $  →  \$
+4) керуючі символи → \XX
+5) обгорнути результат у "..."
+Якщо $ екранувати до \, отримаєте подвійне екранування і зламаний рядок.
+
+Приклад безпечної функції (псевдокод JS):
+
+function q(v) {
+  return '"' + String(v)
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g,  '\\"')
+    .replace(/\$/g, '\\$')
+    .replace(/[\x00-\x1F\x7F]/g, c =>
+        '\\' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'))
+    + '"';
+}
+Чого екранування НЕ рятує: поля, які не можуть бути рядком у лапках — числа, enum-и, імена інтерфейсів у деяких контекстах, MAC-адреси, IP. Їх треба валідувати за whitelist-патерном, а не екранувати. Типова вразливість генератора конфігів: MAC-адреса з імпортованого профілю вставляється як є → AA:BB:CC:DD:EE:FF; /user add name=evil password=x group=full виконується як окрема команда.
+
+Правило: структуровані поля → whitelist-regex; вільний текст (comment, ssid, passphrase, identity) → лапки + екранування; числа → парсинг + перевірка діапазону.
+
+22. Готові шаблони
+22.1 Роутер офісу: WAN DHCP + LAN + NAT + firewall
+/interface list add name=WAN
+/interface list add name=LAN
+/interface bridge add name=bridge-lan protocol-mode=rstp
+/interface bridge port add bridge=bridge-lan interface=ether2
+/interface bridge port add bridge=bridge-lan interface=ether3
+/interface bridge port add bridge=bridge-lan interface=ether4
+/interface list member add list=WAN interface=ether1
+/interface list member add list=LAN interface=bridge-lan
+
+/ip address add address=192.168.88.1/24 interface=bridge-lan
+/ip dhcp-client add interface=ether1 use-peer-dns=no add-default-route=yes
+/ip pool add name=dhcp ranges=192.168.88.100-192.168.88.200
+/ip dhcp-server add name=srv1 interface=bridge-lan address-pool=dhcp lease-time=8h disabled=no
+/ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=192.168.88.1
+/ip dns set servers=1.1.1.1,9.9.9.9 allow-remote-requests=yes
+
+/ip firewall nat add chain=srcnat action=masquerade out-interface-list=WAN
+
+/ip firewall filter
+add chain=input action=accept connection-state=established,related
+add chain=input action=drop connection-state=invalid
+add chain=input action=accept protocol=icmp limit=10,20:packet
+add chain=input action=accept in-interface-list=LAN
+add chain=input action=drop
+add chain=forward action=fasttrack-connection connection-state=established,related
+add chain=forward action=accept connection-state=established,related
+add chain=forward action=drop connection-state=invalid
+add chain=forward action=accept in-interface-list=LAN out-interface-list=WAN
+add chain=forward action=accept connection-nat-state=dstnat
+add chain=forward action=drop
+
+/ip firewall filter add chain=input action=drop in-interface-list=WAN protocol=udp dst-port=53
+/ip firewall filter add chain=input action=drop in-interface-list=WAN protocol=tcp dst-port=53
+22.2 Гостьовий VLAN з ізоляцією
+/interface vlan add name=vlan-guest vlan-id=30 interface=bridge-lan
+/ip address add address=192.168.30.1/24 interface=vlan-guest
+/ip pool add name=guest ranges=192.168.30.50-192.168.30.250
+/ip dhcp-server add name=guest-dhcp interface=vlan-guest address-pool=guest disabled=no
+/ip dhcp-server network add address=192.168.30.0/24 gateway=192.168.30.1 dns-server=1.1.1.1
+
+/interface list add name=GUEST
+/interface list member add list=GUEST interface=vlan-guest
+
+/ip firewall address-list add list=LOCAL address=192.168.0.0/16
+/ip firewall address-list add list=LOCAL address=10.0.0.0/8
+/ip firewall address-list add list=LOCAL address=172.16.0.0/12
+
+/ip firewall filter
+add chain=forward action=drop in-interface-list=GUEST dst-address-list=LOCAL \
+    place-before=[find comment="LAN->WAN"] comment="guest isolation"
+add chain=input action=accept in-interface-list=GUEST protocol=udp dst-port=53
+add chain=input action=accept in-interface-list=GUEST protocol=udp dst-port=67
+add chain=input action=drop in-interface-list=GUEST comment="guest cannot manage router"
+22.3 Щоденний бекап з відправкою поштою
+/system script add name=daily-backup source={
+    :local d [/system clock get date]
+    :local n [/system identity get name]
+    :local fn ($n . "-" . $d)
+    /system backup save name=$fn
+    :delay 5s
+    /export file=$fn
+    :delay 5s
+    /tool e-mail send to="admin@example.com" subject=("Backup " . $fn) \
+        body="attached" file=($fn . ".backup")
+    :delay 30s
+    /file remove [find name=($fn . ".backup")]
+    /file remove [find name=($fn . ".rsc")]
+}
+/system scheduler add name=daily-backup start-time=02:30:00 interval=1d on-event=daily-backup
+23. Швидкий довідник команд
+# Система
+/system resource print                  /system health print
+/system identity print                  /system routerboard print
+/system license print                   /system clock print
+/system reboot                          /system shutdown
+
+# Інтерфейси
+/interface print                        /interface ethernet monitor ether1
+/interface bridge host print            /interface print stats
+
+# IP
+/ip address print                       /ip route print detail
+/ip arp print                           /ip dhcp-server lease print
+/ip firewall connection print           /ip dns cache print
+
+# Firewall
+/ip firewall filter print stats         /ip firewall address-list print
+/ip firewall nat print
+
+# Моніторинг
+/tool torch interface=ether1            /tool profile duration=10
+/log print follow                       /ip traffic-flow print
+
+# Користувачі
+/user print                             /user active print
+
+# Файли
+/file print                             /file remove [find name~"old"]
+24. Що читати далі в офіційному Help
+Тема	Розділ у help.mikrotik.com
+Перший запуск	RouterOS → Getting started
+CLI і скрипти	RouterOS → Scripting
+Bridge і VLAN	RouterOS → Bridging and Switching
+Firewall	RouterOS → Firewall and Quality of Service
+Маршрутизація	RouterOS → Routing (OSPF, BGP, RIP, MPLS)
+VPN	RouterOS → Virtual Private Networks
+Wi-Fi	RouterOS → Wireless (WiFi / CAPsMAN / Wireless legacy)
+Контейнери	RouterOS → Container
+API / REST	RouterOS → REST API, API
+Апаратне	RouterBOARD, Hardware, Netinstall
+На форумі шукайте за: «V7.x [stable] is released» (release notes), «beginner basics», а також підрозділи General, Scripting, Wireless, Container.
+
+25. Обмеження цього документа
+Складено у вересні 2026 з орієнтиром на RouterOS 7.23.x. Меню та параметри змінюються між релізами — звіряйтесь із ? у CLI.
+Синтаксис наведено для v7; для v6 багато прикладів (OSPF, BGP, routing filters, wifi) не працюватимуть.
+Конфіги моделезалежні: набір інтерфейсів, можливості switch chip, підтримка hw-offload, доступність пакетів відрізняються.
+Це не заміна офіційній документації, а робоча шпаргалка. Для повних таблиць параметрів завжди йдіть у help.mikrotik.com.
+Питання регуляторики (канали Wi-Fi, потужність, ліцензії) — за місцевим законодавством.
+
+MikroTik RouterOS v7 — зведений практичний мануал
+ЧАСТИНА ДРУГА: доповнення
+Продовження документа v1.0 (розділи 0–25). Нумерація наскрізна: тут розділи 26–45. Орієнтир: RouterOS 7.23.x · вересень 2026
+
+Що додає ця частина
+Перша частина покривала «щоденний мінімум»: CLI, bridge/VLAN, firewall, NAT, базові VPN, скрипти. Друга частина — це те, що починає боліти, коли мережа виростає або коли конфіг генерується програмно:
+
+IPv6, PPPoE/RADIUS, Hotspot, MPLS — сервісні сценарії;
+поглиблено bridge (MSTP, QinQ, bridge filter), switch chip і offload;
+PKI, моніторинг, апаратна специфіка (LTE, PoE, диски);
+просунутий скриптинг, бінарний API, автоматизація (Ansible/Terraform/CI);
+окремо — розділи 42–44 про генерацію .rsc: ідемпотентність, порядок команд, залежності, edge cases парсера. Це пряме продовження розділу 21 першої частини.
+26. IPv6 — повний робочий цикл
+26.1 Увімкнення
+IPv6 у RouterOS v7 вбудовано в основний пакет, але може бути вимкнено:
+
+/ipv6 settings set disable-ipv6=no forward=yes accept-router-advertisements=no
+На маршрутизаторі accept-router-advertisements=no — правильний дефолт. Інакше роутер сам починає слухати RA з WAN і ставити маршрути.
+
+26.2 Отримання префікса від провайдера (DHCPv6-PD)
+/ipv6 dhcp-client add interface=ether1 request=prefix pool-name=isp-pool \
+  pool-prefix-length=64 add-default-route=yes use-peer-dns=no
+
+/ipv6 address add address=::1 from-pool=isp-pool interface=bridge-lan advertise=yes
+address=::1 from-pool=... означає «взяти перший /64 з делегованого префікса і дати роутеру адресу ...::1».
+
+26.3 Роздача клієнтам
+SLAAC (найпростіше):
+
+/ipv6 nd set [find default=yes] interface=bridge-lan advertise-dns=yes \
+  managed-address-configuration=no other-configuration=no ra-lifetime=30m
+/ipv6 nd prefix default set autonomous=yes preferred-lifetime=1d valid-lifetime=2d
+DHCPv6-сервер (коли потрібні фіксовані адреси):
+
+/ipv6 pool add name=lan-pool prefix=2001:db8:1::/48 prefix-length=64
+/ipv6 dhcp-server add name=dhcp6 interface=bridge-lan address-pool=lan-pool
+/ipv6 nd set [find] managed-address-configuration=yes other-configuration=yes
+Android історично не підтримує DHCPv6 — якщо в мережі є Android-пристрої, SLAAC обов'язковий (або SLAAC+DHCPv6 разом).
+
+26.4 Firewall для IPv6 — не забувайте
+IPv6 — це глобально маршрутизовані адреси без NAT. Без firewall уся ваша LAN доступна з Інтернету.
+
+/ipv6 firewall address-list
+add list=bad_ipv6 address=::1/128 comment="lo"
+add list=bad_ipv6 address=::ffff:0.0.0.0/96 comment="ipv4-mapped"
+add list=bad_ipv6 address=2001:db8::/32 comment="documentation"
+add list=bad_ipv6 address=fe80::/10 comment="link-local"
+
+/ipv6 firewall filter
+add chain=input action=accept connection-state=established,related
+add chain=input action=drop connection-state=invalid
+add chain=input action=accept protocol=icmpv6 comment="ICMPv6 is MANDATORY"
+add chain=input action=accept protocol=udp dst-port=546 src-address=fe80::/10 comment="dhcpv6"
+add chain=input action=accept in-interface-list=LAN
+add chain=input action=drop
+
+add chain=forward action=accept connection-state=established,related
+add chain=forward action=drop connection-state=invalid
+add chain=forward action=accept protocol=icmpv6
+add chain=forward action=drop src-address-list=bad_ipv6
+add chain=forward action=drop dst-address-list=bad_ipv6
+add chain=forward action=accept in-interface-list=LAN
+add chain=forward action=drop
+Не блокуйте ICMPv6 наосліп. На відміну від IPv4, в IPv6 ICMP несе NDP (заміна ARP) і PMTUD. Блокування = мережа не працює. Максимум — rate-limit.
+
+26.5 NAT66 / масквардинг IPv6
+Технічно можливий (/ipv6 firewall nat action=masquerade), але не рекомендований: ламає e2e, PMTUD і частину протоколів. Використовують лише коли провайдер видає один /128 без делегування. Альтернатива — NPTv6 (action=netmap).
+
+26.6 Діагностика
+/ipv6 address print
+/ipv6 neighbor print
+/ipv6 route print where active=yes
+/ping 2606:4700:4700::1111
+/ipv6 nd print detail
+27. PPP, PPPoE, RADIUS і User Manager
+27.1 PPPoE-клієнт (WAN у провайдера)
+/interface pppoe-client add name=pppoe-wan interface=ether1 \
+  user="login" password="pass" add-default-route=yes use-peer-dns=no \
+  default-route-distance=1 disabled=no
+/interface list member add list=WAN interface=pppoe-wan
+MTU для PPPoE — 1480/1492 залежно від провайдера. Обов'язковий MSS-clamping:
+
+/ip firewall mangle add chain=forward action=change-mss new-mss=clamp-to-pmtu \
+  protocol=tcp tcp-flags=syn out-interface=pppoe-wan
+27.2 PPPoE-сервер (для ISP-сценаріїв)
+/ip pool add name=pppoe-pool ranges=10.100.0.2-10.100.15.254
+
+/ppp profile add name=prof-100M local-address=10.100.0.1 remote-address=pppoe-pool \
+  dns-server=10.100.0.1 rate-limit=100M/100M only-one=yes change-tcp-mss=yes \
+  use-compression=no use-encryption=no
+
+/interface pppoe-server server add service-name=isp interface=bridge-access \
+  default-profile=prof-100M authentication=pap,chap,mschap2 \
+  max-mtu=1480 max-mru=1480 one-session-per-host=yes disabled=no
+
+/ppp secret add name=client001 password="..." service=pppoe profile=prof-100M \
+  remote-address=10.100.0.50 comment="Ivanov, contract 1234"
+Ключові параметри профілю:
+
+rate-limit формат: rx/tx або розширений rx/tx rx-burst/tx-burst rx-burst-threshold/tx-burst-threshold rx-burst-time/tx-burst-time priority rx-min/tx-min;
+only-one=yes — заборона одночасних сесій одного користувача;
+change-tcp-mss=yes — автоматичний MSS-clamp для сесії;
+address-list= — динамічно додавати клієнта у address-list (зручно для firewall).
+Моніторинг: /ppp active print, /interface pppoe-server print.
+
+27.3 RADIUS
+/radius add service=ppp,login,hotspot address=10.0.0.10 secret="radius-secret" \
+  timeout=300ms src-address=10.0.0.1 authentication-port=1812 accounting-port=1813
+/radius incoming set accept=yes port=3799       # CoA / Disconnect-Message
+/ppp aaa set use-radius=yes accounting=yes interim-update=5m
+Для адмінського входу через RADIUS:
+
+/user aaa set use-radius=yes default-group=read exclude-groups=""
+Завжди лишайте локального адміністратора. Якщо RADIUS недоступний, а use-radius=yes єдиний спосіб входу — вас врятує тільки Netinstall.
+
+27.4 User Manager (v7 переписаний)
+/user-manager set enabled=yes certificate=um-cert
+/user-manager router add name=nas1 address=10.0.0.1 shared-secret="secret"
+/user-manager user add name=test password=test group=default
+/user-manager profile add name=basic name-for-users="Basic 50M"
+/user-manager user-profile add user=test profile=basic
+Синтаксис v7 UM повністю відрізняється від v6 — міграція ручна.
+
+28. Hotspot
+28.1 Базове налаштування
+/ip pool add name=hs-pool ranges=10.5.50.10-10.5.50.254
+/ip dhcp-server add name=hs-dhcp interface=bridge-guest address-pool=hs-pool disabled=no
+/ip dhcp-server network add address=10.5.50.0/24 gateway=10.5.50.1 dns-server=10.5.50.1
+
+/ip hotspot profile add name=hsprof hotspot-address=10.5.50.1 dns-name=wifi.example.com \
+  html-directory=hotspot login-by=http-chap,mac-cookie use-radius=no
+/ip hotspot add name=hs1 interface=bridge-guest address-pool=hs-pool profile=hsprof \
+  addresses-per-mac=1 idle-timeout=5m keepalive-timeout=none
+
+/ip hotspot user profile add name=guest rate-limit=10M/10M shared-users=1 \
+  session-timeout=3h
+/ip hotspot user add name=guest1 password=guest1 profile=guest
+28.2 Walled garden (що дозволено до логіну)
+/ip hotspot walled-garden add dst-host="*.example.com" action=allow
+/ip hotspot walled-garden ip add dst-address=10.0.0.5 action=accept protocol=tcp dst-port=443
+28.3 Практичні нюанси
+Hotspot працює через прозорий проксі — HTTPS-редирект неможливий коректно без сертифіката, довіреного клієнтом. Сучасні ОС використовують captive portal detection (captive.apple.com, connectivitycheck.gstatic.com) — додайте їх у walled garden, щоб спливало вікно логіну.
+Hotspot додає власні правила в firewall/NAT з динамічними ланцюгами hotspot, pre-hotspot, hs-unauth — не видаляйте їх вручну.
+login-by=mac дозволяє автологін за MAC — зручно і небезпечно одночасно.
+Кастомізація сторінок: /ip hotspot profile → html-directory; файли редагуються через Files/FTP.
+29. MPLS і VPLS (оглядово)
+Актуально для провайдерських мереж. Мінімальний L2VPN:
+
+/mpls ldp add transport-addresses=10.255.0.1 lsr-id=10.255.0.1 enabled=yes
+/mpls ldp interface add interface=ether1
+/mpls settings set dynamic-label-range=16-1048575
+
+/interface vpls add name=vpls-to-B remote-peer=10.255.0.2 vpls-id=1:100 \
+  cisco-style=no disabled=no
+/interface bridge port add bridge=bridge-l2 interface=vpls-to-B
+Вимоги:
+
+IGP (OSPF) має бути піднятий і стабільний — MPLS будується поверх нього;
+MTU: MPLS додає 4 байти на мітку → потрібен jumbo-capable транспорт (l2mtu ≥ 1526+);
+lsr-id і transport-address — зазвичай loopback (/interface bridge add name=lo + адреса /32).
+Діагностика: /mpls ldp neighbor print, /mpls forwarding-table print, /mpls local-mapping print.
+
+MPLS на MikroTik — потужний, але чутливий до MTU і версій. Для 2–3 офісів простіше EoIP/WireGuard.
+
+30. Bridge: просунуті можливості
+30.1 MSTP
+/interface bridge set bridge1 protocol-mode=mstp region-name=REGION1 region-revision=1
+/interface bridge msti add bridge=bridge1 identifier=1 priority=0x8000
+/interface bridge port set [find interface=ether2] internal-path-cost=10
+MSTP дозволяє різним VLAN мати різні активні топології. Усі комутатори в регіоні мусять мати однакові region-name, region-revision і мапінг VLAN→MSTI.
+
+30.2 Bridge filter і bridge NAT (фільтрація на L2)
+/interface bridge filter add chain=forward action=drop mac-protocol=ipx
+/interface bridge filter add chain=input action=drop src-mac-address=AA:BB:CC:00:00:00/FF:FF:FF:00:00:00
+/interface bridge nat add chain=dstnat action=dst-nat to-dst-mac-address=... 
+/interface bridge settings set use-ip-firewall=yes змушує мостовий трафік проходити через IP firewall — дорого по CPU, вмикати тільки свідомо.
+
+30.3 Port isolation (horizon)
+/interface bridge port set [find interface=ether2] horizon=1
+/interface bridge port set [find interface=ether3] horizon=1
+Порти з однаковим horizon не обмінюються трафіком між собою (аналог private VLAN). Дешевше, ніж окремі VLAN для кожного клієнта.
+
+30.4 QinQ (802.1ad, service VLAN)
+/interface bridge set bridge1 vlan-filtering=yes ether-type=0x88a8
+/interface vlan add name=svlan100 vlan-id=100 interface=ether1 use-service-tag=yes
+/interface vlan add name=cvlan10 vlan-id=10 interface=svlan100
+Потрібен запас MTU (+4 байти на кожну мітку) і підтримка з боку чипа.
+
+30.5 Інші корисні параметри порту
+Параметр	Що робить
+hw=yes	апаратний offload (тільки порти одного switch chip)
+edge=yes	порт доступу — швидший перехід у forwarding
+bpdu-guard=yes	вимикає порт, якщо прийшов BPDU (захист від підключення чужого комутатора)
+frame-types	admit-all, admit-only-untagged-and-priority-tagged, admit-only-vlan-tagged
+ingress-filtering=yes	відкидати кадри з VLAN, не дозволеними на порту
+unknown-unicast-flood=no	обмеження флуду
+multicast-router / IGMP snooping	/interface bridge set bridge1 igmp-snooping=yes
+Для VLAN-безпеки завжди: ingress-filtering=yes + frame-types=admit-only-untagged-and-priority-tagged на портах доступу.
+
+31. Switch chip і hardware offload
+31.1 Що треба розуміти
+Кожен пристрій має свій чип: Atheros8327, QCA8337, Marvell Prestera, MT7621, тощо. Можливості різні: підтримка VLAN offload, ACL rules, mirroring, кількість записів у таблицях.
+Offload працює тільки між портами одного чипа. Порти на різних чипах або через CPU — програмна обробка.
+/interface ethernet switch print покаже наявні чипи; /interface bridge port print — колонку H (hardware offload активний).
+31.2 Перевірка
+/interface ethernet switch print
+/interface bridge port print detail where hw=yes
+/interface ethernet switch rule print       # ACL на рівні чипа (не на всіх моделях)
+/interface ethernet switch port print
+31.3 Чому offload «злітає»
+Типові причини втрати H=yes:
+
+на bridge увімкнено use-ip-firewall=yes;
+порт у bonding;
+змішані типи портів (SFP + ether різних чипів);
+увімкнено певні режими STP чи mirroring;
+інтерфейс — VLAN/тунель, а не фізичний порт.
+31.4 Дзеркалювання портів
+/interface ethernet switch set 0 mirror-source=ether2 mirror-target=ether5
+32. Сертифікати і PKI
+32.1 Повний цикл власного CA
+/certificate add name=ca common-name="MyCA" key-size=2048 days-valid=3650 \
+  key-usage=key-cert-sign,crl-sign
+/certificate sign ca ca-crl-host=10.0.0.1 name=ca
+
+/certificate add name=server common-name="vpn.example.com" key-size=2048 days-valid=1825 \
+  subject-alt-name="DNS:vpn.example.com,IP:203.0.113.10" \
+  key-usage=digital-signature,key-encipherment,tls-server
+/certificate sign server ca=ca name=server
+
+/certificate add name=client1 common-name="client1" key-size=2048 days-valid=365 \
+  key-usage=tls-client
+/certificate sign client1 ca=ca name=client1
+
+# експорт для клієнта
+/certificate export-certificate ca export-passphrase=""
+/certificate export-certificate client1 export-passphrase="StrongPass" type=pkcs12
+32.2 Let's Encrypt (вбудовано з 7.x)
+/ip cloud set ddns-enabled=yes
+/certificate enable-ssl-certificate dns-name=xxxxxx.sn.mynetname.net
+Потрібен відкритий TCP 80 ззовні на час валідації. Сертифікат автоматично прив'язується до www-ssl.
+
+32.3 Нюанси
+subject-alt-name обов'язковий для сучасних клієнтів (Windows/iOS/macOS ігнорують CN);
+час на роутері має бути правильним (NTP!), інакше підпис/валідація падають;
+CRL: /certificate crl print, ca-crl-host має бути досяжним, інакше клієнти можуть відкидати сертифікат;
+імпорт: покладіть .crt/.key/.p12 у Files → /certificate import file-name=... passphrase=.... Ключ імпортується окремим викликом import того ж імені файлу.
+33. Моніторинг
+33.1 SNMP
+/snmp community set [find default=yes] name=public addresses=10.0.0.0/24 read-access=yes write-access=no
+/snmp community add name=v3user security=private authentication-protocol=SHA1 \
+  authentication-password="authpass" encryption-protocol=AES encryption-password="encpass" \
+  addresses=10.0.0.5/32
+/snmp set enabled=yes contact="noc@example.com" location="DC1 rack 3" trap-version=3
+Корисні OID-гілки: 1.3.6.1.2.1.2 (інтерфейси), 1.3.6.1.4.1.14988 (MikroTik private: температура, CPU, оптика SFP, Wi-Fi реєстрації).
+
+33.2 NetFlow / traffic-flow
+/ip traffic-flow set enabled=yes interfaces=all cache-entries=32k \
+  active-flow-timeout=30m inactive-flow-timeout=15s
+/ip traffic-flow target add dst-address=10.0.0.20 port=2055 version=9 v9-template-refresh=20
+Версії: 1, 5, 9, IPFIX. Для IPv6 і MPLS потрібна v9/IPFIX.
+
+33.3 Graphing (вбудовані графіки)
+/tool graphing interface add interface=all store-on-disk=yes
+/tool graphing resource add store-on-disk=yes
+/tool graphing set store-every=5min
+Доступ: http://router/graphs/.
+
+33.4 Що моніторити в першу чергу
+Метрика	Команда / OID	Поріг тривоги
+CPU load	/system resource print	стабільно >70%
+Free memory	те саме	<15%
+Disk / bad blocks	/system resource print	bad-blocks >0%
+Температура	/system health print	залежить від моделі
+Помилки на інтерфейсах	/interface ethernet print stats	будь-який приріст rx-error, fcs-error
+Кількість conntrack	/ip firewall connection print count-only	близько до max
+Uptime	несподіваний ресет = проблема живлення/вотчдог	
+SFP DDM	/interface ethernet monitor sfp-sfpplus1	rx-power поза діапазоном
+33.5 The Dude
+Серверна частина ставиться як пакет на MikroTik (або CHR) — карта мережі, автовиявлення, сповіщення, збір SNMP/syslog. Для великих мереж краще Zabbix/LibreNMS + SNMP з роутерів.
+
+34. Апаратна специфіка
+34.1 LTE / 5G
+/interface lte set lte1 apn-profiles=default allow-roaming=no
+/interface lte apn set [find default=yes] apn=internet authentication=none use-network-apn=no
+/interface lte monitor lte1 once
+/interface lte at-chat lte1 input="AT+CSQ"
+Passthrough (модем сам роздає IP клієнту): /interface lte set lte1 modem-passthrough=... — не на всіх моделях.
+Сигнал: дивіться RSRP/RSRQ/SINR у monitor, не «палички».
+Багато провайдерів дають CGNAT → вхідні підключення неможливі без VPN/публічної IP.
+34.2 PoE-out
+/interface ethernet poe print
+/interface ethernet poe set ether5 poe-out=auto-on poe-priority=10
+/interface ethernet poe monitor ether5 once
+/interface ethernet poe set ether5 poe-out=off ; :delay 5s ; /interface ethernet poe set ether5 poe-out=auto-on
+Останній рядок — «віддалений ресет» камери/точки доступу. Дуже корисний у скриптах разом із netwatch.
+
+34.3 Диски, USB, SMB
+/disk print
+/disk format-drive 0 file-system=ext4 label=data
+/ip smb set enabled=yes interfaces=bridge-lan domain=WORKGROUP
+/ip smb share add name=data directory=disk1/share
+SMB-сервер RouterOS історично був джерелом вразливостей. Вмикайте лише в LAN і тримайте оновлення.
+
+34.4 Watchdog
+/system watchdog set watchdog-timer=yes watch-address=8.8.8.8 ping-timeout=1m \
+  automatic-supout=yes no-ping-delay=5m
+Апаратний вотчдог перезавантажить роутер, якщо він «завис» або втратив зв'язок із контрольною адресою. Обережно на резервних каналах — може зациклити ребути.
+
+35. Просунутий скриптинг
+35.1 Функції
+:global addToList do={
+    :local lst $1
+    :local addr $2
+    :if ([:len [/ip firewall address-list find list=$lst address=$addr]] = 0) do={
+        /ip firewall address-list add list=$lst address=$addr
+        :return true
+    }
+    :return false
+}
+# виклик:
+:put [$addToList "blocked" "1.2.3.4"]
+Іменовані аргументи:
+
+:global notify do={
+    :log info ("[" . $level . "] " . $msg)
+}
+$notify level="warn" msg="disk almost full"
+35.2 Масиви і словники
+:local arr {1;2;3}
+:local dict {"a"=1; "b"=2}
+:put ($dict->"a")
+:foreach k,v in=$dict do={ :put ("$k = $v") }
+:set arr ($arr, 4)                 # додати елемент
+:put [:len $arr]
+:put [:pick $arr 1]
+35.3 JSON
+:local json "{\"name\":\"test\",\"value\":42}"
+:local obj [:deserialize from=json value=$json]
+:put ($obj->"name")
+
+:local out [:serialize to=json value={"status"="ok"; "uptime"=[/system resource get uptime]}]
+/tool fetch url="https://api.example.com/report" http-method=post http-data=$out \
+  http-header-field="Content-Type: application/json" keep-result=no
+:serialize / :deserialize з'явились у v7; у старіших релізах JSON парсили вручну через :pick/:find. Перевірте наявність: :serialize ?.
+
+35.4 Обробка помилок
+:do {
+    /interface wireguard peers add interface=wg0 public-key=$key allowed-address=$addr
+} on-error={
+    :log error ("failed to add peer " . $key)
+}
+
+# перевірка результату fetch
+:local res [/tool fetch url="https://example.com/x" as-value output=user]
+:if (($res->"status") = "finished") do={ :put ($res->"data") }
+35.5 Регулярні вирази
+Використовуються в find where ... ~ "...", /ip dns static regexp=, /ip firewall layer7-protocol. Синтаксис — POSIX extended. Екранування в .rsc подвійне: \\. означає літеральну крапку.
+
+/log print where message~"login failure for user (admin|root)"
+/ip dns static add regexp="^.*\\.ads\\.example\\.com\$" address=0.0.0.0
+35.6 Робота з часом
+:local now [/system clock get time]
+:local today [/system clock get date]
+:put [:timestamp]
+:if ([:tonum [:pick $now 0 2]] >= 22) do={ :put "night" }
+Формат дати у v7 — ISO (2026-09-21), у v6 був sep/21/2026. Скрипти, що парсять дату, ламаються при міграції.
+
+35.7 Готовий приклад: авто-бан за логами
+/system script add name=scan-auth source={
+    :foreach l in=[/log find where topics~"system" && message~"login failure"] do={
+        :local m [/log get $l message]
+        :local p [:find $m "from "]
+        :if ($p > 0) do={
+            :local ip [:pick $m ($p+5) [:find $m " via"]]
+            :if ([:len [/ip firewall address-list find list=banned address=$ip]] = 0) do={
+                /ip firewall address-list add list=banned address=$ip timeout=1d \
+                    comment="auto: failed login"
+                :log warning ("banned " . $ip)
+            }
+        }
+    }
+}
+/system scheduler add name=scan-auth interval=2m on-event=scan-auth
+Приклад демонстраційний: формат рядків логу відрізняється між версіями. Перед продакшеном перевірте /log print руками.
+
+36. API: бінарний і REST
+36.1 Бінарний API (8728 / 8729 TLS)
+Протокол простий і добре підходить для автоматизації:
+
+Повідомлення = sentence — послідовність words, завершена word нульової довжини.
+Кожне word має префікс довжини змінного розміру:
+Довжина	Кодування префікса
+< 0x80	1 байт: len
+< 0x4000	2 байти: len | 0x8000, big-endian
+< 0x200000	3 байти: len | 0xC00000
+< 0x10000000	4 байти: len | 0xE0000000
+більше	1 байт 0xF0 + 4 байти довжини
+Перше word — команда (/interface/print), далі атрибути (=name=value), query-слова (?type=ether), і теги (.tag=1).
+Відповіді: !re (дані), !done (кінець), !trap (помилка), !fatal.
+Логін у сучасних версіях — одним sentence:
+/login
+=name=admin
+=password=secret
+(старий MD5-challenge механізм підтримувався до 6.43; у v7 не потрібен).
+
+Готові бібліотеки: librouteros (Python), routeros_api (Python), routeros-api (PHP), go-routeros (Go), node-routeros (JS).
+
+36.2 REST API
+GET    https://router/rest/interface
+GET    https://router/rest/ip/address?interface=ether1
+POST   https://router/rest/ip/address        {"address":"10.0.0.1/24","interface":"ether1"}
+PATCH  https://router/rest/ip/address/*3     {"comment":"updated"}
+DELETE https://router/rest/ip/address/*3
+POST   https://router/rest/execute           {"script":"/system/resource/print"}
+Особливості:
+
+потребує www-ssl з сертифікатом (див. 32);
+.id має вигляд *3 — у URL використовується без зірочки або з нею залежно від версії, перевіряйте;
+для команд без CRUD використовується POST /rest/<path>/<command>, напр. POST /rest/system/reboot.
+36.3 Що обрати
+Сценарій	Рекомендація
+Масовий опитувач / моніторинг	бінарний API (швидший, менше накладних)
+Інтеграція з вебом / скриптами	REST
+Разова зміна	SSH + .rsc
+Керування парком	Ansible / Terraform (див. 37)
+37. Автоматизація парку пристроїв
+37.1 Ansible
+Колекція community.routeros дає модулі routeros_command, routeros_api, routeros_facts.
+
+- hosts: mikrotiks
+  gather_facts: no
+  connection: network_cli
+  vars:
+    ansible_network_os: community.routeros.routeros
+  tasks:
+    - name: Ensure NTP
+      community.routeros.routeros_command:
+        commands:
+          - /system ntp client set enabled=yes
+          - /system ntp client servers add address=time.cloudflare.com
+37.2 Terraform
+Провайдер terraform-routeros/routeros працює через REST або старий API, покриває більшість ресурсів v7. Придатний для декларативного керування, але стан (state) треба акуратно імпортувати для існуючих пристроїв.
+
+37.3 CI для конфігів — практичний підхід
+Конфіг як код: .rsc-шаблони в Git, змінні окремо (YAML/JSON).
+Генерація → лінт (перевірка діапазонів, екранування, заборонених команд).
+Тест на CHR у CI: підняти віртуальний роутер, /import, перевірити /log print where topics~"error" і кілька smoke-перевірок.
+Деплой: SSH з таймером-відкатом (див. 4.4 першої частини) або Ansible з --check.
+Дрифт-детекція: щоденний /export terse → diff з еталоном.
+# приклад smoke-перевірки після імпорту
+:if ([:len [/ip firewall filter find chain=input action=drop]] = 0) do={
+    :log error "SMOKE FAIL: no default drop in input"
+}
+37.4 Централізований бекап
+/system script add name=push-backup source={
+    :local n [/system identity get name]
+    /export file=$n
+    :delay 5s
+    /tool fetch mode=sftp address=10.0.0.30 user=backup password="..." \
+        src-path=($n . ".rsc") dst-path=("/backups/" . $n . ".rsc") upload=yes
+    :delay 10s
+    /file remove [find name=($n . ".rsc")]
+}
+38. Device-mode, ліцензії, RouterBOOT
+38.1 Device-mode (v7 механізм обмеження можливостей)
+/system device-mode print
+/system device-mode update mode=enterprise container=yes scheduler=yes
+Після виконання потрібне фізичне підтвердження: натиснути reset або перезавантажити живлення протягом 5 хвилин. Це захист від віддаленої зміни зловмисником. Режими обмежують доступ до container, traffic-gen, scheduler, socks, fetch, bandwidth-test, email, proxy, hotspot, zerotier, partitions, install-any-version.
+
+Після компрометації/оновлення саме device-mode часто блокує потрібну функцію — перевіряйте його першим, якщо команда «не існує» або «заборонена».
+
+38.2 Ліцензії
+Рівень	Що дає
+0 (demo)	24 години
+1 (free)	обмежений, без Wi-Fi AP
+3	CPE-режим
+4 (WISP)	повний роутер + AP
+5	більше тунелів/hotspot-користувачів
+6 (controller)	без обмежень
+CHR: free / p1 / p10 / pu	обмеження швидкості на інтерфейс (1 Мбіт/с у free)
+/system license print
+/system license renew                  # CHR
+RouterBOARD-пристрої мають ліцензію в чипі — при Netinstall не губиться.
+
+38.3 RouterBOOT
+/system routerboard print
+/system routerboard upgrade            # оновлення завантажувача, потім reboot
+/system routerboard settings print
+/system routerboard settings set boot-device=try-ethernet-once-then-nand silent-boot=no
+Оновлювати RouterBOOT треба після оновлення RouterOS — інакше можна отримати несумісність.
+
+39. Продуктивність і планування ємності
+39.1 Де витрачається CPU
+Firewall/conntrack — кількість правил × пакети. Оптимізація: раннє accept established,related, raw для сміття, address-list замість десятків правил, fasttrack.
+Queue — особливо queue tree з багатьма гілками і PCQ з великим pcq-limit.
+Шифрування — IPsec/WireGuard/OVPN. Дивіться, чи є апаратне прискорення IPsec (/system resource print → наявність ipsec в hw).
+Wi-Fi — обробка кадрів.
+Логування — рясний action=log у firewall здатен покласти роутер.
+39.2 Правила оптимізації firewall
+# ПОГАНО: 50 правил з окремими IP
+# ДОБРЕ: один address-list
+/ip firewall address-list add list=blocked address=1.2.3.0/24
+/ip firewall filter add chain=forward action=drop src-address-list=blocked
+
+# ПОГАНО: log на кожен дроп
+# ДОБРЕ: log з обмеженням
+/ip firewall filter add chain=input action=log log-prefix="DROP" limit=5,10:packet
+39.3 Орієнтири (дуже приблизні, перевіряйте на своєму залізі)
+hEX/RB750-клас: 100–300 Мбіт/с з NAT+firewall, значно менше з queue/VPN;
+hAP ax-клас: ~1 Гбіт/с з fasttrack;
+CCR2004/CCR2116: десятки Гбіт/с, IPsec з апаратним прискоренням;
+CHR: залежить від vCPU і vNIC (virtio + multiqueue дає в рази більше).
+Єдиний правильний спосіб знати цифри — /tool profile duration=10 під реальним навантаженням.
+
+40. Просунутий хардинг
+40.1 Управління через окремий шлях
+Найкраща практика: менеджмент-VLAN або VPN, жодного доступу до input з WAN.
+
+/interface list add name=MGMT
+/interface list member add list=MGMT interface=vlan-mgmt
+/ip service set winbox address=10.255.255.0/24
+/ip firewall filter add chain=input action=accept in-interface-list=MGMT place-before=0
+40.2 RoMON
+Дозволяє керувати пристроями на L2 без IP. Зручно — і небезпечно, якщо відкрито у клієнтський сегмент.
+
+/tool romon set enabled=yes id=00:00:00:00:00:01 secrets=strongsecret
+/tool romon port add interface=ether1 forbid=yes
+40.3 dot1x (порт-автентифікація)
+/interface dot1x server add interface=ether5 auth-types=dot1x,mac-auth \
+  reject-vlan-id=999 retrans-timeout=30s
+/interface dot1x client add interface=ether1 identity=switch1 password="..."
+40.4 Історична безпека — чому оновлення критичні
+RouterOS мав публічно відомі вразливості, які масово експлуатувалися (найвідоміший приклад — обхід автентифікації Winbox у v6, що призвів до масового зараження криптомайнером і ботнетами). Уроки:
+
+не виставляйте Winbox/API/WWW у публічний Інтернет ніколи;
+оновлюйтесь регулярно, особливо long-term гілку на критичних пристроях;
+після підозри на компрометацію: /system reset-configuration no-defaults=yes + Netinstall + зміна всіх паролів, а не «почистити скрипти». Перевірте /system scheduler, /system script, /ip socks, /ip proxy, /tool fetch у планувальнику, /file print, /user print — класичні місця закріплення.
+40.5 Аудит-скрипт (швидка перевірка)
+/system script add name=audit source={
+    :if ([/ip service get [find name=telnet] disabled] = false) do={ :log warning "telnet ON" }
+    :if ([/ip service get [find name=api] disabled] = false) do={ :log warning "api ON" }
+    :if ([/ip dns get allow-remote-requests] = true) do={ :log info "check DNS firewall" }
+    :if ([:len [/user find name=admin disabled=no]] > 0) do={ :log warning "default admin enabled" }
+    :if ([:len [/ip firewall filter find chain=input action=drop !in-interface]] = 0) do={
+        :log warning "no default drop in input" }
+    :if ([/tool bandwidth-server get enabled] = true) do={ :log warning "btest server ON" }
+}
+41. Лабораторія і тестування
+CHR (Cloud Hosted Router) — образ RouterOS для VMware/Hyper-V/KVM/VirtualBox/хмар. Безкоштовна ліцензія: 1 Мбіт/с на інтерфейс — достатньо для тестів конфігу.
+GNS3 / EVE-NG — топології з десятків CHR, зручно для відпрацювання OSPF/BGP/MPLS.
+Docker + CHR — швидкий CI-стенд.
+Мінімальний цикл перевірки нового .rsc: підняти чистий CHR → /import → перевірити код виходу і /log print where topics~"error" → прогнати smoke-скрипт (37.3).
+# автоматизована перевірка імпорту
+:local errBefore [:len [/log find where topics~"error"]]
+:do { /import file-name=test.rsc } on-error={ :log error "IMPORT FAILED" }
+:local errAfter [:len [/log find where topics~"error"]]
+:if ($errAfter > $errBefore) do={ :log error "errors during import" }
+42. Генерація .rsc: ідемпотентність і порядок
+Продовження розділу 21 першої частини. Це найважливіша частина для вашого сценарію — програмної генерації конфігів.
+
+42.1 Проблема
+/import — це послідовне виконання команд, а не декларативне застосування стану. Наслідки:
+
+повторний імпорт створює дублікати (два однакові firewall-правила, дві адреси);
+команда add падає, якщо об'єкт існує з унікальним полем;
+помилка на рядку N зупиняє виконання, залишаючи рядки 1..N-1 застосованими.
+42.2 Три стратегії
+A. Clean-slate (найпростіша і найнадійніша)
+
+/system reset-configuration no-defaults=yes skip-backup=yes run-after-reset=config.rsc
+Плюс: гарантований детермінований результат. Мінус: обрив зв'язку, потрібен фізичний/OOB-доступ.
+
+B. Секційне очищення перед записом
+
+/ip firewall filter remove [find]
+/ip firewall nat remove [find]
+/ip firewall filter add ...
+Плюс: не чіпає решту конфігу. Мінус: момент, коли firewall порожній (використовуйте /system scheduler для атомарного застосування або safe mode).
+
+C. Ідемпотентні операції (upsert за коментарем)
+
+:local cmt "gen:nat:wan-masq"
+:if ([:len [/ip firewall nat find comment=$cmt]] > 0) do={
+    /ip firewall nat set [find comment=$cmt] action=masquerade out-interface-list=WAN
+} else={
+    /ip firewall nat add comment=$cmt action=masquerade chain=srcnat out-interface-list=WAN
+}
+Патерн «comment як зовнішній ID» — найкраща практика для генераторів: RouterOS не має стабільних ID між перезавантаженнями (*3 змінюється), тому коментар з префіксом (gen:) стає ключем. Правило: усе, що створює генератор, отримує коментар із префіксом; все з цим префіксом можна безпечно видалити при повній перегенерації:
+
+/ip firewall filter remove [find comment~"^gen:"]
+42.3 Порядок команд — граф залежностей
+Генератор мусить випускати команди у топологічно коректному порядку:
+
+1. /interface bridge, /interface bonding, /interface vlan   (створення L2)
+2. /interface list, /interface list member
+3. /interface bridge port, /interface bridge vlan
+4. vlan-filtering=yes                                        ← ТІЛЬКИ ПІСЛЯ п.3
+5. /ip pool
+6. /ip address
+7. /ip dhcp-server, /ip dhcp-server network
+8. /ip dns
+9. /routing table                                            ← перед маршрутами з routing-table
+10. /ip route
+11. /ip firewall address-list
+12. /ip firewall mangle → nat → filter                        (порядок усередині кожної таблиці критичний)
+13. /interface wireguard → /interface wireguard peers
+14. /ip ipsec profile → proposal → peer → identity → policy
+15. /queue type → /queue simple або /queue tree
+16. /system script → /system scheduler
+17. /user, /ip service                                        ← в кінці (ризик обриву)
+Типові порушення, які ламають імпорт:
+
+маршрут із routing-table=X до створення /routing table add name=X;
+interface list member з інтерфейсом, який ще не створено;
+queue з packet-mark, якого ще немає в mangle (RouterOS це дозволить, але правило буде мертве);
+/ip address на VLAN-інтерфейсі до його створення;
+IPsec policy до peer/proposal.
+42.4 Порядок усередині firewall
+Правила додаються в кінець. Якщо генератор випускає їх у потрібному порядку — все добре. Якщо ж вставляє в існуючий набір — використовуйте place-before:
+
+/ip firewall filter add chain=forward action=drop comment="gen:guest-isolation" \
+  place-before=[find comment="gen:lan-to-wan"]
+place-before приймає ID. Якщо find нічого не знайшов, команда впаде — обгортайте в :do {} on-error={} або перевіряйте довжину.
+
+42.5 Безпечний «шапка/підвал» згенерованого файлу
+# ==== generated by <tool> v1.4 on 2026-09-21T10:00:00Z ====
+# target: RouterOS 7.20+ / device: hEX S
+:global GENFAIL false
+:do {
+    ... основна частина ...
+} on-error={
+    :set GENFAIL true
+    :log error "generated config import FAILED"
+}
+:if ($GENFAIL = false) do={ :log info "generated config applied OK" }
+43. .rsc: edge cases парсера
+Перелік речей, які регулярно ламають згенеровані файли:
+
+Ситуація	Що відбувається	Як обробляти в генераторі
+Ім'я інтерфейсу з пробілом ("ether1 - WAN")	команда розбивається на дві	завжди лапки навколо імен, або заборонити пробіли у власних іменах
+Коментар із ;	решта рядка — нова команда	екранувати + лапки (див. 21.3)
+Коментар із $	підстановка змінної → порожньо або сміття	\$
+Порожнє значення (comment=)	синтаксична помилка	comment=""
+Багаторядкове значення (скрипт у source=)	{} блок, всередині свої правила	вкладати як source={...}, стежити за балансом фігурних дужок
+Не-ASCII (кирилиця в comment/ssid)	залежить від кодування файлу	зберігати .rsc у UTF-8 без BOM
+BOM на початку файлу	перший рядок не розпізнається	не писати BOM
+CRLF vs LF	зазвичай ок, але краще LF	нормалізувати
+Дуже довгий рядок	обмеження консолі	розбивати логічно, не посеред значення
+Коментар-рядок #	працює тільки на початку рядка	не ставити # у середині
+Продовження рядка	символ \ в кінці рядка	використовувати обережно, краще довгі рядки
+[ ] у рядковому значенні	всередині подвійних лапок підстановка команд не виконується, але поза лапками — виконується	завжди лапки для вільного тексту
+find повернув порожньо	set [] — no-op, place-before=[] — помилка	перевіряти [:len ...]
+Пароль, що починається з - чи містить \	ламає парсинг	лапки + екранування
+0 замість no у boolean	помилка типу	приводити до yes/no
+Число з провідним нулем чи пробілом	port= 80 — помилка	trim + приведення типу
+43.1 Мінімальний набір валідаторів для генератора
+const V = {
+  ipv4:   s => /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(s),
+  cidr4:  s => { const [a,b]=String(s).split('/');
+                 return V.ipv4(a) && /^\d{1,2}$/.test(b) && +b>=0 && +b<=32; },
+  mac:    s => /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(s),
+  vlan:   n => Number.isInteger(+n) && +n>=1   && +n<=4094,
+  port:   n => Number.isInteger(+n) && +n>=1   && +n<=65535,
+  dist:   n => Number.isInteger(+n) && +n>=1   && +n<=255,
+  vrid:   n => Number.isInteger(+n) && +n>=1   && +n<=255,
+  wgkey:  s => /^[A-Za-z0-9+/]{43}=$/.test(s),
+  ifname: s => /^[A-Za-z0-9_.\-]{1,32}$/.test(s),   // без пробілів — свідоме обмеження
+  timeSpec: s => /^(\d+[wdhms])+$|^\d{2}:\d{2}:\d{2}$/.test(s),
+};
+Правило розподілу:
+
+структуроване поле (IP, MAC, VLAN, порт, ключ, enum) → whitelist-валідація, без лапок; при невдачі — відмова генерувати, а не «санітизація»;
+вільний текст (comment, ssid, identity, passphrase, name) → лапки + екранування за 21.3;
+числа → парсинг у ціле + перевірка діапазону + повторна серіалізація (не передавати рядок користувача).
+Ключова теза: санітизація структурованих полів небезпечна. Якщо MAC не проходить regex — це помилка вводу або атака; «почистити» його і продовжити означає згенерувати конфіг, якого користувач не очікує. Відмова краща.
+
+43.2 Що перевіряти на рівні семантики (не синтаксису)
+IP-адреса шлюзу належить одній із підмереж пристрою (або досяжна через інший маршрут);
+адреса з /32 як LAN-мережа — майже завжди помилка;
+pool не перетинається зі статичними адресами і адресою шлюзу;
+dst-nat на приватну адресу, якої немає в жодній локальній мережі;
+два дефолтні маршрути з однаковим distance (несвідомий ECMP);
+VLAN ID, використаний двічі на одному bridge;
+out-interface посилається на інтерфейс, якого немає в конфігурації;
+правило accept після drop у тому самому ланцюзі — мертвий код;
+відсутність default drop в input при наявності WAN.
+44. Матриця сумісності версій (для генератора)
+Якщо інструмент підтримує кілька версій RouterOS, ці розбіжності критичні:
+
+Функція	v6	v7.0–7.12	v7.13+
+Wi-Fi меню	/interface wireless	wireless + ранній wifiwave2	/interface wifi (рекомендовано)
+CAPsMAN	/caps-man	/caps-man	/interface wifi capsman
+OSPF	/routing ospf (instance/network)	новий синтаксис (instance/area/interface-template)	те саме
+BGP	/routing bgp instance/peer	/routing bgp connection/template	те саме
+Routing filters	набір полів	скриптова мова /routing filter rule	те саме
+Routing tables	routing-mark	/routing table + routing-table=	те саме
+VRF	/ip route vrf	/ip vrf	те саме
+WireGuard	немає	є з 7.1	розширено
+Контейнери	немає	/container з 7.4	+ меню /app у 7.2x
+Формат дати	sep/21/2026	ISO 2026-09-21	ISO
+/export секрети	показувались	приховані за замовчуванням	show-sensitive
+Device-mode	немає	є	розширено
+REST API	немає	є з 7.1	є
+Генератору варто приймати цільову версію як параметр і відмовлятися генерувати конфіг для непідтримуваної гілки, а не випускати «приблизно сумісний» файл.
+
+45. Обмеження цієї частини
+Як і перша частина, це витяжка, а не копія офіційної документації. Повні таблиці параметрів — тільки в help.mikrotik.com.
+Розділи, де я свідомо був обережним і де синтаксис варто звірити на своєму релізі: :serialize/:deserialize, меню /app поверх /container, /interface dot1x, modem-passthrough для LTE, точний формат .id у REST-URL, деталі device-mode.
+Приклад авто-бану за логами (35.7) залежить від формату повідомлень логу, який змінювався між версіями — перевіряйте на реальних даних.
+Орієнтири продуктивності (39.3) — дуже приблизні; це порядок величини, не специфікація.
+Таблиця сумісності (44) відображає основні зламні зміни, але не є вичерпною — MikroTik вносить дрібні зміни майже в кожному мінорному релізі.
+MPLS, dot1x, User Manager і Hotspot подані оглядово: кожна з цих тем заслуговує окремого документа такого ж обсягу.
+
+Стандартні налаштування MIKROTIK
+
+# model = RB952Ui-5ac2nD
+# serial number = HGJ09ZG90JE
+/interface bridge
+add admin-mac=D4:01:C3:C8:18:95 auto-mac=no comment=defconf name=bridge
+/interface wireless
+set [ find default-name=wlan1 ] band=2ghz-b/g/n channel-width=20/40mhz-XX \
+    disabled=no distance=indoors frequency=auto mode=ap-bridge ssid=\
+    MikroTik-C8189A wireless-protocol=802.11
+set [ find default-name=wlan2 ] band=5ghz-a/n/ac channel-width=20/40/80mhz-XXXX \
+    disabled=no distance=indoors frequency=auto mode=ap-bridge ssid=\
+    MikroTik-C8189A wireless-protocol=802.11
+/interface list
+add comment=defconf name=WAN
+add comment=defconf name=LAN
+/interface wireless security-profiles
+set [ find default=yes ] authentication-types=wpa2-psk mode=dynamic-keys \
+    supplicant-identity=MikroTik
+/ip pool
+add name=default-dhcp ranges=192.168.88.10-192.168.88.254
+/ip dhcp-server
+add address-pool=default-dhcp interface=bridge name=defconf
+/disk settings
+set auto-media-interface=bridge auto-media-sharing=yes auto-smb-sharing=yes
+/interface bridge port
+add bridge=bridge comment=defconf interface=ether2
+add bridge=bridge comment=defconf interface=ether3
+add bridge=bridge comment=defconf interface=ether4
+add bridge=bridge comment=defconf interface=ether5
+add bridge=bridge comment=defconf interface=wlan1
+add bridge=bridge comment=defconf interface=wlan2
+/ip neighbor discovery-settings
+set discover-interface-list=LAN
+/interface list member
+add comment=defconf interface=bridge list=LAN
+add comment=defconf interface=ether1 list=WAN
+/ip address
+add address=192.168.88.1/24 comment=defconf interface=bridge network=\
+    192.168.88.0
+/ip dhcp-client
+add comment=defconf interface=ether1
+/ip dhcp-server network
+add address=192.168.88.0/24 comment=defconf dns-server=192.168.88.1 gateway=\
+    192.168.88.1
+/ip dns
+set allow-remote-requests=yes
+/ip dns static
+add address=192.168.88.1 comment=defconf name=router.lan type=A
+/ip firewall filter
+add action=accept chain=input comment=\
+    "defconf: accept established,related,untracked" connection-state=\
+    established,related,untracked
+add action=drop chain=input comment="defconf: drop invalid" connection-state=\
+    invalid
+add action=accept chain=input comment="defconf: accept ICMP" protocol=icmp
+add action=accept chain=input comment=\
+    "defconf: accept to local loopback (for CAPsMAN)" dst-address=127.0.0.1 \
+    in-interface=lo src-address=127.0.0.1
+add action=drop chain=input comment="defconf: drop all not coming from LAN" \
+    in-interface-list=!LAN
+add action=accept chain=forward comment="defconf: accept in ipsec policy" \
+    ipsec-policy=in,ipsec
+add action=accept chain=forward comment="defconf: accept out ipsec policy" \
+    ipsec-policy=out,ipsec
+add action=fasttrack-connection chain=forward comment="defconf: fasttrack" \
+    connection-state=established,related
+add action=accept chain=forward comment=\
+    "defconf: accept established,related, untracked" connection-state=\
+    established,related,untracked
+add action=drop chain=forward comment="defconf: drop invalid" connection-state=\
+    invalid
+add action=drop chain=forward comment="defconf: drop all from WAN not DSTNATed" \
+    connection-nat-state=!dstnat in-interface-list=WAN
+add action=accept chain=forward comment="Allow LAN  WAN" out-interface=ether1 \
+    src-address=192.168.88.0/24
+/ip firewall nat
+add action=masquerade chain=srcnat comment="defconf: masquerade" ipsec-policy=\
+    out,none out-interface-list=WAN
+/ipv6 firewall address-list
+add address=::/128 comment="defconf: unspecified address" list=bad_ipv6
+add address=::1/128 comment="defconf: lo" list=bad_ipv6
+add address=fec0::/10 comment="defconf: site-local" list=bad_ipv6
+add address=::ffff:0.0.0.0/96 comment="defconf: ipv4-mapped" list=bad_ipv6
+add address=::/96 comment="defconf: ipv4 compat" list=bad_ipv6
+add address=100::/64 comment="defconf: discard only " list=bad_ipv6
+add address=2001:db8::/32 comment="defconf: documentation" list=bad_ipv6
+add address=2001:10::/28 comment="defconf: ORCHID" list=bad_ipv6
+add address=3ffe::/16 comment="defconf: 6bone" list=bad_ipv6
+/ipv6 firewall filter
+add action=accept chain=input comment=\
+    "defconf: accept established,related,untracked" connection-state=\
+    established,related,untracked
+add action=drop chain=input comment="defconf: drop invalid" connection-state=\
+    invalid
+add action=accept chain=input comment="defconf: accept ICMPv6" protocol=icmpv6
+add action=accept chain=input comment="defconf: accept UDP traceroute" \
+    dst-port=33434-33534 protocol=udp
+add action=accept chain=input comment=\
+    "defconf: accept DHCPv6-Client prefix delegation." dst-port=546 protocol=\
+    udp src-address=fe80::/10
+add action=accept chain=input comment="defconf: accept IKE" dst-port=500,4500 \
+    protocol=udp
+add action=accept chain=input comment="defconf: accept ipsec AH" protocol=\
+    ipsec-ah
+add action=accept chain=input comment="defconf: accept ipsec ESP" protocol=\
+    ipsec-esp
+add action=accept chain=input comment=\
+    "defconf: accept all that matches ipsec policy" ipsec-policy=in,ipsec
+add action=drop chain=input comment=\
+    "defconf: drop everything else not coming from LAN" in-interface-list=!LAN
+add action=fasttrack-connection chain=forward comment="defconf: fasttrack6" \
+    connection-state=established,related
+add action=accept chain=forward comment=\
+    "defconf: accept established,related,untracked" connection-state=\
+    established,related,untracked
+add action=drop chain=forward comment="defconf: drop invalid" connection-state=\
+    invalid
+add action=drop chain=forward comment="defconf: drop packets with bad src ipv6" \
+    src-address-list=bad_ipv6
+add action=drop chain=forward comment="defconf: drop packets with bad dst ipv6" \
+    dst-address-list=bad_ipv6
+add action=drop chain=forward comment="defconf: rfc4890 drop hop-limit=1" \
+    hop-limit=equal:1 protocol=icmpv6
+add action=accept chain=forward comment="defconf: accept ICMPv6" protocol=\
+    icmpv6
+add action=accept chain=forward comment="defconf: accept HIP" protocol=139
+add action=accept chain=forward comment="defconf: accept IKE" dst-port=500,4500 \
+    protocol=udp
+add action=accept chain=forward comment="defconf: accept ipsec AH" protocol=\
+    ipsec-ah
+add action=accept chain=forward comment="defconf: accept ipsec ESP" protocol=\
+    ipsec-esp
+add action=accept chain=forward comment=\
+    "defconf: accept all that matches ipsec policy" ipsec-policy=in,ipsec
+add action=drop chain=forward comment=\
+    "defconf: drop everything else not coming from LAN" in-interface-list=!LAN
+/system clock
+set time-zone-name=Europe/Kiev
+/tool mac-server
+set allowed-interface-list=LAN
+/tool mac-server mac-winbox
+set allowed-interface-list=LAN
+/tool romon
+set enabled=yes

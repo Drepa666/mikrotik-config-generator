@@ -302,14 +302,31 @@ AIAgentUI.createSidebar = function() {
 
   document.body.appendChild(sidebar);
 
-  /* Вішаємо listeners одразу після додавання в DOM */
-  var _closeBtn = document.getElementById('ai-close-btn');
-  var _minBtn   = document.getElementById('ai-minimize-btn');
-  var _zBtn     = document.getElementById('ai-zindex-btn');
-  if (_closeBtn) _closeBtn.onclick = function() { AIAgentUI.toggle(); };
-  if (_minBtn)   _minBtn.onclick   = function() { AIAgentUI.minimize(); };
-  if (_zBtn)     _zBtn.onclick     = function() { AIAgentUI.toggleZIndex(); };
-  console.log('[AIAgentUI] Buttons OK ✅');
+  /* EVENT DELEGATION — не губляться при перерендері */
+  document.addEventListener('click', function(e) {
+    var t = e.target;
+    /* Шукаємо кнопку вгору по DOM */
+    while (t && t !== document.body) {
+      var id = t.id || '';
+      if (id === 'ai-close-btn') {
+        e.stopPropagation();
+        AIAgentUI.toggle();
+        return;
+      }
+      if (id === 'ai-minimize-btn') {
+        e.stopPropagation();
+        AIAgentUI.minimize();
+        return;
+      }
+      if (id === 'ai-zindex-btn') {
+        e.stopPropagation();
+        AIAgentUI.toggleZIndex();
+        return;
+      }
+      t = t.parentElement;
+    }
+  }, true); /* capture=true щоб перехопити до інших handlers */
+  console.log('[AIAgentUI] Event delegation OK ✅');
 
   /* Drag & Drop на sidebar */
   if (window.AIFileUpload) {
@@ -397,44 +414,97 @@ AIAgentUI.toggle = function() {
   var sidebar = document.getElementById('ai-sidebar');
   var btn     = document.getElementById('ai-toggle-btn');
   if (!sidebar) return;
+
   AIAgentUI.state.isOpen = !AIAgentUI.state.isOpen;
-  sidebar.classList.toggle('open', AIAgentUI.state.isOpen);
-  if (btn) btn.classList.toggle('open', AIAgentUI.state.isOpen);
+
   if (AIAgentUI.state.isOpen) {
-    /* Завжди піднімаємо на передній план при відкритті */
-    if (sidebar) {
-      sidebar.style.zIndex = '999999';
-      AIAgentUI._zHigh = true;
-      var zBtn = document.getElementById('ai-zindex-btn');
-      if (zBtn) zBtn.style.color = '#f0a840';
+    /* Відкриваємо */
+    sidebar.style.display = 'flex';
+    sidebar.style.opacity = '0';
+    sidebar.style.transform = 'translateY(20px)';
+    /* Скидаємо мінімізацію якщо була */
+    if (AIAgentUI._minimized) {
+      AIAgentUI._minimized = false;
+      sidebar.style.height = '85vh';
+      sidebar.style.width  = '420px';
+      sidebar.style.overflow = 'hidden';
+      var mb = document.getElementById('ai-minimize-btn');
+      if (mb) { mb.innerHTML = '🗕'; mb.title = 'Згорнути'; }
     }
+    requestAnimationFrame(function() {
+      sidebar.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+      sidebar.style.opacity    = '1';
+      sidebar.style.transform  = 'translateY(0)';
+    });
+    sidebar.style.zIndex = '999999';
+    AIAgentUI._zHigh = true;
     AIAgentUI.updateRouterBar();
     AIAgentUI.initDrag();
     setTimeout(function() {
       var input = document.getElementById('ai-input');
       if (input) input.focus();
-    }, 100);
+    }, 200);
+  } else {
+    /* Закриваємо з анімацією */
+    sidebar.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+    sidebar.style.opacity    = '0';
+    sidebar.style.transform  = 'translateY(20px)';
+    setTimeout(function() {
+      sidebar.style.display = 'none';
+      sidebar.style.transition = '';
+      sidebar.style.transform  = '';
+    }, 200);
   }
+  if (btn) btn.classList.toggle('open', AIAgentUI.state.isOpen);
 };
 
 /* ── Мінімізація ── */
 AIAgentUI._minimized = false;
 AIAgentUI.minimize = function() {
-  var sidebar  = document.getElementById('ai-sidebar');
-  var minBtn   = document.getElementById('ai-minimize-btn');
+  var sidebar = document.getElementById('ai-sidebar');
+  var minBtn  = document.getElementById('ai-minimize-btn');
   if (!sidebar) return;
 
   AIAgentUI._minimized = !AIAgentUI._minimized;
 
   if (AIAgentUI._minimized) {
-    sidebar.style.height = '54px';
-    sidebar.style.overflow = 'hidden';
-    sidebar.style.resize = 'none';
+    /* Зберігаємо поточну позицію */
+    AIAgentUI._savedPos = {
+      top:    sidebar.style.top,
+      left:   sidebar.style.left,
+      right:  sidebar.style.right,
+      bottom: sidebar.style.bottom,
+      height: sidebar.style.height,
+      width:  sidebar.style.width,
+    };
+    /* Переміщуємо в правий нижній кут */
+    sidebar.style.cssText += [
+      'transition:all 0.3s ease',
+      'top:auto',
+      'left:auto',
+      'right:20px',
+      'bottom:20px',
+      'height:54px',
+      'width:320px',
+      'overflow:hidden',
+      'resize:none',
+      'border-radius:14px',
+    ].join(';');
     if (minBtn) { minBtn.innerHTML = '🗖'; minBtn.title = 'Розгорнути'; }
   } else {
-    sidebar.style.height = '85vh';
-    sidebar.style.overflow = 'hidden';
-    sidebar.style.resize = 'both';
+    /* Відновлюємо позицію */
+    var p = AIAgentUI._savedPos || {};
+    sidebar.style.cssText += [
+      'transition:all 0.3s ease',
+      'top:'    + (p.top    || '80px'),
+      'left:'   + (p.left   || 'auto'),
+      'right:'  + (p.right  || '20px'),
+      'bottom:' + (p.bottom || 'auto'),
+      'height:' + (p.height || '85vh'),
+      'width:'  + (p.width  || '420px'),
+      'overflow:hidden',
+      'resize:both',
+    ].join(';');
     if (minBtn) { minBtn.innerHTML = '🗕'; minBtn.title = 'Згорнути'; }
   }
 };;;
@@ -460,54 +530,52 @@ AIAgentUI.initDrag = function() {
   if (!sidebar || !handle || handle._dragInit) return;
   handle._dragInit = true;
 
-  var startX, startY, startLeft, startTop;
+  var startX, startY, startL, startT;
+  var isDragging = false;
+
+  handle.style.cursor = 'grab';
 
   handle.addEventListener('mousedown', function(e) {
-    if (e.target.tagName === 'BUTTON') return;
-    e.preventDefault();
-    var rect   = sidebar.getBoundingClientRect();
-    startX     = e.clientX;
-    startY     = e.clientY;
-    startLeft  = rect.left;
-    startTop   = rect.top;
-
-    /* Переводимо з right в left */
+    /* Не перехоплюємо кліки на кнопках */
+    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    isDragging = true;
+    handle.style.cursor = 'grabbing';
+    var rect = sidebar.getBoundingClientRect();
+    startX = e.clientX;
+    startY = e.clientY;
+    startL = rect.left;
+    startT = rect.top;
+    /* Переводимо в абсолютне позиціонування */
     sidebar.style.right  = 'auto';
-    sidebar.style.left   = startLeft + 'px';
-    sidebar.style.top    = startTop  + 'px';
-
-    function onMove(e) {
-      var dx = e.clientX - startX;
-      var dy = e.clientY - startY;
-      var newLeft = Math.max(0, Math.min(window.innerWidth  - sidebar.offsetWidth,  startLeft + dx));
-      var newTop  = Math.max(0, Math.min(window.innerHeight - sidebar.offsetHeight, startTop  + dy));
-      sidebar.style.left = newLeft + 'px';
-      sidebar.style.top  = newTop  + 'px';
-    }
-
-    function onUp() {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup',   onUp);
-      /* Зберігаємо позицію */
-      localStorage.setItem('ai-sidebar-pos', JSON.stringify({
-        left: sidebar.style.left,
-        top:  sidebar.style.top
-      }));
-    }
-
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup',   onUp);
+    sidebar.style.bottom = 'auto';
+    sidebar.style.left   = startL + 'px';
+    sidebar.style.top    = startT + 'px';
+    sidebar.style.margin = '0';
+    sidebar.style.transition = 'none';
+    e.preventDefault();
   });
 
-  /* Відновлюємо позицію */
-  try {
-    var pos = JSON.parse(localStorage.getItem('ai-sidebar-pos') || '{}');
-    if (pos.left && pos.top) {
-      sidebar.style.right = 'auto';
-      sidebar.style.left  = pos.left;
-      sidebar.style.top   = pos.top;
+  document.addEventListener('mousemove', function(e) {
+    if (!isDragging) return;
+    var dx = e.clientX - startX;
+    var dy = e.clientY - startY;
+    var newL = startL + dx;
+    var newT = startT + dy;
+    /* Не виходимо за межі екрану */
+    var maxL = window.innerWidth  - sidebar.offsetWidth;
+    var maxT = window.innerHeight - sidebar.offsetHeight;
+    newL = Math.max(0, Math.min(newL, maxL));
+    newT = Math.max(0, Math.min(newT, maxT));
+    sidebar.style.left = newL + 'px';
+    sidebar.style.top  = newT + 'px';
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (isDragging) {
+      isDragging = false;
+      handle.style.cursor = 'grab';
     }
-  } catch(e) {}
+  });
 };
 
 /* ── Router bar ── */

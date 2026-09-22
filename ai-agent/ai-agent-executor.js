@@ -26,6 +26,30 @@ window.AIExecutor = {
   },
 
   /* ── Виконати одну команду ── */
+  /* Перевірка небезпечних firewall команд */
+  validateFirewall: function(commands) {
+    var warnings = [];
+    commands.forEach(function(cmd) {
+      var c = cmd.toLowerCase();
+      /* Небезпечно: drop без умов в input chain */
+      if (c.indexOf('chain=input') >= 0 &&
+          c.indexOf('action=drop') >= 0 &&
+          c.indexOf('in-interface') < 0 &&
+          c.indexOf('src-address') < 0 &&
+          c.indexOf('protocol') < 0 &&
+          c.indexOf('connection-state') < 0) {
+        warnings.push('⚠️ НЕБЕЗПЕЧНО: Голий DROP в input chain без умов!\n' +
+          'Це заблокує весь трафік включно з LAN, DNS, DHCP, Winbox!\n' +
+          'Додайте умову: in-interface-list=WAN');
+      }
+      /* Небезпечно: reset-configuration */
+      if (c.indexOf('reset-configuration') >= 0) {
+        warnings.push('⚠️ НЕБЕЗПЕЧНО: reset-configuration видалить ВСІ налаштування!');
+      }
+    });
+    return warnings;
+  },
+
   parseCommands: function(text) {
     var cmds = [];
     var lines = text.split('\n');
@@ -46,11 +70,24 @@ window.AIExecutor = {
 
   executeOne: function(cmd, onResult) {
     var router = window.getActiveRouter ? window.getActiveRouter() : null;
-    if (!router) { onResult({ ok: false, error: 'Немає роутера' }); return; }
-    var c = cmd.replace(/\\\\/g, ' ').replace(/\s+/g, ' ').trim();
-    console.log('[Executor] cmd:', c);
+    if (!router) {
+      onResult({ ok: false, error: 'Немає підключеного роутера' });
+      return;
+    }
+    /* Очищаємо команду */
+    var c = cmd
+      .replace(/\\\s*\n\s*/g, ' ')  /* видаляємо \ продовження */
+      .replace(/\s+/g, ' ')            /* нормалізуємо пробіли */
+      .replace(/^\//,'/')              /* зберігаємо / на початку */
+      .trim();
+    console.log('[Executor] Running:', c);
+    if (!window.sshCall) {
+      onResult({ ok: false, error: 'sshCall не доступний' });
+      return;
+    }
     window.sshCall(router, c)
       .then(function(d) {
+        console.log('[Executor] Result:', d);
         var out = typeof d === 'string' ? d
                 : (d && d.text)   ? d.text
                 : (d && d.output) ? d.output
@@ -59,7 +96,9 @@ window.AIExecutor = {
                 : JSON.stringify(d);
         onResult({ ok: true, output: out || 'OK' });
       })
-      .catch(function(e) { onResult({ ok: false, error: String(e) }); });
+      .catch(function(e) {
+        onResult({ ok: false, error: String(e) });
+      });
   },
 
   /* ── Виконати список команд послідовно ── */
@@ -88,81 +127,117 @@ window.AIExecutor = {
     var old = document.getElementById('ai-exec-modal');
     if (old) old.remove();
 
-    var hasDangerous = commands.some(function(c) { return AIExecutor.isDangerous(c); });
+    /* Очищаємо команди від \ продовжень рядків */
+    var cleanCmds = commands.map(function(cmd) {
+      return cmd
+        .replace(/\\\s*\n\s*/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }).filter(function(cmd) {
+      return cmd.length > 0 && !cmd.startsWith('#');
+    });
 
-    var cmdList = commands.map(function(cmd, i) {
-      var danger = AIExecutor.isDangerous(cmd);
-      return '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px;' +
-        'background:' + (danger ? '#1a0808' : '#060d14') + ';' +
-        'border:1px solid ' + (danger ? '#3a1a1a' : '#1a2a38') + ';' +
-        'border-radius:6px;margin-bottom:6px;">' +
-        '<span style="font-size:14px;flex-shrink:0;">' + (danger ? '⚠️' : '▶') + '</span>' +
-        '<code style="font-size:12px;color:' + (danger ? '#e05252' : '#5fd0a5') + ';' +
-          'white-space:pre-wrap;word-break:break-all;flex:1;">' + cmd + '</code>' +
-      '</div>';
+    /* Адаптуємо команди під версію роутера */
+    if (window.ROSAdapter && ROSAdapter._version) {
+      cleanCmds = ROSAdapter.adaptCommands(cleanCmds);
+    }
+
+    var hasDangerous = cleanCmds.some(function(c) {
+      var l = c.toLowerCase();
+      return l.indexOf('reset') >= 0 || l.indexOf('remove') >= 0 ||
+             l.indexOf('reboot') >= 0 || l.indexOf('shutdown') >= 0 ||
+             l.indexOf('format') >= 0;
+    });
+
+    /* Валідація firewall правил */
+    /* Використовуємо ROSValidator якщо є */
+    var fwWarnings = [];
+    if (window.ROSValidator) {
+      var rosVersion = window.ROSAdapter
+        ? ROSAdapter._version || '7'
+        : ROSValidator.getRouterVersion();
+      var validResults = ROSValidator.validate(cleanCmds, rosVersion);
+      var validHtml = ROSValidator.renderResults(validResults);
+      validResults.forEach(function(r) {
+        r.errors.forEach(function(e) { fwWarnings.push('❌ ' + e); });
+        r.warnings.forEach(function(w) { fwWarnings.push(w); });
+      });
+    } else {
+      fwWarnings = AIExecutor.validateFirewall(cleanCmds);
+    }
+    if (fwWarnings.length > 0) {
+      hasDangerous = true;
+      console.warn('[Executor] Firewall warnings:', fwWarnings);
+    }
+
+    /* Рендеримо команди */
+    /* Показуємо firewall попередження */
+    var warningsHtml = '';
+    if (window.ROSValidator && typeof validHtml !== 'undefined' && validHtml) {
+      warningsHtml = validHtml;
+    } else if (fwWarnings && fwWarnings.length > 0) {
+      warningsHtml = fwWarnings.map(function(w) {
+        return '<div style="background:#3a1010;border:1px solid #c03030;' +
+          'border-radius:8px;padding:10px 14px;margin-bottom:10px;' +
+          'color:#ff8080;font-size:12px;">' +
+          w.replace(/\n/g,'<br>') + '</div>';
+      }).join('');
+    }
+
+    var cmdsHtml = cleanCmds.map(function(cmd, i) {
+      return '<div style="font-family:monospace;font-size:12px;padding:6px 10px;' +
+        'background:#0a1a0a;border-left:3px solid #5fd0a5;border-radius:0 4px 4px 0;' +
+        'margin-bottom:4px;color:#5fd0a5;word-break:break-all;">' +
+        (i+1) + '. ' + cmd.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
     }).join('');
 
     var modal = document.createElement('div');
     modal.id = 'ai-exec-modal';
-    modal.style.cssText =
-      'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);' +
-      'z-index:99999;display:flex;align-items:center;justify-content:center;';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
+      'background:rgba(0,0,0,.85);z-index:9999999;display:flex;' +
+      'align-items:center;justify-content:center;';
+
+    var btnColor = hasDangerous
+      ? 'linear-gradient(135deg,#c03030,#e05252)'
+      : 'linear-gradient(135deg,#5fd0a5,#4ab890)';
+    var btnText  = hasDangerous ? '#fff' : '#082018';
 
     modal.innerHTML =
-      '<div style="background:#0d1117;border:1px solid ' + (hasDangerous ? '#3a1a1a' : '#2a3b48') + ';' +
-        'border-radius:14px;width:580px;max-height:85vh;display:flex;flex-direction:column;' +
-        'box-shadow:0 20px 60px rgba(0,0,0,.7);">' +
-
-        /* Header */
-        '<div style="padding:16px 20px;border-bottom:1px solid #1a2a38;display:flex;align-items:center;gap:10px;">' +
-          '<span style="font-size:20px;">' + (hasDangerous ? '⚠️' : '⚡') + '</span>' +
+      '<div style="background:#0d1117;border:1px solid #2a3b48;border-radius:14px;' +
+        'width:540px;max-height:80vh;overflow-y:auto;margin:20px;">' +
+        '<div style="padding:16px 20px;border-bottom:1px solid #1a2a38;' +
+          'display:flex;align-items:center;justify-content:space-between;">' +
           '<div>' +
-            '<div style="font-weight:700;color:#e6edf3;font-size:15px;">' + title + '</div>' +
-            '<div style="font-size:11px;color:#4a6070;">' + commands.length + ' команд' +
-              (hasDangerous ? ' · <span style="color:#e05252;">Містить небезпечні операції</span>' : '') +
+            '<div style="font-size:15px;font-weight:700;color:#e6edf3;">⚡ ' + title + '</div>' +
+            '<div style="font-size:11px;color:#4a6070;margin-top:2px;">' +
+              cleanCmds.length + ' команд' + (hasDangerous ? ' — ⚠️ небезпечні операції!' : '') +
             '</div>' +
           '</div>' +
-          '<button onclick="document.getElementById(\'ai-exec-modal\').remove()" ' +
-            'style="margin-left:auto;background:transparent;border:1px solid #2a3b48;' +
+          '<button id="exec-close-x" style="background:transparent;border:1px solid #2a3b48;' +
             'color:#4a6070;border-radius:6px;padding:4px 10px;cursor:pointer;">✕</button>' +
         '</div>' +
-
-        /* Description */
-        (description ?
-          '<div style="padding:12px 20px;background:#080f17;border-bottom:1px solid #1a2a38;' +
-            'font-size:12px;color:#8ea3b0;line-height:1.6;">' + description + '</div>'
-        : '') +
-
-        /* Commands */
-        '<div style="padding:16px 20px;overflow-y:auto;flex:1;">' +
-          '<div style="font-size:11px;color:#4a6070;margin-bottom:8px;text-transform:uppercase;">Команди для виконання:</div>' +
-          cmdList +
-        '</div>' +
-
-        /* Result area */
-        '<div id="ai-exec-result" style="display:none;padding:12px 20px;' +
-          'border-top:1px solid #1a2a38;max-height:200px;overflow-y:auto;"></div>' +
-
-        /* Buttons */
-        '<div style="padding:14px 20px;border-top:1px solid #1a2a38;display:flex;gap:8px;">' +
-          '<button onclick="document.getElementById(\'ai-exec-modal\').remove()" ' +
-            'style="background:transparent;border:1px solid #2a3b48;color:#8ea3b0;' +
-            'border-radius:8px;padding:10px 20px;cursor:pointer;font-size:13px;">Скасувати</button>' +
-          (hasDangerous ?
-            '<div style="flex:1;background:#1a0808;border:1px solid #3a1a1a;border-radius:8px;' +
-              'padding:8px 12px;font-size:11px;color:#e05252;display:flex;align-items:center;">' +
-              '⚠️ Ці команди можуть вплинути на роботу мережі!' +
-            '</div>' : '<div style="flex:1;"></div>') +
-          '<button onclick="window.AIExecutor.runAll(' + JSON.stringify(commands).replace(/'/g, "\\'") + ')" ' +
-            'style="background:' + (hasDangerous ? 'linear-gradient(135deg,#c03030,#e05252)' : 'linear-gradient(135deg,#5fd0a5,#4ab890)') + ';' +
-            'color:' + (hasDangerous ? '#fff' : '#082018') + ';border:none;' +
-            'border-radius:8px;padding:10px 24px;cursor:pointer;font-size:13px;font-weight:700;">' +
-            (hasDangerous ? '⚠️ Відкрити термінал' : '▶ Відкрити термінал') +
-          '</button>' +
+        '<div style="padding:16px 20px;">' +
+          warningsHtml + cmdsHtml +
+          '<div style="display:flex;gap:10px;margin-top:16px;">' +
+            '<button id="exec-run-btn" style="background:' + btnColor + ';color:' + btnText + ';' +
+              'border:none;border-radius:8px;padding:10px 24px;cursor:pointer;' +
+              'font-size:13px;font-weight:700;flex:1;">▶ Виконати (' + cleanCmds.length + ')</button>' +
+            '<button id="exec-cancel-btn" style="background:transparent;border:1px solid #2a3b48;' +
+              'color:#8ea3b0;border-radius:8px;padding:10px 20px;cursor:pointer;font-size:13px;">Скасувати</button>' +
+          '</div>' +
         '</div>' +
       '</div>';
 
     document.body.appendChild(modal);
+
+    /* Listeners */
+    document.getElementById('exec-close-x').onclick = function() { modal.remove(); };
+    document.getElementById('exec-cancel-btn').onclick = function() { modal.remove(); };
+    document.getElementById('exec-run-btn').onclick = function() {
+      modal.remove();
+      AIExecutor.runAll(cleanCmds);
+    };
+    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
   },
 
   /* ── Відкрити термінал і виконати команди ── */

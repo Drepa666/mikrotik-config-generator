@@ -67,6 +67,13 @@ window.SwitchScanner = {
         };
       });
 
+
+      /* Вторинний індекс по IP для надійного мержу */
+      var byIP = {};
+      Object.values(devices).forEach(function(d) {
+        if (d.ip) byIP[d.ip] = d;
+      });
+
       /* DHCP */
       dhcpList.forEach(function(e) {
         var mac = (e['mac-address'] || '').toUpperCase();
@@ -74,14 +81,16 @@ window.SwitchScanner = {
         var key = mac || ip;
         /* Статус DHCP lease */
         var dhcpOnline = e['status'] === 'bound' || e['dynamic'] !== 'false';
-        if (devices[key]) {
-          devices[key].hostname = e['host-name'] || '';
-          devices[key].dhcpName = e['host-name'] || '';
-          devices[key].comment  = e['comment']   || '';
-          /* Якщо DHCP каже bound — точно онлайн */
-          if (dhcpOnline) devices[key].online = true;
-          if (!devices[key].source.includes('DHCP'))
-            devices[key].source += '+DHCP';
+        /* Шукаємо по MAC або IP */
+        var existing = devices[key] || byIP[ip];
+        if (existing) {
+          existing.hostname = e['host-name'] || existing.hostname || '';
+          existing.dhcpName = e['host-name'] || '';
+          existing.comment  = e['comment']   || existing.comment  || '';
+          /* DHCP bound = підтверджено онлайн */
+          if (dhcpOnline) existing.online = true;
+          if (!existing.source.includes('DHCP'))
+            existing.source += '+DHCP';
         } else if (ip) {
           devices[key] = {
             ip: ip, mac: mac, iface: '',
@@ -92,6 +101,7 @@ window.SwitchScanner = {
             online: dhcpOnline,
             source: 'DHCP',
           };
+          if (ip) byIP[ip] = devices[key];
         }
       });
 
@@ -239,9 +249,16 @@ window.SwitchScanner = {
           /* RouterOS ping повертає received=N [1] */
           var m = out.match(/received=(\d+)/);
           var rcv = m ? parseInt(m[1]) : 0;
-          d.online = rcv > 0 ||
-                     out.includes('time=') ||
-                     out.toLowerCase().includes('ttl=');
+          var pingOk = rcv > 0 ||
+                       out.includes('time=') ||
+                       out.toLowerCase().includes('ttl=');
+          /* Якщо підтверджено DHCP/LLDP — не ставимо offline по пінгу */
+          var isConfirmed = d.source && (
+            d.source.includes('DHCP') ||
+            d.source.includes('LLDP') ||
+            d.source.includes('WiFi')
+          );
+          if (!isConfirmed) d.online = pingOk;
         })
         .catch(function() {
           /* Якщо SSH помилка — залишаємо поточний статус */

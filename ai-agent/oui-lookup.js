@@ -112,6 +112,64 @@ window.OUILookup = {
     '00:08:9B':'QNAP','24:5E:BE':'QNAP',
     /* Axis cameras */
     '00:40:8C':'AXIS','AC:CC:8E':'AXIS',
+    /* Intel */
+    'F4:4E:B4':'Intel','8C:8D:28':'Intel','18:66:DA':'Intel',
+    'AC:ED:5C':'Intel','00:1B:21':'Intel','00:21:6A':'Intel',
+    '8C:EC:4B':'Intel','94:65:9C':'Intel','A4:C3:F0':'Intel',
+    'D0:57:7B':'Intel','00:1E:67':'Intel','E4:B3:18':'Intel',
+    /* Apple */
+    'F4:4E:B4':'Apple','3C:15:C2':'Apple','A8:86:DD':'Apple',
+    '00:17:F2':'Apple','28:CF:DA':'Apple','3C:07:54':'Apple',
+    'AC:BC:32':'Apple','F0:18:98':'Apple','DC:A9:04':'Apple',
+    '78:4F:43':'Apple','B8:E8:56':'Apple','8C:85:90':'Apple',
+    /* Samsung */
+    '00:12:47':'Samsung','00:15:99':'Samsung','00:1A:8A':'Samsung',
+    '00:21:19':'Samsung','18:22:7E':'Samsung','30:07:4D':'Samsung',
+    '4C:BC:98':'Samsung','78:52:1A':'Samsung','94:35:0A':'Samsung',
+    'B4:79:A7':'Samsung','CC:07:AB':'Samsung','E4:92:FB':'Samsung',
+    /* Xiaomi */
+    '00:9E:C8':'Xiaomi','04:CF:8C':'Xiaomi','10:2A:B3':'Xiaomi',
+    '14:F6:5A':'Xiaomi','28:6C:07':'Xiaomi','34:80:B3':'Xiaomi',
+    '50:8F:4C':'Xiaomi','64:09:80':'Xiaomi','74:23:44':'Xiaomi',
+    '8C:BE:BE':'Xiaomi','A4:50:46':'Xiaomi','F8:A4:5F':'Xiaomi',
+    /* Dell */
+    '00:06:5B':'Dell','00:08:74':'Dell','00:0B:DB':'Dell',
+    '00:11:43':'Dell','00:12:3F':'Dell','00:13:72':'Dell',
+    '14:18:77':'Dell','18:03:73':'Dell','18:66:DA':'Dell',
+    'B8:CA:3A':'Dell','F4:8E:38':'Dell','F8:DB:88':'Dell',
+    /* HP */
+    '00:0F:20':'HP','00:11:0A':'HP','00:12:79':'HP',
+    '00:13:21':'HP','00:14:38':'HP','00:15:60':'HP',
+    '3C:A8:2A':'HP','58:20:B1':'HP','78:E7:D1':'HP',
+    'B4:99:BA':'HP','D4:85:64':'HP','FC:15:B4':'HP',
+    /* Lenovo */
+    '00:1A:6B':'Lenovo','00:21:CC':'Lenovo','28:D2:44':'Lenovo',
+    '40:8D:5C':'Lenovo','54:EE:75':'Lenovo','70:F3:95':'Lenovo',
+    '88:70:8C':'Lenovo','98:FA:9B':'Lenovo','B8:63:4D':'Lenovo',
+    /* ASUS */
+    '00:1A:92':'ASUS','00:1D:60':'ASUS','00:22:15':'ASUS',
+    '08:60:6E':'ASUS','10:02:B5':'ASUS','14:DA:E9':'ASUS',
+    '2C:4D:54':'ASUS','40:16:7E':'ASUS','50:46:5D':'ASUS',
+    '74:D0:2B':'ASUS','90:E6:BA':'ASUS','AC:22:0B':'ASUS',
+    /* Realtek/Common */
+    'B2:33:88':'Local/Virtual MAC','A6:45:43':'Local/Virtual MAC',
+    'A2:33:88':'Local/Virtual MAC','02:00:00':'Local/Virtual MAC',
+    /* D-Link */
+    '00:05:5D':'D-Link','00:0D:88':'D-Link','00:11:95':'D-Link',
+    '00:1B:11':'D-Link','00:21:91':'D-Link','00:26:5A':'D-Link',
+    '1C:7E:E5':'D-Link','28:10:7B':'D-Link','34:08:04':'D-Link',
+    /* Netgear */
+    '00:09:5B':'Netgear','00:0F:B5':'Netgear','00:14:6C':'Netgear',
+    '00:1B:2F':'Netgear','00:1E:2A':'Netgear','00:22:3F':'Netgear',
+    '20:4E:7F':'Netgear','28:C6:8E':'Netgear','30:46:9A':'Netgear',
+    /* Zyxel */
+    '00:13:49':'Zyxel','00:19:CB':'Zyxel','00:A0:C5':'Zyxel',
+    '28:28:5D':'Zyxel','40:4A:03':'Zyxel','50:67:F0':'Zyxel',
+    /* Synology */
+    '00:11:32':'Synology','00:1B:21':'Synology','90:09:D0':'Synology',
+    /* QNAP */
+    '00:08:9B':'QNAP','24:5E:BE':'QNAP','00:D0:B4':'QNAP',
+
   },
 
   /* ── Кеш онлайн запитів ── */

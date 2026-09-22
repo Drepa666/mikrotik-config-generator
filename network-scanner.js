@@ -216,7 +216,18 @@ window.nsStartScan = function() {
     });
 
     Object.values(devices).forEach(function(d) {
-      if (d.mac) d.vendor = OUI[d.mac.substring(0,8)] || '';
+      if (d.mac) {
+        d.vendor = (window.OUILookup ? OUILookup.lookup(d.mac) : '') || '';
+        if (!d.vendor || d.vendor === 'Unknown') {
+          /* fallback to local OUI if exists */
+          d.vendor = (typeof OUI !== 'undefined' ? OUI[d.mac.substring(0,8)] : '') || '';
+        }
+        if (window.OUILookup) {
+          var _dt = OUILookup.getDeviceType(d.vendor, [], d.hostname || '');
+          d.devType  = _dt.type;
+          d.devIcon  = _dt.icon;
+        }
+      }
     });
 
     var arr = Object.values(devices);
@@ -262,7 +273,13 @@ window.nsStartScan = function() {
                       out.includes('ttl=') ||
                       out.includes('time=')) ? true : false;
         })
-        .catch(function() { d.online = null; })
+        .catch(function() {
+          /* не перезаписуємо якщо вже підтверджено DHCP/LLDP */
+          var srcLow = (d.type || '').toLowerCase();
+          if (!srcLow.includes('dhcp') && !srcLow.includes('neighbor')) {
+            d.online = null;
+          }
+        })
         .finally(function() {
           checked++;
           /* Оновлюємо рядок в таблиці */

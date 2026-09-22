@@ -320,20 +320,17 @@ window.SwitchScanner = {
     /* Рендеримо без одинарних лапок в атрибутах */
     var rows = filtered.map(function(d) {
       /* 🟢 ARP+DHCP/LLDP = онлайн, 🟡 тільки ARP = можливо онлайн, 🔴 офлайн */
-      var hasDHCP = d.source && d.source.includes('DHCP');
-      var hasLLDP = d.source && d.source.includes('LLDP');
-      var hasWiFi = d.source && d.source.includes('WiFi');
-      var hasDHCP  = d.source && (d.source.includes('DHCP') || d.source.includes('LLDP') || d.source.includes('WiFi'));
-      var dotColor = !d.online  ? '#e08080'
-                   : hasDHCP    ? '#5fd0a5'
+      var confirmed = d.source && (
+        d.source.includes('DHCP') ||
+        d.source.includes('LLDP') ||
+        d.source.includes('WiFi')
+      );
+      var dotColor = !d.online   ? '#e08080'
+                   : confirmed   ? '#5fd0a5'
                    : '#f0a840';
-      var dotTitle = !d.online  ? 'Офлайн'
-                   : hasDHCP    ? 'Онлайн (підтверджено)'
-                   : 'ARP (нещодавно активний)'  /* 🟡 тільки ARP — можливо онлайн */
-      var dotTitle = !d.online     ? 'Офлайн'
-                   : (hasDHCP || hasLLDP || hasWiFi)
-                   ? 'Онлайн (підтверджено)'
-                   : 'ARP (нещодавно активний)';
+      var dotTitle = !d.online   ? 'Offline'
+                   : confirmed   ? 'Online'
+                   : 'ARP only';
 
       var vendorHtml = (d.vendor && d.vendor !== 'Unknown')
         ? '<div style="color:#5b9bd5;font-size:11px;">' + esc(d.vendor) + '</div>'

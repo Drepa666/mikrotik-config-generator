@@ -7,6 +7,7 @@
      ДАНІ
   ════════════════════════════════════════ */
   var nodes    = [];   /* { id, type, label, x, y, ip, mac, iface } */
+  var links    = [];   /* { from, to, label, dashed } */
   var edges    = [];   /* { from, to, label, speed, active } */
   /* ── Експортуємо для topology-extend.js ── */
   window._topoNodes = nodes;
@@ -1432,7 +1433,4 @@
   window.TopoVisual = window.TopoVisual || {};
   window.TopoVisual.runSwitchScan       = runSwitchScan;
   window.TopoVisual.buildSwitchTopology = buildSwitchTopology;
-
-  window.TopoVisual = window.TopoVisual || {};
-  window.TopoVisual.runSwitchScan = runSwitchScan;
 })();

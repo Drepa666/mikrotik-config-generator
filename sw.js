@@ -4,7 +4,7 @@
    ============================================================ */
 'use strict';
 
-const CACHE_NAME = 'mt-config-v8865';
+const CACHE_NAME = 'mt-config-v4751';
 
 const API_HOSTS = [
   'api.openai.com',

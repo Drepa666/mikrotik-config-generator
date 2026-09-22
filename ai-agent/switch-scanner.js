@@ -183,19 +183,22 @@ window.SwitchScanner = {
 
       var onlineCount = SwitchScanner._devices.filter(function(d){return d.online;}).length;
       var confirmedCount = SwitchScanner._devices.filter(function(d){
-        return d.online && (d.source.includes('DHCP') ||
-               d.source.includes('LLDP') || d.source.includes('WiFi'));
+        return d.online && ((d.source || '').toLowerCase().includes('dhcp') ||
+               (d.source || '').toLowerCase().includes('lldp') ||
+               (d.source || '').toLowerCase().includes('wifi'));
       }).length;
       var arpOnlyCount = SwitchScanner._devices.filter(function(d){
-        return d.online && d.source === 'ARP';
+        return d.online && (d.source || '').toLowerCase() === 'arp';
       }).length;
       var _total   = SwitchScanner._devices.length;
       var _green   = SwitchScanner._devices.filter(function(d){
         return d.online && d.source && 
-          (d.source.includes('DHCP')||d.source.includes('LLDP')||d.source.includes('WiFi'));
+          ((d.source || '').toLowerCase().includes('dhcp') ||
+               (d.source || '').toLowerCase().includes('lldp') ||
+               (d.source || '').toLowerCase().includes('wifi'));
       }).length;
       var _yellow  = SwitchScanner._devices.filter(function(d){
-        return d.online && d.source === 'ARP';
+        return d.online && (d.source || '').toLowerCase() === 'arp';
       }).length;
       SwitchScanner.setStatus(
         'Всього: ' + _total +
@@ -254,9 +257,7 @@ window.SwitchScanner = {
                        out.toLowerCase().includes('ttl=');
           /* Якщо підтверджено DHCP/LLDP — не ставимо offline по пінгу */
           var isConfirmed = d.source && (
-            d.source.includes('DHCP') ||
-            d.source.includes('LLDP') ||
-            d.source.includes('WiFi')
+            (d.source || '').toLowerCase().includes('dhcp') || (d.source || '').toLowerCase().includes('lldp') || (d.source || '').toLowerCase().includes('wifi')
           );
           if (!isConfirmed) d.online = pingOk;
         })
@@ -294,8 +295,10 @@ window.SwitchScanner = {
     if (legendEl) {
       var total    = devices.length;
       var confirm  = devices.filter(function(d){ return d.online && 
-        (d.source.includes('DHCP')||d.source.includes('LLDP')||d.source.includes('WiFi')); }).length;
-      var arpOnly  = devices.filter(function(d){ return d.online && d.source==='ARP'; }).length;
+        ((d.source || '').toLowerCase().includes('dhcp') ||
+               (d.source || '').toLowerCase().includes('lldp') ||
+               (d.source || '').toLowerCase().includes('wifi')); }).length;
+      var arpOnly  = devices.filter(function(d){ return d.online && (d.source || '').toLowerCase() === 'arp'; }).length;
       var offline  = devices.filter(function(d){ return !d.online; }).length;
       legendEl.innerHTML =
         '<span style="color:#5fd0a5;">🟢 ' + confirm + ' онлайн</span>' +
@@ -337,11 +340,11 @@ window.SwitchScanner = {
     /* Рендеримо без одинарних лапок в атрибутах */
     var rows = filtered.map(function(d) {
       /* 🟢 ARP+DHCP/LLDP = онлайн, 🟡 тільки ARP = можливо онлайн, 🔴 офлайн */
-      var confirmed = d.source && (
-        d.source.includes('DHCP') ||
-        d.source.includes('LLDP') ||
-        d.source.includes('WiFi')
-      );
+      /* case-insensitive — source може бути ARP+DHCP або arp+dhcp */
+      var _src = (d.source || '').toLowerCase();
+      var confirmed = _src.includes('dhcp') ||
+                      _src.includes('lldp') ||
+                      _src.includes('wifi');
       var dotColor = !d.online   ? '#e08080'
                    : confirmed   ? '#5fd0a5'
                    : '#f0a840';

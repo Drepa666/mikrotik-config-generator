@@ -1230,17 +1230,7 @@
       + '<span style="color:#4a6070;font-size:11px;">ARP + ping sweep</span>';
     document.body.appendChild(st);
 
-    var _ipc = window.electronAPI
-      || (window.require && window.require('electron').ipcRenderer);
-
-    if (!_ipc || !_ipc.invoke) {
-      st.textContent = '❌ IPC not available';
-      st.style.borderColor = '#e08080';
-      setTimeout(function(){ st.remove(); }, 3000);
-      return;
-    }
-
-    _ipc.invoke('direct-scan', { subnet: subnet, timeout: 2000 })
+    window.electronAPI.directScan({ subnet: subnet, timeout: 2000 })
       .then(function(data) {
         st.remove();
         if (!data || data.ok === false) {
@@ -1370,13 +1360,13 @@
            .forEach(function(n, i) {
         setTimeout(function() {
           OUILookup.lookupOnline(n.mac, function(v) {
-            if (v && v !== 'Unknown') { n.vendor = v; redraw(); }
+            if (v && v !== 'Unknown') { n.vendor = v; draw(); }
           });
         }, i * 600);
       });
     }
 
-    redraw();
+    draw();
 
     /* Success toast */
     var msg = document.createElement('div');

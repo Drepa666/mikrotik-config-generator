@@ -23,7 +23,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   proxyRestart: function() {
     return ipcRenderer.invoke('proxy-restart');
+  },  directScan: function(opts) {
+    return ipcRenderer.invoke('direct-scan', opts);
   },
+  onScanProgress: function(callback) {
+    ipcRenderer.on('scan-progress', function(event, data) { callback(data); });
+  },
+
   isElectron: true,
 });
 

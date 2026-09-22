@@ -1,229 +1,203 @@
 # -*- coding: utf-8 -*-
-import subprocess, re
+import subprocess
 
-with open('diff-apply.js', 'r', encoding='utf-8') as f:
-    content = f.read()
+# ════════════════════════════════════
+# 1. Відновлюємо чисті файли з git
+# ════════════════════════════════════
+print('Відновлення...')
+for fname in ['topology-extend.js', 'topology-visual.js']:
+    r = subprocess.run(
+        ['git', 'checkout', 'HEAD', '--', fname],
+        capture_output=True, text=True
+    )
+    print(f'  {fname}: {"OK ✅" if r.returncode==0 else "❌ "+r.stderr.strip()}')
 
-# ════════════════════════════════════════════════════════
-# ФІК 1: Замінюємо runDiffAIAnalysis на runDiffAI(btn, mode)
-# ════════════════════════════════════════════════════════
-m = re.search(r'function runDiffAIAnalysis\s*\(\)', content)
-if m:
-    start = m.start()
-    depth = 0; found = False; end = start
-    for i, ch in enumerate(content[start:], start):
-        if ch == '{': depth += 1; found = True
-        elif ch == '}': depth -= 1
-        if found and depth == 0: end = i+1; break
-    print(f'runDiffAIAnalysis: {start}-{end}')
+# ════════════════════════════════════
+# 2. ФІКС topology-extend.js
+#    str.replace — точний текст з діагностики
+# ════════════════════════════════════
+with open('topology-extend.js', 'r', encoding='utf-8') as f:
+    te = f.read()
 
-    NEW_AI = r"""function runDiffAI(btn, mode) {
-  var out = document.getElementById('diff-ai-out');
-  var d   = window.__diffData;
-  if (!out || !d) { console.error('runDiffAI: no out or data'); return; }
-  if (btn) btn.disabled = true;
-  out.innerHTML = '<div style="color:#4a6070;">&#9203; AI аналізує...</div>';
+# Нормалізуємо line endings
+te = te.replace('\r\n', '\n')
 
-  var q = (mode === 'custom')
-    ? ((document.getElementById('diff-ai-q') || {value:''}).value || '')
-    : '';
-
-  var prompts = {
-    analyze: 'Проаналізуй зміни в конфігурації MikroTik RouterOS:\n' + d.summary + '\n\nПоясни що змінилось.',
-    risk:    'Знайди небезпечні зміни в конфігурації MikroTik:\n' + d.summary + '\n\nЩо може зламатись?',
-    apply:   'Чи безпечно застосувати ці зміни MikroTik:\n' + d.summary + '\n\nДай рекомендацію.',
-    custom:  q + '\n\nКонтекст diff:\n' + d.summary,
-  };
-  var prompt = 'Ти експерт MikroTik RouterOS. ' +
-    (prompts[mode] || prompts.analyze) +
-    '\nВідповідай українською, стисло і по суті.';
-
-  var done = function(text) {
-    out.innerHTML =
-      '<div style="line-height:1.8;font-size:12px;color:#c9d8e4;">' +
-      (text||'').replace(/\*\*(.*?)\*\*/g,'<b style="color:#5fd0a5;">$1</b>')
-                .replace(/\n/g,'<br>') +
-      '</div>';
-    if (btn) btn.disabled = false;
-  };
-
-  var fail = function() {
-    done(localDiffAI(d, mode));
-    if (btn) btn.disabled = false;
-  };
-
-  /* window.callAI — electron-bridge.js */
-  if (typeof window.callAI === 'function') {
-    window.callAI(prompt).then(done).catch(fail);
-    return;
-  }
-  /* window.electronAPI.aiRequest — preload.js */
-  if (window.electronAPI && typeof window.electronAPI.aiRequest === 'function') {
-    window.electronAPI.aiRequest({ prompt: prompt, provider: 'groq' })
-      .then(function(r){ done(r && r.result ? r.result : JSON.stringify(r)); })
-      .catch(fail);
-    return;
-  }
-  /* Локальний аналіз */
-  fail();
-}"""
-
-    content = content[:start] + NEW_AI + content[end:]
-    print('OK: runDiffAI замінено ✅')
-
-# ════════════════════════════════════════════════════════
-# ФІК 2: localDiffAI — замість localDiffAnalysis
-# ════════════════════════════════════════════════════════
-if 'function localDiffAI' not in content:
-    # Знаходимо localDiffAnalysis і додаємо аліас
-    idx_local = content.find('function localDiffAnalysis')
-    if idx_local > 0:
-        # Знаходимо кінець
-        depth = 0; found = False; end_local = idx_local
-        for i, ch in enumerate(content[idx_local:], idx_local):
-            if ch == '{': depth += 1; found = True
-            elif ch == '}': depth -= 1
-            if found and depth == 0: end_local = i+1; break
-        # Додаємо аліас після
-        alias = '\nfunction localDiffAI(d, mode) { return localDiffAnalysis(d); }\n'
-        content = content[:end_local] + alias + content[end_local:]
-        print('OK: localDiffAI аліас додано ✅')
-    else:
-        # Додаємо просту функцію
-        LOCAL_AI = """
-function localDiffAI(d, mode) {
-  var lines = (d.summary||'').split('\\n').filter(Boolean);
-  var warn = [], info = [];
-  lines.forEach(function(l) {
-    var lo = l.toLowerCase();
-    if (lo.includes('password')||lo.includes('pass')) warn.push('🔐 ' + l.trim());
-    else if (lo.includes('firewall')||lo.includes('drop')||lo.includes('accept')) warn.push('🛡 ' + l.trim());
-    else if (l.startsWith('+ ')) info.push('✅ Додано: ' + l.slice(2));
-    else if (l.startsWith('- ')) info.push('❌ Видалено: ' + l.slice(2));
-    else if (l.startsWith('~ ')) info.push('📝 Змінено: ' + l.slice(2));
-  });
-  var r = '';
-  if (warn.length) r += '**⚠️ Увага:**\\n' + warn.join('\\n') + '\\n\\n';
-  r += '**Зміни:**\\n' + info.slice(0,15).join('\\n');
-  r += '\\n\\n**Статистика:** +' + d.added + ' / −' + d.removed + ' / ~' + d.changed;
-  return r;
-}
-"""
-        idx_init = content.find('function initDiffApply')
-        content = content[:idx_init] + LOCAL_AI + content[idx_init:]
-        print('OK: localDiffAI додано ✅')
-
-# ════════════════════════════════════════════════════════
-# ФІК 3: toggleDiffAIChat
-# ════════════════════════════════════════════════════════
-if 'function toggleDiffAIChat' not in content:
-    content += '\nfunction toggleDiffAIChat(){var e=document.getElementById("diff-ai-chat");if(e)e.style.display=e.style.display==="none"?"block":"none";}\n'
-    print('OK: toggleDiffAIChat додано ✅')
-
-# ════════════════════════════════════════════════════════
-# ФІК 4: window.* в кінці — після всіх функцій
-# ════════════════════════════════════════════════════════
-# Видаляємо старі window.*
-content = re.sub(
-    r'\n/\* ── Глобальні функції[^*]*\*/\n.*?window\.diffLines[^\n]*\n',
-    '\n',
-    content, flags=re.DOTALL
+# Точний текст оригінальної функції (з діагностики)
+OLD_GET_MAC = (
+    "function getMacVendor(mac) {\n"
+    "    if (!mac) return '';\n"
+    "    var clean = mac.toUpperCase().replace(/-/g, ':');\n"
+    "    var oui3  = clean.slice(0, 8);\n"
+    "    var oui2  = clean.slice(0, 5);\n"
+    "\n"
+    "    if (_vendorCache[oui3]) return _vendorCache[oui3];\n"
+    "    if (MAC_OUI[oui3]) { _vendorCache[oui3] = MAC_OUI[oui3]; return MAC_OUI[oui3]; }\n"
+    "    if (MAC_OUI[oui2]) { _vendorCache[oui3] = MAC_OUI[oui2]; return MAC_OUI[oui2]; }\n"
+    "    return '';\n"
+    "  }"
 )
 
-# Додаємо в самий кінець
-GLOBALS = """
-/* ── Глобальні аліаси ── */
-window.runDiffAI        = runDiffAI;
-window.toggleDiffAIChat = toggleDiffAIChat;
-window.injectDiffCSS    = injectDiffCSS;
-window.renderDiffVisual = renderDiffVisual;
-window.diffLines        = diffLines;
-"""
-content = content.rstrip() + '\n' + GLOBALS
-print('OK: window.* додано в кінець ✅')
+NEW_GET_MAC = (
+    "function getMacVendor(mac) {\n"
+    "    if (!mac) return '';\n"
+    "    var clean = mac.toUpperCase().replace(/-/g, ':');\n"
+    "    /* 1. OUILookup — велика база + онлайн кеш */\n"
+    "    if (window.OUILookup) {\n"
+    "      var ouiResult = OUILookup.lookup(clean);\n"
+    "      if (ouiResult && ouiResult !== 'Unknown') return ouiResult;\n"
+    "    }\n"
+    "    /* 2. Локальна база topology-extend */\n"
+    "    var oui3 = clean.slice(0, 8);\n"
+    "    var oui2 = clean.slice(0, 5);\n"
+    "    if (_vendorCache[oui3]) return _vendorCache[oui3];\n"
+    "    if (MAC_OUI[oui3]) { _vendorCache[oui3] = MAC_OUI[oui3]; return MAC_OUI[oui3]; }\n"
+    "    if (MAC_OUI[oui2]) { _vendorCache[oui3] = MAC_OUI[oui2]; return MAC_OUI[oui2]; }\n"
+    "    return '';\n"
+    "  }"
+)
 
-# ════════════════════════════════════════════════════════
-# ФІК 5: Diff вирівнювання — замінюємо diffLines merge
-# ════════════════════════════════════════════════════════
-m2 = re.search(r'function diffLines\s*\(textA,\s*textB\)\s*\{', content)
-if m2:
-    start2 = m2.start()
-    depth = 0; found = False; end2 = start2
-    for i, ch in enumerate(content[start2:], start2):
-        if ch == '{': depth += 1; found = True
-        elif ch == '}': depth -= 1
-        if found and depth == 0: end2 = i+1; break
+if OLD_GET_MAC in te:
+    te = te.replace(OLD_GET_MAC, NEW_GET_MAC, 1)
+    print('OK: getMacVendor замінено через str.replace ✅')
+else:
+    # Запасний варіант — шукаємо без порожнього рядка між
+    OLD_ALT = OLD_GET_MAC.replace('\n\n', '\n')
+    if OLD_ALT in te:
+        te = te.replace(OLD_ALT, NEW_GET_MAC, 1)
+        print('OK: getMacVendor замінено (alt) ✅')
+    else:
+        print('WARN: не знайдено точний текст, шукаємо частково...')
+        # Останній варіант — шукаємо по сигнатурі
+        sig = "function getMacVendor(mac) {"
+        if sig in te:
+            idx = te.find(sig)
+            # Знаходимо кінець вручну — простий підхід
+            pos = idx + len(sig)
+            depth = 1
+            while pos < len(te) and depth > 0:
+                if te[pos] == '{':
+                    depth += 1
+                elif te[pos] == '}':
+                    depth -= 1
+                pos += 1
+            fn_end = pos
+            print(f'  Знайдено @ {idx}:{fn_end}')
+            print(f'  Текст: {repr(te[idx:fn_end][:80])}...')
+            te = te[:idx] + NEW_GET_MAC + te[fn_end:]
+            print('OK: getMacVendor замінено (manual scan) ✅')
 
-    NEW_DIFF = r"""function diffLines(textA, textB) {
-  var linesA = textA.split('\n');
-  var linesB = textB.split('\n');
-  var m = linesA.length, n = linesB.length;
+with open('topology-extend.js', 'w', encoding='utf-8', newline='\n') as f:
+    f.write(te)
 
-  /* LCS dp */
-  var dp = [];
-  for (var i = 0; i <= m; i++) {
-    dp[i] = [];
-    for (var j = 0; j <= n; j++) dp[i][j] = 0;
-  }
-  for (var i = 1; i <= m; i++)
-    for (var j = 1; j <= n; j++)
-      dp[i][j] = (linesA[i-1].trim() === linesB[j-1].trim())
-        ? dp[i-1][j-1] + 1
-        : Math.max(dp[i-1][j], dp[i][j-1]);
+r1 = subprocess.run(['node','--check','topology-extend.js'],
+                    capture_output=True, text=True)
+print('topology-extend:', 'OK ✅' if r1.returncode==0 else '❌\n'+r1.stderr[:200])
 
-  /* Backtrack */
-  var raw = []; var i = m, j = n;
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && linesA[i-1].trim() === linesB[j-1].trim()) {
-      raw.unshift({type:'equal',  a:linesA[i-1], b:linesB[j-1], na:i, nb:j}); i--; j--;
-    } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
-      raw.unshift({type:'insert', b:linesB[j-1], nb:j}); j--;
-    } else {
-      raw.unshift({type:'delete', a:linesA[i-1], na:i}); i--;
-    }
-  }
+# Перевіряємо що МакВендор тепер один
+count = te.count('function getMacVendor')
+print(f'  getMacVendor зустрічається {count} раз(и) — має бути 1')
 
-  /* Side-by-side: zip delete+insert блоки разом */
-  var pairs = [];
-  var k = 0;
-  while (k < raw.length) {
-    if (raw[k].type === 'equal') {
-      pairs.push(raw[k]); k++;
-    } else {
-      /* Збираємо блок delete і insert */
-      var dels = [], ins = [];
-      while (k < raw.length && raw[k].type === 'delete') { dels.push(raw[k]); k++; }
-      while (k < raw.length && raw[k].type === 'insert') { ins.push(raw[k]); k++; }
-      /* Zip: пари delete+insert в одному рядку */
-      var maxLen = Math.max(dels.length, ins.length);
-      for (var z = 0; z < maxLen; z++) {
-        var dd = dels[z] || null;
-        var ii = ins[z]  || null;
-        if (dd && ii) {
-          pairs.push({type:'change', a:dd.a, b:ii.b, na:dd.na, nb:ii.nb});
-        } else if (dd) {
-          pairs.push({type:'delete', a:dd.a, na:dd.na, nb:null});
-        } else {
-          pairs.push({type:'insert', b:ii.b, na:null, nb:ii.nb});
-        }
-      }
-    }
-  }
+# ════════════════════════════════════
+# 3. ФІКС topology-visual.js
+# ════════════════════════════════════
+with open('topology-visual.js', 'r', encoding='utf-8') as f:
+    tv = f.read()
 
-  return {
-    pairs:     pairs,
-    added:     pairs.filter(function(p){return p.type==='insert';}).map(function(p){return p.b;}),
-    removed:   pairs.filter(function(p){return p.type==='delete';}).map(function(p){return p.a;}),
-    unchanged: pairs.filter(function(p){return p.type==='equal'; }).map(function(p){return p.a;}),
-  };
-}"""
+tv = tv.replace('\r\n', '\n')
 
-    content = content[:start2] + NEW_DIFF + content[end2:]
-    print('OK: diffLines з вирівнюванням замінено ✅')
+# Знаходимо lookupVendor через простий ручний скан
+sig2 = 'function lookupVendor('
+if sig2 not in tv:
+    print('WARN: lookupVendor не знайдено')
+else:
+    idx2 = tv.find(sig2)
+    # Йдемо до першої { (відкриття функції)
+    pos2 = idx2
+    while pos2 < len(tv) and tv[pos2] != '{':
+        pos2 += 1
+    # Тепер рахуємо дужки
+    depth2 = 0
+    fn_end2 = pos2
+    while fn_end2 < len(tv):
+        if tv[fn_end2] == '{':
+            depth2 += 1
+        elif tv[fn_end2] == '}':
+            depth2 -= 1
+            if depth2 == 0:
+                fn_end2 += 1
+                break
+        fn_end2 += 1
 
-with open('diff-apply.js', 'w', encoding='utf-8') as f:
-    f.write(content)
+    print(f'lookupVendor: [{idx2}:{fn_end2}]')
+    print(f'  Знайдено: {repr(tv[idx2:idx2+50])}...')
+    print(f'  Закінчення: {repr(tv[fn_end2-20:fn_end2+5])}')
+    print(f'  Після функції: {repr(tv[fn_end2:fn_end2+30])}')
 
-r = subprocess.run(['node', '--check', 'diff-apply.js'],
-                   capture_output=True, text=True)
-print('Syntax:', 'OK ✅' if r.returncode == 0 else '❌\n' + r.stderr[:300])
+    NEW_LOOKUP = (
+        "function lookupVendor(node) {\n"
+        "    var vendorEl = document.getElementById('detail-vendor');\n"
+        "    if (!vendorEl || !node) {\n"
+        "      if (vendorEl) vendorEl.value = '\u2014';\n"
+        "      return;\n"
+        "    }\n"
+        "    /* Vendor вже є в node */\n"
+        "    if (node.vendor &&\n"
+        "        node.vendor !== 'Unknown' &&\n"
+        "        node.vendor !== '\u041d\u0435\u0432\u0456\u0434\u043e\u043c\u0438\u0439') {\n"
+        "      vendorEl.value = node.vendor;\n"
+        "      vendorEl.style.color = '#5fd0a5';\n"
+        "      return;\n"
+        "    }\n"
+        "    var mac = (node.mac || '').toUpperCase().replace(/-/g, ':');\n"
+        "    if (!mac) { vendorEl.value = '\u2014'; return; }\n"
+        "    /* 1. OUILookup локально */\n"
+        "    if (window.OUILookup) {\n"
+        "      var localV = OUILookup.lookup(mac);\n"
+        "      if (localV && localV !== 'Unknown') {\n"
+        "        node.vendor    = localV;\n"
+        "        vendorEl.value = localV;\n"
+        "        vendorEl.style.color = '#5fd0a5';\n"
+        "        return;\n"
+        "      }\n"
+        "    }\n"
+        "    /* 2. getMacVendor */\n"
+        "    if (typeof getMacVendor === 'function') {\n"
+        "      var lv = getMacVendor(mac);\n"
+        "      if (lv) {\n"
+        "        node.vendor    = lv;\n"
+        "        vendorEl.value = lv;\n"
+        "        vendorEl.style.color = '#5fd0a5';\n"
+        "        return;\n"
+        "      }\n"
+        "    }\n"
+        "    /* 3. \u041e\u043d\u043b\u0430\u0439\u043d */\n"
+        "    vendorEl.value = '\u23f3 \u0412\u0438\u0437\u043d\u0430\u0447\u0430\u0454\u043c\u043e...';\n"
+        "    vendorEl.style.color = '#f0a840';\n"
+        "    if (window.OUILookup && OUILookup.lookupOnline) {\n"
+        "      OUILookup.lookupOnline(mac, function(vendor) {\n"
+        "        node.vendor    = vendor || 'Unknown';\n"
+        "        vendorEl.value = vendor || 'Unknown';\n"
+        "        vendorEl.style.color =\n"
+        "          (vendor && vendor !== 'Unknown') ? '#5fd0a5' : '#4a6070';\n"
+        "      });\n"
+        "    } else {\n"
+        "      vendorEl.value = 'Unknown';\n"
+        "      vendorEl.style.color = '#4a6070';\n"
+        "    }\n"
+        "  }"
+    )
+
+    tv_new = tv[:idx2] + NEW_LOOKUP + tv[fn_end2:]
+
+    # Перевіряємо що не дублюємо
+    count2 = tv_new.count('function lookupVendor')
+    print(f'  lookupVendor зустрічається {count2} раз(и) — має бути 1')
+
+    with open('topology-visual.js', 'w', encoding='utf-8', newline='\n') as f:
+        f.write(tv_new)
+
+r2 = subprocess.run(['node','--check','topology-visual.js'],
+                    capture_output=True, text=True)
+print('topology-visual:', 'OK ✅' if r2.returncode==0 else '❌\n'+r2.stderr[:200])
+
+print('\nВсе готово! npm start')

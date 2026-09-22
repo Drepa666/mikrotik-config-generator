@@ -467,7 +467,16 @@
       if (vendorEl) vendorEl.value = '—';
       return;
     }
-    if (node.vendor) {
+    /* OUILookup — перевіряємо vendor */
+    if (!node.vendor || node.vendor === 'Unknown' ||
+        node.vendor === 'Невідомий') {
+      if (window.OUILookup && node.mac) {
+        var _mac = (node.mac||'').toUpperCase().replace(/-/g,':');
+        var _ov  = OUILookup.lookup(_mac);
+        if (_ov && _ov !== 'Unknown') node.vendor = _ov;
+      }
+    }
+    if (node.vendor && node.vendor !== 'Unknown') {
       vendorEl.value = node.vendor;
       vendorEl.style.color = '#5fd0a5';
       return;

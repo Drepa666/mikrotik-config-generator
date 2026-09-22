@@ -63,6 +63,10 @@
   function getMacVendor(mac) {
     if (!mac) return '';
     var clean = mac.toUpperCase().replace(/-/g, ':');
+    if (window.OUILookup) {
+      var _ouiR = OUILookup.lookup(clean);
+      if (_ouiR && _ouiR !== 'Unknown') return _ouiR;
+    }
     var oui3  = clean.slice(0, 8);
     var oui2  = clean.slice(0, 5);
 

@@ -234,6 +234,10 @@
       <div id="rm-panel">
         <div id="rm-header">
           <span id="rm-title">🖥️ Router Manager</span>
+          <div style="display:flex;gap:4px;margin-left:12px;">
+            <button id="rm-tab-routers" onclick="window.SwitchScanner && SwitchScanner._showTab('routers')" style="background:#1a3a2a;border:1px solid #3a6a2a;color:#5fd0a5;border-radius:6px;padding:3px 12px;cursor:pointer;font-size:12px;font-weight:600;">🖥 Роутери</button>
+            <button id="rm-tab-scanner" onclick="window.SwitchScanner && SwitchScanner._showTab('scanner')" style="background:transparent;border:1px solid #2a3b48;color:#4a6070;border-radius:6px;padding:3px 12px;cursor:pointer;font-size:12px;">🔍 Мережевий сканер</button>
+          </div>
           <div id="rm-tabs"></div>
           <button id="rm-add-btn" title="Додати роутер">＋</button>
           <button id="rm-close-btn">✕ Закрити</button>
@@ -2147,13 +2151,148 @@
 
   window.__rmGetState = function() { return state; };
 
+  
+  /* ── Switch Scanner Tab ── */
+  function buildScannerPanel() {
+    var existing = document.getElementById('ss-panel');
+    if (existing) return;
+    var panel = document.getElementById('rm-panel');
+    if (!panel) return;
+
+    var ss = document.createElement('div');
+    ss.id = 'ss-panel';
+    ss.style.cssText = 'display:none;flex-direction:column;height:100%;overflow:hidden;';
+    ss.innerHTML = [
+      /* Toolbar */
+      '<div style="padding:10px 16px;border-bottom:1px solid #1a2a38;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">',
+        '<button id="ss-scan-btn" onclick="SwitchScanner.scan()" ',
+          'style="background:linear-gradient(135deg,#1a3a2a,#2a5a3a);border:1px solid #3a7a4a;',
+          'color:#5fd0a5;border-radius:8px;padding:7px 18px;cursor:pointer;font-size:13px;font-weight:700;">',
+          '🔍 Сканувати мережу</button>',
+        '<span id="ss-status" style="font-size:12px;color:#4a6070;flex:1;"></span>',
+        '<button onclick="SwitchScanner.exportCSV()" ',
+          'style="background:#1a2a3a;border:1px solid #2a3b48;color:#5b9bd5;',
+          'border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">📥 CSV</button>',
+      '</div>',
+      /* Stats */
+      '<div style="display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid #1a2a38;">',
+        '<div style="background:#0a0f1a;border:1px solid #1a2a38;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">',
+          '<div id="ss-stat-total" style="color:#5fd0a5;font-size:20px;font-weight:700;">0</div>',
+          '<div style="color:#4a6070;font-size:10px;">Всього</div>',
+        '</div>',
+        '<div style="background:#0a0f1a;border:1px solid #1a2a38;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">',
+          '<div id="ss-stat-arp" style="color:#5b9bd5;font-size:20px;font-weight:700;">0</div>',
+          '<div style="color:#4a6070;font-size:10px;">ARP</div>',
+        '</div>',
+        '<div style="background:#0a0f1a;border:1px solid #1a2a38;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">',
+          '<div id="ss-stat-dhcp" style="color:#c084fc;font-size:20px;font-weight:700;">0</div>',
+          '<div style="color:#4a6070;font-size:10px;">DHCP</div>',
+        '</div>',
+        '<div style="background:#0a0f1a;border:1px solid #1a2a38;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">',
+          '<div id="ss-stat-nbr" style="color:#f0a840;font-size:20px;font-weight:700;">0</div>',
+          '<div style="color:#4a6070;font-size:10px;">Сусіди</div>',
+        '</div>',
+        '<div style="background:#0a0f1a;border:1px solid #1a2a38;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">',
+          '<div id="ss-stat-wifi" style="color:#90c060;font-size:20px;font-weight:700;">0</div>',
+          '<div style="color:#4a6070;font-size:10px;">WiFi</div>',
+        '</div>',
+      '</div>',
+      /* Filters */
+      '<div style="display:flex;gap:8px;padding:8px 16px;border-bottom:1px solid #1a2a38;flex-wrap:wrap;">',
+        '<input id="ss-search" type="text" placeholder="🔍 IP, MAC, hostname, vendor..." ',
+          'oninput="SwitchScanner.renderTable(SwitchScanner._devices)" ',
+          'style="flex:2;min-width:180px;background:#060d14;border:1px solid #1c2a37;',
+          'color:#e6edf3;padding:5px 10px;border-radius:6px;font-size:12px;">',
+        '<select id="ss-type-filter" onchange="SwitchScanner.renderTable(SwitchScanner._devices)" ',
+          'style="flex:1;min-width:120px;background:#060d14;border:1px solid #1c2a37;',
+          'color:#e6edf3;padding:5px;border-radius:6px;font-size:12px;">',
+          '<option value="">Всі типи</option>',
+        '</select>',
+        '<select id="ss-iface-filter" onchange="SwitchScanner.renderTable(SwitchScanner._devices)" ',
+          'style="flex:1;min-width:120px;background:#060d14;border:1px solid #1c2a37;',
+          'color:#e6edf3;padding:5px;border-radius:6px;font-size:12px;">',
+          '<option value="">Всі інтерфейси</option>',
+        '</select>',
+        '<label style="display:flex;align-items:center;gap:6px;color:#5fd0a5;font-size:12px;cursor:pointer;">',
+          '<input id="ss-online-only" type="checkbox" ',
+            'onchange="SwitchScanner.renderTable(SwitchScanner._devices)" ',
+            'style="accent-color:#5fd0a5;">',
+          'Тільки онлайн',
+        '</label>',
+      '</div>',
+      /* Table */
+      '<div style="flex:1;overflow-y:auto;">',
+        '<table style="width:100%;border-collapse:collapse;">',
+          '<thead>',
+            '<tr style="background:#0a0f1a;border-bottom:2px solid #1a2a38;">',
+              '<th style="padding:8px 10px;text-align:left;font-size:11px;color:#4a6070;font-weight:600;">IP</th>',
+              '<th style="padding:8px 10px;text-align:left;font-size:11px;color:#4a6070;font-weight:600;">MAC / Vendor</th>',
+              '<th style="padding:8px 10px;text-align:left;font-size:11px;color:#4a6070;font-weight:600;">Тип</th>',
+              '<th style="padding:8px 10px;text-align:left;font-size:11px;color:#4a6070;font-weight:600;">Hostname</th>',
+              '<th style="padding:8px 10px;text-align:left;font-size:11px;color:#4a6070;font-weight:600;">Iface</th>',
+              '<th style="padding:8px 10px;text-align:left;font-size:11px;color:#4a6070;font-weight:600;">Signal</th>',
+              '<th style="padding:8px 10px;text-align:left;font-size:11px;color:#4a6070;font-weight:600;">Source</th>',
+              '<th style="padding:8px 10px;text-align:left;font-size:11px;color:#4a6070;font-weight:600;">Дії</th>',
+            '</tr>',
+          '</thead>',
+          '<tbody id="ss-tbody">',
+            '<tr><td colspan="8" style="text-align:center;color:#4a6070;padding:40px;">',
+              'Натисніть "Сканувати мережу"',
+            '</td></tr>',
+          '</tbody>',
+        '</table>',
+      '</div>',
+    ].join('');
+
+    panel.appendChild(ss);
+  }
+
+  /* Захист якщо SwitchScanner ще не завантажений */
+  if (!window.SwitchScanner) {
+    console.warn('[RM] SwitchScanner not loaded yet');
+    return;
+  }
+
+  SwitchScanner._showTab = function(tab) {
+    buildScannerPanel();
+    var routersContent = document.getElementById('rm-content');
+    var routersTabs    = document.getElementById('rm-tabs');
+    var ssPanel        = document.getElementById('ss-panel');
+    var btnR = document.getElementById('rm-tab-routers');
+    var btnS = document.getElementById('rm-tab-scanner');
+
+    if (tab === 'scanner') {
+      if (routersContent) routersContent.style.display = 'none';
+      if (routersTabs)    routersTabs.style.display    = 'none';
+      if (ssPanel)        ssPanel.style.display        = 'flex';
+      if (btnR) { btnR.style.background='transparent'; btnR.style.color='#4a6070'; }
+      if (btnS) { btnS.style.background='#1a2a3a'; btnS.style.color='#5b9bd5'; }
+    } else {
+      if (routersContent) routersContent.style.display = '';
+      if (routersTabs)    routersTabs.style.display    = '';
+      if (ssPanel)        ssPanel.style.display        = 'none';
+      if (btnR) { btnR.style.background='#1a3a2a'; btnR.style.color='#5fd0a5'; }
+      if (btnS) { btnS.style.background='transparent'; btnS.style.color='#4a6070'; }
+    }
+  };
+
+
   window.RouterManager = {
     open:      openManager,
     close:     closeManager,
     addRouter: addRouter,
     _state:    state,
+    /* Повертає активний роутер */
     _getActiveRouter: function() {
       return state.routers.find(function(r) { return r.id === state.activeRouter; }) || null;
+    },
+    /* Повертає ВСІ роутери */
+    _getAllRouters: function() {
+      return state.routers || [];
+    },
+    /* Повертає кількість роутерів */
+    _getCount: function() {
+      return (state.routers || []).length;
     },
   };
 

@@ -61,8 +61,8 @@ window.SwitchScanner = {
           signal:   '',
           dhcpName: '',
           comment:  '',
-          /* ARP є = пристрій активний! */
-          online:   e['dynamic'] !== 'false',
+          /* ARP є = нещодавно активний */
+          online:   true,
           source:   'ARP',
         };
       });
@@ -172,9 +172,17 @@ window.SwitchScanner = {
       SwitchScanner._scanning = false;
 
       var onlineCount = SwitchScanner._devices.filter(function(d){return d.online;}).length;
+      var confirmedCount = SwitchScanner._devices.filter(function(d){
+        return d.online && (d.source.includes('DHCP') ||
+               d.source.includes('LLDP') || d.source.includes('WiFi'));
+      }).length;
+      var arpOnlyCount = SwitchScanner._devices.filter(function(d){
+        return d.online && d.source === 'ARP';
+      }).length;
       SwitchScanner.setStatus(
         'Знайдено: ' + SwitchScanner._devices.length +
-        ' пристроїв (' + onlineCount + ' онлайн)',
+        ' | 🟢 ' + confirmedCount + ' онлайн' +
+        ' | 🟡 ' + arpOnlyCount + ' ARP',
         '#5fd0a5'
       );
       SwitchScanner.renderTable(SwitchScanner._devices);
@@ -256,6 +264,20 @@ window.SwitchScanner = {
   renderTable: function(devices) {
     var tbody = document.getElementById('ss-tbody');
     if (!tbody) return;
+    /* Легенда */
+    var legendEl = document.getElementById('ss-legend');
+    if (legendEl) {
+      var total    = devices.length;
+      var confirm  = devices.filter(function(d){ return d.online && 
+        (d.source.includes('DHCP')||d.source.includes('LLDP')||d.source.includes('WiFi')); }).length;
+      var arpOnly  = devices.filter(function(d){ return d.online && d.source==='ARP'; }).length;
+      var offline  = devices.filter(function(d){ return !d.online; }).length;
+      legendEl.innerHTML =
+        '<span style="color:#5fd0a5;">🟢 ' + confirm + ' онлайн</span>' +
+        '<span style="color:#f0a840;margin-left:10px;">🟡 ' + arpOnly + ' ARP</span>' +
+        '<span style="color:#e08080;margin-left:10px;">🔴 ' + offline + ' офлайн</span>' +
+        '<span style="color:#4a6070;margin-left:10px;">Всього: ' + total + '</span>';
+    }
 
     var textFilter  = (document.getElementById('ss-search')      || {}).value   || '';
     var typeFilter  = (document.getElementById('ss-type-filter') || {}).value   || '';
@@ -289,8 +311,18 @@ window.SwitchScanner = {
 
     /* Рендеримо без одинарних лапок в атрибутах */
     var rows = filtered.map(function(d) {
-      var dotColor = d.online ? '#5fd0a5' : '#e08080';
-      var dotTitle = d.online ? 'Онлайн' : 'Офлайн';
+      /* 🟢 ARP+DHCP/LLDP = онлайн, 🟡 тільки ARP = можливо онлайн, 🔴 офлайн */
+      var hasDHCP = d.source && d.source.includes('DHCP');
+      var hasLLDP = d.source && d.source.includes('LLDP');
+      var hasWiFi = d.source && d.source.includes('WiFi');
+      var dotColor = !d.online     ? '#e08080'  /* 🔴 офлайн */
+                   : (hasDHCP || hasLLDP || hasWiFi)
+                   ? '#5fd0a5'    /* 🟢 підтверджено онлайн */
+                   : '#f0a840';  /* 🟡 тільки ARP — можливо онлайн */
+      var dotTitle = !d.online     ? 'Офлайн'
+                   : (hasDHCP || hasLLDP || hasWiFi)
+                   ? 'Онлайн (підтверджено)'
+                   : 'ARP (нещодавно активний)';
 
       var vendorHtml = (d.vendor && d.vendor !== 'Unknown')
         ? '<div style="color:#5b9bd5;font-size:11px;">' + esc(d.vendor) + '</div>'
@@ -515,6 +547,163 @@ window.SwitchScanner = {
   setStatus: function(msg, color) {
     var el = document.getElementById('ss-status');
     if (el) { el.textContent = msg; el.style.color = color || '#5fd0a5'; }
+  },
+
+
+  /* ── Діалог прямого сканування свіча ── */
+  showDirectScanDialog: function() {
+    var old = document.getElementById('ss-direct-dialog');
+    if (old) { old.remove(); return; }
+
+    var dlg = document.createElement('div');
+    dlg.id = 'ss-direct-dialog';
+    dlg.style.cssText = [
+      'position:fixed', 'top:50%', 'left:50%',
+      'transform:translate(-50%,-50%)',
+      'background:#0d1117', 'border:1px solid #3a2a5a',
+      'border-radius:12px', 'padding:24px 28px',
+      'z-index:9999999', 'min-width:360px',
+      'box-shadow:0 8px 40px rgba(0,0,0,.8)',
+    ].join(';');
+
+    dlg.innerHTML =
+      '<div style="color:#c084fc;font-weight:700;font-size:15px;margin-bottom:16px;">' +
+        '🔌 Пряме сканування мережі' +
+      '</div>' +
+      '<div style="color:#8ea3b0;font-size:12px;margin-bottom:16px;line-height:1.6;">' +
+        'Підключіться кабелем до свіча або мережі.<br>' +
+        'Сканер знайде всі пристрої без MikroTik.' +
+      '</div>' +
+      /* Підмережа */
+      '<div style="margin-bottom:12px;">' +
+        '<label style="color:#4a6070;font-size:11px;">Підмережа для сканування:</label>' +
+        '<div style="display:flex;gap:8px;margin-top:4px;">' +
+          '<input id="ss-direct-subnet" type="text" value="192.168.1" ' +
+            'style="flex:1;background:#060d14;border:1px solid #1c2a37;' +
+            'color:#e6edf3;padding:6px 10px;border-radius:6px;font-size:13px;">' +
+          '<span style="color:#4a6070;line-height:32px;font-size:13px;">.0/24</span>' +
+        '</div>' +
+      '</div>' +
+      /* SNMP */
+      '<div style="margin-bottom:16px;">' +
+        '<label style="color:#4a6070;font-size:11px;">' +
+          'SNMP Community (для керованих свічів):' +
+        '</label>' +
+        '<input id="ss-direct-snmp" type="text" value="public" ' +
+          'style="width:100%;box-sizing:border-box;background:#060d14;' +
+          'border:1px solid #1c2a37;color:#e6edf3;padding:6px 10px;' +
+          'border-radius:6px;font-size:13px;margin-top:4px;">' +
+      '</div>' +
+      /* Що сканувати */
+      '<div style="margin-bottom:16px;">' +
+        '<label style="color:#4a6070;font-size:11px;">Що шукаємо:</label>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">' +
+          ['🔌 Свічі', '📷 Камери', '☀️ Інвертори',
+           '⚙️ Контролери', '💡 Smart Home', '❓ Всі пристрої'].map(function(t) {
+            return '<label style="display:flex;align-items:center;gap:4px;' +
+              'color:#c9d8e4;font-size:12px;cursor:pointer;">' +
+              '<input type="checkbox" checked style="accent-color:#c084fc;"> ' + t + '</label>';
+          }).join('') +
+        '</div>' +
+      '</div>' +
+      /* Кнопки */
+      '<div style="display:flex;gap:8px;">' +
+        '<button id="ss-direct-scan-btn" ' +
+          'style="background:linear-gradient(135deg,#2a1a4a,#3a2a6a);' +
+          'border:1px solid #5a3a9a;color:#c084fc;border-radius:8px;' +
+          'padding:8px 20px;cursor:pointer;font-size:13px;font-weight:700;flex:1;">' +
+          '🔍 Сканувати' +
+        '</button>' +
+        '<button id="ss-direct-cancel" ' +
+          'style="background:transparent;border:1px solid #2a3b48;' +
+          'color:#4a6070;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:12px;">' +
+          '✕ Скасувати' +
+        '</button>' +
+      '</div>';
+
+    document.body.appendChild(dlg);
+
+    document.getElementById('ss-direct-cancel').onclick = function() { dlg.remove(); };
+    document.getElementById('ss-direct-scan-btn').onclick = function() {
+      var subnet = document.getElementById('ss-direct-subnet').value.trim();
+      var snmp   = document.getElementById('ss-direct-snmp').value.trim();
+      dlg.remove();
+      SwitchScanner.scanDirect(subnet, snmp);
+    };
+  },
+
+  /* ── Пряме сканування без роутера ── */
+  scanDirect: function(subnet, snmpCommunity) {
+    if (!subnet) subnet = '192.168.1';
+    snmpCommunity = snmpCommunity || 'public';
+    SwitchScanner._scanning = true;
+    SwitchScanner._devices  = [];
+    SwitchScanner.setStatus('⏳ Сканування ' + subnet + '.0/24...', '#c084fc');
+    SwitchScanner.clearTable();
+
+    /* Через backend — прямий ARP/ping scan */
+    fetch(SwitchScanner._PROXY + '/direct-scan', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        subnet:    subnet,
+        snmp:      snmpCommunity,
+        ports:     [80, 443, 22, 23, 161, 502, 8080, 8443],
+        timeout:   3000,
+      }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var devs = Array.isArray(data) ? data
+               : Array.isArray(data.devices) ? data.devices : [];
+
+      devs.forEach(function(d) {
+        d.vendor   = window.OUILookup ? OUILookup.lookup(d.mac||'') : 'Unknown';
+        var dt     = window.OUILookup
+          ? OUILookup.getDeviceType(d.vendor, d.openPorts||[], d.hostname||'')
+          : {icon:'❓', type:'Unknown'};
+        d.typeIcon = dt.icon;
+        d.type     = dt.type;
+        d.online   = true;
+        d.source   = d.source || 'Direct';
+      });
+
+      /* OUI онлайн lookup для Unknown */
+      if (window.OUILookup && OUILookup.lookupOnline) {
+        devs.filter(function(d){return d.vendor==='Unknown';})
+            .forEach(function(d, i) {
+          setTimeout(function() {
+            OUILookup.lookupOnline(d.mac, function(v) {
+              if (v && v !== 'Unknown') {
+                d.vendor = v;
+                var dt2 = OUILookup.getDeviceType(v, [], d.hostname||'');
+                d.typeIcon = dt2.icon;
+                d.type     = dt2.type;
+                SwitchScanner.renderTable(SwitchScanner._devices);
+              }
+            });
+          }, i * 600);
+        });
+      }
+
+      SwitchScanner._devices  = devs;
+      SwitchScanner._scanning = false;
+      SwitchScanner.setStatus(
+        '✅ Знайдено: ' + devs.length + ' пристроїв (пряме сканування)',
+        '#c084fc'
+      );
+      SwitchScanner.renderTable(devs);
+      SwitchScanner.updateStats(devs.length, devs.length, 0, 0, 0);
+    })
+    .catch(function(e) {
+      SwitchScanner._scanning = false;
+      /* Fallback — якщо backend не підтримує /direct-scan */
+      SwitchScanner.setStatus(
+        '⚠️ Backend не підтримує прямий скан. Додайте /direct-scan endpoint. ' + e,
+        '#f0a840'
+      );
+      console.error('[DirectScan]', e);
+    });
   },
 
   clearTable: function() {

@@ -292,7 +292,7 @@
       ip:        cfg.ip,
       port:      cfg.port || 80,
       sshPort:   cfg.sshPort || 22,
-      user:      cfg.user || 'admin',
+      user:      cfg.user || '',
       pass:      cfg.pass || '',
       connected: false,
       info:      null,
@@ -1155,6 +1155,18 @@
         localStorage.setItem('rm-form-saved', JSON.stringify({
           user:user, pass:remember?pass:'', remember:remember
         }));
+        /* Оновлюємо також rm-routers — щоб diff/scanner мали правильні дані */
+        try {
+          var _rs  = JSON.parse(localStorage.getItem('rm-routers') || '[]');
+          var _aid = localStorage.getItem('rm-active-router');
+          var _ar  = _rs.find(function(r){return r.id===_aid;});
+          if (_ar) {
+            _ar.user = user;
+            if (remember) _ar.pass = pass;
+            localStorage.setItem('rm-routers', JSON.stringify(_rs));
+            console.log('[RM] rm-routers synced:', _ar.ip, user);
+          }
+        } catch(e) {}
       } catch(e) {}
 
       /* Завантажуємо збережений логін/пароль */

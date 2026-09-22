@@ -29,131 +29,183 @@ function inlineDiff(a, b) {
   return { a: hA, b: hB };
 }
 
-function renderDiffVisual(textA, textB, diff, outputEl, statsEl) {
+function renderDiffVisual(textA, textB, diffResult, outputEl, statsEl) {
   if (!outputEl) return;
-  var pairs   = diff.pairs || [];
-  var added   = diff.added.length;
-  var removed = diff.removed.length;
-  var changed = pairs.filter(function(p){return p.type==='change';}).length;
-  var same    = pairs.filter(function(p){return p.type==='equal'; }).length;
+  var pairs   = diffResult.pairs   || [];
+  var nAdded  = pairs.filter(function(p){return p.type==='insert';}).length;
+  var nRemoved= pairs.filter(function(p){return p.type==='delete';}).length;
+  var nChanged= pairs.filter(function(p){return p.type==='change';}).length;
+  var nSame   = pairs.filter(function(p){return p.type==='equal'; }).length;
 
-  /* Статистика */
+  /* ── Статистика ── */
   if (statsEl) {
     statsEl.innerHTML =
-      '<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;font-weight:600;margin-right:6px;background:#0a2a1a;color:#5fd0a5;">+' + added + ' додано</span>' +
-      '<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;font-weight:600;margin-right:6px;background:#2a0a0a;color:#e05252;">&#8722;' + removed + ' видалено</span>' +
-      '<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;font-weight:600;margin-right:6px;background:#1a1a0a;color:#f0a840;">~' + changed + ' змінено</span>' +
-      '<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;font-weight:600;margin-right:6px;background:#0a0f14;color:#4a6070;">' + same + ' однакових</span>' +
-      (added+removed+changed===0 ? '<span style="color:#5fd0a5;font-size:13px;">&#10003; Конфіги ідентичні</span>' : '');
-  }
-
-  /* Стилі рядків */
-  var S = {
-    wrap:    'overflow:auto;max-height:420px;border-radius:6px;border:1px solid #2a3b48;margin-top:8px;',
-    tbl:     'width:100%;border-collapse:collapse;font-family:monospace;font-size:12px;',
-    th:      'background:#080f17;color:#4a6070;padding:6px 12px;border-bottom:1px solid #2a3b48;text-align:left;position:sticky;top:0;',
-    thNum:   'background:#060d14;width:36px;border-bottom:1px solid #2a3b48;position:sticky;top:0;',
-    ln:      'width:36px;text-align:right;padding:2px 6px;color:#4a6070;font-size:11px;background:#060d14;border-right:1px solid #1a2a38;user-select:none;',
-    lnD:     'width:36px;text-align:right;padding:2px 6px;color:#e05252;font-size:11px;background:#060d14;border-right:1px solid #1a2a38;user-select:none;',
-    lnI:     'width:36px;text-align:right;padding:2px 6px;color:#5fd0a5;font-size:11px;background:#060d14;border-right:1px solid #1a2a38;user-select:none;',
-    cell:    'padding:2px 10px;white-space:pre-wrap;word-break:break-all;color:#4a6070;',
-    cellD:   'padding:2px 10px;white-space:pre-wrap;word-break:break-all;color:#e08080;background:#2a0808;border-right:2px solid #1a2a38;',
-    cellI:   'padding:2px 10px;white-space:pre-wrap;word-break:break-all;color:#80e0a0;background:#082808;',
-    cellCD:  'padding:2px 10px;white-space:pre-wrap;word-break:break-all;color:#e0c080;background:#2a1f08;border-right:2px solid #1a2a38;',
-    cellCI:  'padding:2px 10px;white-space:pre-wrap;word-break:break-all;color:#80c0e0;background:#081f2a;',
-    cellEq:  'padding:2px 10px;white-space:pre-wrap;word-break:break-all;color:#4a6070;border-right:2px solid #1a2a38;',
-    cellEmp: 'padding:2px 10px;background:#0a0f14;border-right:2px solid #1a2a38;',
-    cellEmpR:'padding:2px 10px;background:#0a0f14;',
-    trEq:    '',
-    trD:     'background:#1a0505;',
-    trI:     'background:#051a05;',
-    trC:     'background:#1a1405;',
-  };
-
-  var rows = pairs.map(function(p) {
-    if (p.type === 'equal')
-      return '<tr style="'+S.trEq+'"><td style="'+S.ln+'">'+(p.na||'')+'</td>' +
-             '<td style="'+S.cellEq+'">'+escH(p.a)+'</td>' +
-             '<td style="'+S.ln+'">'+(p.nb||'')+'</td>' +
-             '<td style="'+S.cell+'">'+escH(p.b||p.a)+'</td></tr>';
-    if (p.type === 'delete')
-      return '<tr style="'+S.trD+'"><td style="'+S.lnD+'">'+p.na+'</td>' +
-             '<td style="'+S.cellD+'"><b style="margin-right:4px;">&#8722;</b>'+escH(p.a)+'</td>' +
-             '<td style="'+S.ln+'"></td>' +
-             '<td style="'+S.cellEmpR+'"></td></tr>';
-    if (p.type === 'insert')
-      return '<tr style="'+S.trI+'"><td style="'+S.ln+'"></td>' +
-             '<td style="'+S.cellEmp+'"></td>' +
-             '<td style="'+S.lnI+'">'+p.nb+'</td>' +
-             '<td style="'+S.cellI+'"><b style="margin-right:4px;">+</b>'+escH(p.b)+'</td></tr>';
-    if (p.type === 'change') {
-      var inl = inlineDiff(p.a, p.b);
-      return '<tr style="'+S.trC+'"><td style="'+S.lnD+'">'+p.na+'</td>' +
-             '<td style="'+S.cellCD+'"><b style="margin-right:4px;">~</b>'+inl.a+'</td>' +
-             '<td style="'+S.lnI+'">'+p.nb+'</td>' +
-             '<td style="'+S.cellCI+'"><b style="margin-right:4px;">~</b>'+inl.b+'</td></tr>';
-    }
-    return '';
-  }).join('');
-
-  outputEl.style.cssText = 'margin-bottom:12px;';
-  outputEl.innerHTML =
-    '<div style="'+S.wrap+'">' +
-      '<table style="'+S.tbl+'">' +
-        '<thead><tr>' +
-          '<th style="'+S.thNum+'"></th>' +
-          '<th style="'+S.th+'border-right:2px solid #1a2a38;">&#128196; Конфіг A (оригінал)</th>' +
-          '<th style="'+S.thNum+'"></th>' +
-          '<th style="'+S.th+'">&#128196; Конфіг B (новий)</th>' +
-        '</tr></thead>' +
-        '<tbody>' +
-          (rows || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#4a6070;">Немає змін</td></tr>') +
-        '</tbody>' +
-      '</table>' +
-    '</div>';
-
-  /* AI панель */
-  window.__diffData = {
-    added: added, removed: removed, changed: changed,
-    summary: pairs.filter(function(p){return p.type!=='equal';})
-      .map(function(p){
-        if(p.type==='delete') return '- '+p.a;
-        if(p.type==='insert') return '+ '+p.b;
-        if(p.type==='change') return '~ '+p.a+' -> '+p.b;
-        return '';
-      }).slice(0,60).join('\n')
-  };
-
-  var oldPanel = document.getElementById('diff-ai-panel');
-  if (oldPanel) oldPanel.remove();
-
-  if (added + removed + changed > 0) {
-    var panel = document.createElement('div');
-    panel.id = 'diff-ai-panel';
-    panel.style.cssText = 'margin-top:12px;background:#0a0f1a;border:1px solid #3a2a6a;border-radius:10px;overflow:hidden;';
-    panel.innerHTML =
-      '<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #1a1a3a;">' +
-        '<span>&#129302;</span>' +
-        '<span style="color:#c9d8e4;font-weight:600;font-size:13px;">AI Аналіз diff</span>' +
-        '<span style="margin-left:auto;font-size:11px;color:#4a6070;">+'+added+' &#8722;'+removed+' ~'+changed+'</span>' +
-      '</div>' +
-      '<div style="padding:12px 16px;">' +
-        '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">' +
-          '<button onclick="runDiffAI(this,\'analyze\')" style="background:linear-gradient(135deg,#5b4efc,#8b5efc);color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;">&#128269; Аналіз</button>' +
-          '<button onclick="runDiffAI(this,\'risk\')"    style="background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;">&#9888;&#65039; Ризики</button>' +
-          '<button onclick="runDiffAI(this,\'apply\')"   style="background:linear-gradient(135deg,#27ae60,#2ecc71);color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;">&#9989; Рекомендація</button>' +
-          '<button onclick="toggleDiffAIChat()" style="background:#1a2a3a;border:1px solid #2a3b48;color:#8ea3b0;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;">&#128172; Запит</button>' +
-        '</div>' +
-        '<div id="diff-ai-chat" style="display:none;margin-bottom:10px;">' +
-          '<textarea id="diff-ai-q" rows="2" placeholder="Запитай AI про ці зміни..." ' +
-            'style="width:100%;background:#060d14;border:1px solid #2a3b48;border-radius:6px;color:#e6edf3;padding:8px;font-size:12px;resize:none;box-sizing:border-box;"></textarea>' +
-          '<button onclick="runDiffAI(this,\'custom\')" style="margin-top:6px;background:#4a90d9;color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px;">&#128640; Надіслати</button>' +
-        '</div>' +
-        '<div id="diff-ai-out" style="font-size:12px;color:#c9d8e4;line-height:1.7;min-height:0;"></div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">'+
+      '<span style="background:#0a2a0a;border:1px solid #2a5a2a;border-radius:5px;'+
+        'padding:2px 10px;color:#5fd0a5;font-size:12px;">+' + nAdded   + ' додано</span>'+
+      '<span style="background:#2a0a0a;border:1px solid #5a2a2a;border-radius:5px;'+
+        'padding:2px 10px;color:#e08080;font-size:12px;">−' + nRemoved + ' видалено</span>'+
+      '<span style="background:#1a1a0a;border:1px solid #4a4a2a;border-radius:5px;'+
+        'padding:2px 10px;color:#f0c060;font-size:12px;">~' + nChanged + ' змінено</span>'+
+      '<span style="background:#0a0f1a;border:1px solid #2a3a4a;border-radius:5px;'+
+        'padding:2px 10px;color:#4a6070;font-size:12px;">'  + nSame    + ' однаково</span>'+
       '</div>';
-    outputEl.parentElement.appendChild(panel);
   }
+
+  function escHtml(s) {
+    return String(s||'')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;');
+  }
+
+  /* ── Заголовки колонок ── */
+  var html =
+    '<table style="width:100%;border-collapse:collapse;table-layout:fixed;">'+
+    '<colgroup><col style="width:50%"><col style="width:50%"></colgroup>'+
+    '<thead><tr>'+
+    '<th style="background:#0a1a0a;color:#5fd0a5;padding:8px 12px;'+
+      'border:1px solid #1a3a2a;font-size:12px;text-align:left;">'+
+      '📄 КОНФІГ A — Поточний (на роутері)'+
+    '</th>'+
+    '<th style="background:#0a0f1a;color:#5b9bd5;padding:8px 12px;'+
+      'border:1px solid #1a2a3a;font-size:12px;text-align:left;">'+
+      '📝 КОНФІГ B — Новий (для застосування)'+
+    '</th>'+
+    '</tr></thead><tbody>';
+
+  var baseCell = 'padding:3px 10px;font-family:monospace;font-size:11px;'+
+    'border:1px solid #1a2a30;vertical-align:top;'+
+    'white-space:pre-wrap;word-break:break-word;';
+
+  pairs.forEach(function(pair) {
+    /* Поля: pair.a = рядок з A, pair.b = рядок з B */
+    var lineA = pair.a || '';
+    var lineB = pair.b || '';
+
+    if (pair.type === 'equal') {
+      var st = baseCell + 'color:#3a5060;background:#070d10;';
+      html += '<tr>'+
+        '<td style="'+st+'">'+escHtml(lineA)+'</td>'+
+        '<td style="'+st+'">'+escHtml(lineB)+'</td>'+
+        '</tr>';
+
+    } else if (pair.type === 'delete') {
+      /* Тільки в A — червоне — буде ВИДАЛЕНО */
+      html += '<tr>'+
+        '<td style="'+baseCell+'background:#1a0505;color:#e08080;border-left:3px solid #c03030;">'+
+          '<span style="color:#c03030;font-size:10px;">−</span> '+
+          escHtml(lineA)+
+          '<div style="color:#6a3030;font-size:10px;margin-top:2px;">'+
+            '⚠ Є в A, відсутнє в B — буде ВИДАЛЕНО'+
+          '</div>'+
+        '</td>'+
+        '<td style="'+baseCell+'background:#0d0505;color:#3a1515;font-style:italic;">'+
+          '— відсутнє в B —'+
+        '</td>'+
+        '</tr>';
+
+    } else if (pair.type === 'insert') {
+      /* Тільки в B — зелене — буде ДОДАНО */
+      html += '<tr>'+
+        '<td style="'+baseCell+'background:#050d05;color:#2a4a2a;font-style:italic;">'+
+          '— відсутнє в A —'+
+        '</td>'+
+        '<td style="'+baseCell+'background:#051505;color:#5fd0a5;border-left:3px solid #3a9a3a;">'+
+          '<span style="color:#3a9a3a;font-size:10px;">+</span> '+
+          escHtml(lineB)+
+          '<div style="color:#2a5a2a;font-size:10px;margin-top:2px;">'+
+            '✅ Відсутнє в A — буде ДОДАНО'+
+          '</div>'+
+        '</td>'+
+        '</tr>';
+
+    } else if (pair.type === 'change') {
+      /* Змінено — жовте ліворуч, зелене праворуч */
+      html += '<tr>'+
+        '<td style="'+baseCell+'background:#1a1200;color:#d4a820;border-left:3px solid #a07820;">'+
+          '<span style="color:#a07820;font-size:10px;">~</span> '+
+          escHtml(lineA)+
+          '<div style="color:#504010;font-size:10px;margin-top:2px;">~ Старе значення в A</div>'+
+        '</td>'+
+        '<td style="'+baseCell+'background:#0d1800;color:#b8d060;border-left:3px solid #608030;">'+
+          '<span style="color:#608030;font-size:10px;">~</span> '+
+          escHtml(lineB)+
+          '<div style="color:#304010;font-size:10px;margin-top:2px;">~ Нове значення в B</div>'+
+        '</td>'+
+        '</tr>';
+    }
+  });
+
+  html += '</tbody></table>';
+  outputEl.innerHTML = html;
+
+  /* AI кнопка */
+  var aiDiv = document.getElementById('da-ai-explain');
+  if (!aiDiv) {
+    aiDiv = document.createElement('div');
+    aiDiv.id = 'da-ai-explain';
+    outputEl.parentNode.appendChild(aiDiv);
+  }
+  aiDiv.innerHTML = '';
+  if (nAdded + nRemoved + nChanged === 0) {
+    aiDiv.innerHTML = '<div style="color:#5fd0a5;padding:12px;text-align:center;">'+
+      '✅ Конфіги ідентичні — відмінностей немає!</div>';
+    return;
+  }
+  var aiBtn = document.createElement('button');
+  aiBtn.textContent = '🤖 AI — Пояснити відмінності';
+  aiBtn.style.cssText = 'margin-top:12px;background:linear-gradient(135deg,#1a3a2a,#2a5a3a);'+
+    'border:1px solid #3a7a4a;color:#5fd0a5;border-radius:8px;padding:8px 18px;'+
+    'cursor:pointer;font-size:13px;font-weight:600;display:block;';
+  aiBtn.onclick = function() { window.DiffAIExplain && DiffAIExplain(textA, textB); };
+  aiDiv.appendChild(aiBtn);
 }
+
+/* ── AI аналіз різниці конфігів ── */
+window.DiffAIExplain = function(textA, textB) {
+  var el = document.getElementById('da-ai-explain');
+  if (!el) return;
+  if (!window.AIAgent || !AIAgent.send) {
+    el.innerHTML = '<div style="color:#ff8080">AI агент недоступний</div>';
+    return;
+  }
+  el.innerHTML = '<div style="color:#5fd0a5;padding:10px">🤖 Аналізую відмінності...</div>';
+  var linesA = textA.split('\n').length;
+  var linesB = textB.split('\n').length;
+  /* Беремо перші 3000 символів щоб не перевантажити */
+  var shortA = textA.substring(0, 1500);
+  var shortB = textB.substring(0, 1500);
+  var prompt = 'Порівняй два конфіги MikroTik RouterOS.\n' +
+    'КОНФІГ A (поточний):' + shortA + '\n\n' +
+    'КОНФІГ B (новий):' + shortB + '\n\n' +
+    'Поясни: 1) Що змінилося? 2) Які ризики? 3) Чи безпечно застосовувати? ' +
+    '4) Що покращиться після застосування? Відповідь українською, коротко і чітко.';
+  AIAgent.send(prompt, { includeContext: false })
+    .then(function(resp) {
+      var txt = resp && resp.content ? resp.content
+              : resp && resp.text    ? resp.text
+              : String(resp || 'Немає відповіді');
+      /* Форматуємо markdown */
+      txt = txt
+        .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+        .replace(/\n/g, '<br>')
+        .replace(/```[\s\S]*?```/g, function(m) {
+          return '<code style="background:#0a1a0a;padding:2px 6px;border-radius:4px;">' +
+            m.replace(/```\w*/g,'').replace(/```/g,'') + '</code>';
+        });
+      el.innerHTML =
+        '<div style="background:#0d1f0d;border:1px solid #2a4a2a;border-radius:10px;' +
+          'padding:14px 18px;margin-top:12px;">' +
+          '<div style="color:#5fd0a5;font-weight:700;margin-bottom:8px;">🤖 AI Аналіз відмінностей</div>' +
+          '<div style="color:#c9d8e4;font-size:13px;line-height:1.6;">' + txt + '</div>' +
+        '</div>';
+    })
+    .catch(function(e) {
+      el.innerHTML = '<div style="color:#ff8080">Помилка AI: ' + e + '</div>';
+    });
+};
+
 
 function runDiffAI(btn, mode) {
   var out = document.getElementById('diff-ai-out');
@@ -487,54 +539,204 @@ function initDiffApply() {
 
   /* ── Синхронізація з терміналом ── */
   function syncFromTerminal() {
-    var fields = [
-      ['tm-ip',   'da-ip'],
-      ['tm-user', 'da-user'],
-      ['tm-pass', 'da-pass'],
-    ];
-    fields.forEach(function(pair) {
-      var src = document.getElementById(pair[0]);
-      var dst = document.getElementById(pair[1]);
-      if (src && dst && src.value) dst.value = src.value;
-    });
+    var daIp   = document.getElementById('da-ip');
+    var daUser = document.getElementById('da-user');
+    var daPass = document.getElementById('da-pass');
+    if (!daIp || !daUser || !daPass) return;
+
+    try {
+      /* 1. Активний роутер з rm-routers */
+      var activeId = localStorage.getItem('rm-active-router');
+      var routers  = JSON.parse(localStorage.getItem('rm-routers') || '[]');
+      var active   = routers.find(function(r) { return r.id === activeId; })
+                  || routers[0]
+                  || null;
+
+      if (active) {
+        if (active.ip)   daIp.value   = active.ip;
+        if (active.user) daUser.value = active.user;
+        if (active.pass) daPass.value = active.pass;
+        console.log('[DiffApply] sync from rm-routers:',
+          active.ip, active.user, 'pass:', active.pass ? '***' : 'empty');
+      }
+
+      /* 2. Якщо пароль порожній — беремо з rm-form-saved */
+      if (!daPass.value) {
+        var formSaved = JSON.parse(localStorage.getItem('rm-form-saved') || 'null');
+        if (formSaved) {
+          if (formSaved.user && !daUser.value) daUser.value = formSaved.user;
+          if (formSaved.pass)                  daPass.value = formSaved.pass;
+          console.log('[DiffApply] pass from rm-form-saved:', formSaved.user);
+        }
+      }
+
+      /* 3. Якщо user порожній — беремо з rm-form-saved */
+      if (!daUser.value) {
+        var fs2 = JSON.parse(localStorage.getItem('rm-form-saved') || 'null');
+        if (fs2 && fs2.user) daUser.value = fs2.user;
+      }
+
+    } catch(e) {
+      console.warn('[DiffApply] syncFromTerminal error:', e);
+    }
   }
 
   /* ── Отримати поточний конфіг з роутера ── */
   document.getElementById('da-fetch-current').addEventListener('click', function() {
-    var btn = this;
+    var btn    = this;
+    var status = document.getElementById('da-conn-status');
     btn.textContent = '⏳ Отримую...';
-    btn.disabled = true;
+    btn.disabled    = true;
+    status.textContent = '';
+
+    /* ── Авто-заповнення credentials ── */
+    /* Оновлюємо поля перед читанням */
+    syncFromTerminal();
 
     var ip   = document.getElementById('da-ip').value.trim();
     var user = document.getElementById('da-user').value.trim();
-    var pass = document.getElementById('da-pass').value;
-    var status = document.getElementById('da-conn-status');
+    var pass = document.getElementById('da-pass').value.trim();
+
+    /* Fallback якщо syncFromTerminal не дав результату */
+    if (!pass && window.RouterManager) {
+      var routers = RouterManager.getAll ? RouterManager.getAll()
+                  : RouterManager.routers || RouterManager._routers || [];
+      if (!Array.isArray(routers)) routers = Object.values(routers);
+      routers.forEach(function(r) {
+        if (!r) return;
+        var rIp = r.ip || r.host || r.address || '';
+        if (rIp && (!ip || ip === rIp)) {
+          ip   = ip   || rIp;
+          user = user || r.user || r.username || r.login || '';
+          pass = pass || r.pass || r.password || '';
+        }
+      });
+    }
+
+    /* 2. Keystore */
+    if (!pass && window.AIKeystore) {
+      var allKeys = AIKeystore.getAll ? AIKeystore.getAll() : {};
+      /* Шукаємо по IP */
+      Object.values(allKeys).forEach(function(k) {
+        if (!k) return;
+        if (k.host === ip || k.ip === ip) {
+          user = user || k.user || k.username || '';
+          pass = pass || k.pass || k.password || '';
+        }
+      });
+      /* Будь-який збережений якщо IP не знайдено */
+      if (!pass) {
+        var anyKey = Object.values(allKeys)[0] || {};
+        user = user || anyKey.user || anyKey.username || '';
+        pass = pass || anyKey.pass || anyKey.password || '';
+      }
+    }
+
+    /* 3. LocalStorage — шукаємо збережені роутери */
+    if (!pass) {
+      try {
+        var lsKeys = ['routers','mikrotik-routers','saved-routers',
+                      'router-list','connections'];
+        lsKeys.forEach(function(key) {
+          if (pass) return;
+          var raw = localStorage.getItem(key);
+          if (!raw) return;
+          var data = JSON.parse(raw);
+          var arr = Array.isArray(data) ? data : Object.values(data);
+          arr.forEach(function(r) {
+            if (!r || pass) return;
+            var rIp = r.ip || r.host || r.address || '';
+            if (!ip || rIp === ip) {
+              user = user || r.user || r.username || r.login || 'admin';
+              pass = pass || r.pass || r.password || '';
+              if (rIp) ip = rIp;
+            }
+          });
+        });
+      } catch(e) {}
+    }
+
+    /* Оновлюємо поля UI */
+    var daIp   = document.getElementById('da-ip');
+    var daUser = document.getElementById('da-user');
+    var daPass = document.getElementById('da-pass');
+    if (daIp   && ip)   daIp.value   = ip;
+    if (daUser && user) daUser.value = user;
+    if (daPass && pass) daPass.value = pass;
+
+    /* Фінальна перевірка */
+    if (!ip || !user || !pass) {
+      status.textContent = '❌ Заповніть IP, логін та пароль';
+      status.style.color = '#e0665a';
+      btn.textContent    = '📥 Отримати поточний конфіг';
+      btn.disabled       = false;
+      return;
+    }
+
+    console.log('[DiffApply] Connecting:', ip, user);
+    status.textContent = '🔄 Підключення до ' + ip + '...';
+    status.style.color = '#8ea3b0';
 
     fetch(PROXY + '/ssh/exec', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        host: ip, port: 22,
-        user: user, password: pass,
+        host: ip,
+        port: (function(){
+          try{
+            var rs=JSON.parse(localStorage.getItem('rm-routers')||'[]');
+            var aid=localStorage.getItem('rm-active-router');
+            var ar=rs.find(function(r){return r.id===aid;})||rs[0]||{};
+            return ar.sshPort||22;
+          }catch(e){return 22;}
+        })(),
+        user: user, username: user, password: pass,
         command: '/export compact',
         timeout: 30,
       }),
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      if (!d.ok) throw new Error(d.error);
-      document.getElementById('da-text-a').value = d.output || '';
+      if (!d.ok) throw new Error(d.error || 'SSH error');
+      var cfg = d.output || d.result || '';
+      /* Очищаємо зайві пробіли і порожні рядки */
+      cfg = cfg.split('\n')
+        .map(function(l){return l.trimRight();})
+        .join('\n')
+        .trim();
+      if (!cfg || cfg.length < 10) throw new Error('Порожня відповідь від роутера');
+      var taA = document.getElementById('da-text-a');
+      if (!taA) throw new Error('textarea da-text-a не знайдено в DOM');
+      taA.value = cfg;
+      /* Тригеримо events щоб UI оновився */
+      taA.dispatchEvent(new Event('input'));
+      taA.dispatchEvent(new Event('change'));
       updateLineCount('da-text-a', 'da-lines-a');
-      status.textContent = '✅ Конфіг отримано!';
+      /* Логуємо в TermLog */
+      if (window.TermLog) {
+        TermLog.log('ok', 'Export отримано (' + cfg.split('\n').length + ' рядків)');
+        TermLog.log('info', cfg.substring(0, 200) + (cfg.length > 200 ? '...' : ''));
+      }
+      status.textContent = '✅ Конфіг отримано! (' + cfg.split('\n').length + ' рядків)';
       status.style.color = '#5fd0a5';
     })
     .catch(function(e) {
-      status.textContent = '❌ ' + e.message;
+      var msg = e.message || String(e);
+      /* Підказки по типу помилки */
+      var hint = '';
+      if (msg.indexOf('Wrong login') >= 0 || msg.indexOf('password') >= 0)
+        hint = ' — перевірте логін/пароль';
+      else if (msg.indexOf('ECONNREFUSED') >= 0 || msg.indexOf('connect') >= 0)
+        hint = ' — роутер недоступний по SSH';
+      else if (msg.indexOf('timeout') >= 0)
+        hint = ' — перевищено час очікування';
+      status.textContent = '❌ ' + msg + hint;
       status.style.color = '#e0665a';
+      console.error('[DiffApply] Error:', msg, {ip, user});
     })
     .finally(function() {
       btn.textContent = '📥 Отримати поточний конфіг';
-      btn.disabled = false;
+      btn.disabled    = false;
     });
   });
 

@@ -49,7 +49,7 @@ function nsSSH(cmd) {
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
       host: r.ip, port: r.sshPort || 22,
-      username: r.user, password: r.pass,
+      user: r.user, username: r.user, password: r.pass,
       command: cmd
     })
   }).then(function(res){ return res.json(); });
@@ -179,7 +179,7 @@ window.nsStartScan = function() {
       if (!ip || ip === '0.0.0.0') return;
       var key = mac || ip;
       devices[key] = {ip:ip, mac:mac, hostname:'', iface:e['interface']||'',
-                      type:'arp', vendor:'', signal:'', online:null};
+                      type:'arp', vendor:'', signal:'', online:true};
     });
 
     dhcpList.forEach(function(e) {
@@ -187,7 +187,7 @@ window.nsStartScan = function() {
       var ip  = e['address']||'';
       var key = mac || ip;
       if (!devices[key]) devices[key] = {ip:ip, mac:mac, hostname:'', iface:'',
-                                          type:'dhcp', vendor:'', signal:'', online:null};
+                                          type:'dhcp', vendor:'', signal:'', online:true};
       devices[key].hostname = e['host-name'] || devices[key].hostname || '';
       devices[key].online   = e['status'] === 'bound' ? true :
                               (e['status'] === 'waiting' || e['status'] === 'expired') ? false : null;
@@ -199,7 +199,7 @@ window.nsStartScan = function() {
       var ip  = e['address4']||e['address6']||'';
       var key = mac || ip;
       if (!devices[key]) devices[key] = {ip:ip, mac:mac, hostname:'', iface:'',
-                                          type:'neighbor', vendor:'', signal:'', online:null};
+                                          type:'neighbor', vendor:'', signal:'', online:true};
       devices[key].hostname = e['identity'] || devices[key].hostname || '';
       devices[key].platform = e['platform'] || '';
       devices[key].type = 'neighbor';
@@ -255,7 +255,12 @@ window.nsStartScan = function() {
         .then(function(res) {
           var out = res.output || '';
           /* received=1 або ttl= означає онлайн */
-          d.online = (out.includes('received=1') || out.includes('ttl=')) ? true : false;
+          /* RouterOS ping output: sent=1 received=1 або host unreachable */
+          var received = out.match(/received=(\d+)/);
+          var rcvNum   = received ? parseInt(received[1]) : 0;
+          d.online = (rcvNum > 0 ||
+                      out.includes('ttl=') ||
+                      out.includes('time=')) ? true : false;
         })
         .catch(function() { d.online = null; })
         .finally(function() {
@@ -281,7 +286,7 @@ window.nsFilter = function() {
   var onlineOnly = (document.getElementById('ns-online-only')  ||{checked:false}).checked;
 
   var filtered = (window.__nsDevices||[]).filter(function(d) {
-    if (onlineOnly && d.online !== true) return false;
+    if (onlineOnly && !d.online) return false;
     if (q && !((d.ip||'').includes(q)||(d.mac||'').toLowerCase().includes(q)||
                (d.hostname||'').toLowerCase().includes(q)||(d.vendor||'').toLowerCase().includes(q))) return false;
     if (type  && !d.type.includes(type))  return false;

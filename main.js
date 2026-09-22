@@ -519,7 +519,18 @@ ipcMain.handle('direct-scan', async function(event, opts) {
 
     function finalize() {
       var result = Object.values(devices).filter(function(d) {
-        return d.ip && !d.ip.endsWith('.0') && !d.ip.endsWith('.255');
+        if (!d.ip) return false;
+        if (d.ip.endsWith('.0'))   return false;
+        if (d.ip.endsWith('.255')) return false;
+        /* multicast 224.x - 239.x */
+        var first = parseInt(d.ip.split('.')[0], 10);
+        if (first >= 224 && first <= 239) return false;
+        /* multicast MAC — перший байт непарний */
+        if (d.mac) {
+          var b = parseInt((d.mac.split(':')[0]||'0'), 16);
+          if (b & 0x01) return false;
+        }
+        return true;
       });
       /* Сортуємо по IP */
       result.sort(function(a, b) {

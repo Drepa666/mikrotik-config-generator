@@ -75,7 +75,7 @@
     '<button id="topo-fit-btn" title="Вписати в екран" style="background:transparent;border:1px solid #2a3b48;color:#8ea3b0;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;">\u26F6 Fit</button>' +
     '<button id="topo-export-btn" title="Зберегти PNG" style="background:transparent;border:1px solid #2a3b48;color:#8ea3b0;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;">\uD83D\uDCF8 PNG</button>' +
     '<button id="topo-save-btn" title="Зберегти топологію" style="background:transparent;border:1px solid #5fd0a5;color:#5fd0a5;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;">\uD83D\uDCBE Зберегти</button>' +
-    '<button id="topo-switch-scan-btn" title="Scan network and build topology" style="background:linear-gradient(135deg,#1a1a3a,#2a1a5a);border:1px solid #5a3a9a;color:#c084fc;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;margin-left:4px;">🔌 Switch Scan</button>' +
+    '<button id="topo-switch-scan-btn" onclick="window.TopoVisual && window.TopoVisual.runSwitchScan()" title="Scan network and build topology" style="background:linear-gradient(135deg,#1a1a3a,#2a1a5a);border:1px solid #5a3a9a;color:#c084fc;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;margin-left:4px;">🔌 Switch Scan</button>' +
     '<button id="topo-close" style="background:transparent;border:1px solid #2a3b48;color:#8ea3b0;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:12px;">\u2715</button>' +
     '</div></div>' +
 
@@ -1216,9 +1216,58 @@
 
   /* == Switch Scan -> Visual Topology == */
   function runSwitchScan() {
-    var subnet = prompt('Subnet to scan (e.g. 192.168.88 or 10.1.51):', '192.168.88');
-    if (!subnet || !subnet.trim()) return;
-    subnet = subnet.trim();
+    /* prompt() not supported in Electron -- use custom dialog */
+    var old = document.getElementById('sw-scan-dlg');
+    if (old) { old.remove(); return; }
+    var dlg = document.createElement('div');
+    dlg.id = 'sw-scan-dlg';
+    dlg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);'
+      + 'background:#0d1117;border:2px solid #5a3a9a;border-radius:12px;'
+      + 'padding:24px 28px;z-index:9999999;min-width:320px;'
+      + 'box-shadow:0 8px 40px rgba(0,0,0,.8);';
+    dlg.innerHTML =
+      '<div style="color:#c084fc;font-weight:700;font-size:15px;margin-bottom:16px;">'
+        + '&#128268; Switch Scan</div>'
+      + '<div style="color:#8ea3b0;font-size:12px;margin-bottom:12px;">'
+        + 'Subnet to scan:</div>'
+      + '<div style="display:flex;gap:8px;margin-bottom:16px;">'
+        + '<input id="sw-scan-input" type="text" value="192.168.88"'
+        + ' style="flex:1;background:#060d14;border:1px solid #2a3b48;'
+        + 'color:#e6edf3;padding:8px 12px;border-radius:6px;font-size:14px;'
+        + 'font-family:monospace;">'
+        + '<span style="color:#4a6070;line-height:36px;">.0/24</span>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;">'
+        + '<button id="sw-scan-ok" style="flex:1;background:linear-gradient(135deg,#2a1a4a,#3a2a6a);'
+        + 'border:1px solid #5a3a9a;color:#c084fc;border-radius:8px;'
+        + 'padding:9px;cursor:pointer;font-size:13px;font-weight:700;">'
+        + '&#128269; Scan</button>'
+        + '<button id="sw-scan-cancel" style="background:transparent;'
+        + 'border:1px solid #2a3b48;color:#4a6070;border-radius:8px;'
+        + 'padding:9px 16px;cursor:pointer;font-size:13px;">'
+        + '&#10005;</button>'
+      + '</div>';
+    document.body.appendChild(dlg);
+    var inp = document.getElementById('sw-scan-input');
+    inp.focus(); inp.select();
+    document.getElementById('sw-scan-cancel').onclick = function() { dlg.remove(); };
+    document.getElementById('sw-scan-ok').onclick = function() {
+      var subnet = inp.value.trim();
+      dlg.remove();
+      if (!subnet) return;
+      runSwitchScanStart(subnet);
+    };
+    inp.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        var subnet = inp.value.trim();
+        dlg.remove();
+        if (subnet) runSwitchScanStart(subnet);
+      }
+      if (e.key === 'Escape') dlg.remove();
+    });
+  }
+
+  function runSwitchScanStart(subnet) {
 
     var st = document.createElement('div');
     st.id = 'sw-scan-status';
@@ -1383,4 +1432,7 @@
   window.TopoVisual = window.TopoVisual || {};
   window.TopoVisual.runSwitchScan       = runSwitchScan;
   window.TopoVisual.buildSwitchTopology = buildSwitchTopology;
+
+  window.TopoVisual = window.TopoVisual || {};
+  window.TopoVisual.runSwitchScan = runSwitchScan;
 })();

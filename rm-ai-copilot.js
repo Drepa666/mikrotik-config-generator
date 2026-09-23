@@ -397,6 +397,7 @@ window.RMAICopilot = (function() {
         '<div class="ai-cop-tab active" data-tab="analyze">🔍 Аналіз</div>' +
         '<div class="ai-cop-tab" data-tab="chat">💬 Chat</div>' +
         '<div class="ai-cop-tab" data-tab="quick">⚡ Швидко</div>' +
+        '<div class="ai-cop-tab" data-tab="settings">⚙️ Ключ</div>' +
       '</div>' +
       '<div id="ai-cop-body"></div>' +
       '<div id="ai-cop-input-wrap">' +
@@ -443,6 +444,8 @@ window.RMAICopilot = (function() {
       renderChatTab(body);
     } else if (_activeTab === 'quick') {
       renderQuickTab(body);
+    } else if (_activeTab === 'settings') {
+      renderSettingsTab(body);
     }
   }
 
@@ -546,6 +549,124 @@ window.RMAICopilot = (function() {
         askAI(q);
       };
     });
+  }
+
+  /* ── Settings tab ── */
+  function renderSettingsTab(body) {
+    var cfg = getAIConfig();
+    body.innerHTML =
+      '<div style="display:flex;flex-direction:column;gap:12px;">' +
+
+      '<div class="ai-issue info">' +
+        '<div class="ai-issue-title">⚙️ AI Налаштування</div>' +
+        '<div class="ai-issue-desc">Введи API ключ для використання AI аналізу.</div>' +
+      '</div>' +
+
+      /* Provider */
+      '<div>' +
+        '<div style="font-size:11px;color:#4a6070;margin-bottom:6px;">Провайдер</div>' +
+        '<select id="ai-prov-sel" style="width:100%;background:#0d1821;border:1px solid #2a3b48;' +
+          'color:#c9d8e4;border-radius:8px;padding:8px 12px;font-size:12px;outline:none;">' +
+          '<option value="gemini"'  + (cfg.provider==='gemini'  ?' selected':'') + '>🤖 Google Gemini (безкоштовний)</option>' +
+          '<option value="openai"'  + (cfg.provider==='openai'  ?' selected':'') + '>🟢 OpenAI GPT-4</option>' +
+          '<option value="groq"'    + (cfg.provider==='groq'    ?' selected':'') + '>⚡ Groq (швидкий)</option>' +
+          '<option value="anthropic"'+(cfg.provider==='anthropic'?' selected':'') + '>🔵 Anthropic Claude</option>' +
+          '<option value="deepseek"'+(cfg.provider==='deepseek' ?' selected':'') + '>🌊 DeepSeek</option>' +
+        '</select>' +
+      '</div>' +
+
+      /* API Key */
+      '<div>' +
+        '<div style="font-size:11px;color:#4a6070;margin-bottom:6px;">API Ключ</div>' +
+        '<input id="ai-key-inp" type="password" placeholder="Встав API ключ тут..."' +
+          'value="' + cfg.apiKey + '"' +
+          'style="width:100%;background:#0d1821;border:1px solid #2a3b48;' +
+          'color:#c9d8e4;border-radius:8px;padding:8px 12px;' +
+          'font-size:12px;outline:none;box-sizing:border-box;">' +
+        '<div style="font-size:10px;color:#4a6070;margin-top:4px;" id="ai-key-hint"></div>' +
+      '</div>' +
+
+      /* Model */
+      '<div>' +
+        '<div style="font-size:11px;color:#4a6070;margin-bottom:6px;">Модель (необов\'язково)</div>' +
+        '<input id="ai-model-inp" type="text" placeholder="залиш порожнім для default"' +
+          'value="' + (cfg.model||'') + '"' +
+          'style="width:100%;background:#0d1821;border:1px solid #2a3b48;' +
+          'color:#c9d8e4;border-radius:8px;padding:8px 12px;' +
+          'font-size:12px;outline:none;box-sizing:border-box;">' +
+      '</div>' +
+
+      /* Save btn */
+      '<button id="ai-save-key" style="' +
+        'background:linear-gradient(135deg,#1a3a2a,#0d2a1a);' +
+        'border:1px solid #3a7a4a;color:#5fd0a5;' +
+        'border-radius:8px;padding:10px;width:100%;' +
+        'cursor:pointer;font-size:13px;font-weight:700;">💾 Зберегти</button>' +
+
+      /* Links */
+      '<div style="font-size:10px;color:#4a6070;line-height:1.8;">' +
+        '🔗 Отримати безкоштовний ключ:<br>' +
+        '<a href="#" id="ai-link-gemini" style="color:#5b9bd5;">Google AI Studio (Gemini)</a><br>' +
+        '<a href="#" id="ai-link-groq"   style="color:#5b9bd5;">Groq Console (безкоштовно)</a>' +
+      '</div>' +
+
+      /* Status */
+      '<div id="ai-save-status" style="font-size:12px;min-height:18px;"></div>' +
+      '</div>';
+
+    /* Підказки провайдерів */
+    var hints = {
+      gemini:    'aistudio.google.com → Get API key → безкоштовно',
+      openai:    'platform.openai.com → API keys → платно',
+      groq:      'console.groq.com → API Keys → безкоштовно',
+      anthropic: 'console.anthropic.com → API Keys → платно',
+      deepseek:  'platform.deepseek.com → API keys → дешево',
+    };
+
+    var provSel = document.getElementById('ai-prov-sel');
+    var keyHint = document.getElementById('ai-key-hint');
+    if (provSel && keyHint) {
+      keyHint.textContent = hints[provSel.value] || '';
+      provSel.onchange = function() {
+        keyHint.textContent = hints[provSel.value] || '';
+      };
+    }
+
+    /* Посилання */
+    var lnkG = document.getElementById('ai-link-gemini');
+    var lnkR = document.getElementById('ai-link-groq');
+    if (lnkG) lnkG.onclick = function(e) {
+      e.preventDefault();
+      if (window.electronAPI && window.electronAPI.openExternal) {
+        window.electronAPI.openExternal('https://aistudio.google.com/app/apikey');
+      } else { window.open('https://aistudio.google.com/app/apikey'); }
+    };
+    if (lnkR) lnkR.onclick = function(e) {
+      e.preventDefault();
+      if (window.electronAPI && window.electronAPI.openExternal) {
+        window.electronAPI.openExternal('https://console.groq.com/keys');
+      } else { window.open('https://console.groq.com/keys'); }
+    };
+
+    /* Зберегти */
+    var saveBtn = document.getElementById('ai-save-key');
+    var status  = document.getElementById('ai-save-status');
+    if (saveBtn) saveBtn.onclick = function() {
+      var prov  = provSel ? provSel.value : 'gemini';
+      var key   = (document.getElementById('ai-key-inp')   || {}).value || '';
+      var model = (document.getElementById('ai-model-inp') || {}).value || '';
+      if (!key.trim()) {
+        status.style.color = '#e08080';
+        status.textContent = '⚠️ Введи API ключ!';
+        return;
+      }
+      localStorage.setItem('ai-provider', prov);
+      localStorage.setItem('ai-api-key',  key.trim());
+      localStorage.setItem('ai-model',    model.trim());
+      status.style.color = '#5fd0a5';
+      status.textContent = '✅ Збережено! Провайдер: ' + prov;
+      setTimeout(function() { status.textContent = ''; }, 3000);
+    };
   }
 
   /* ── Локальний аналіз ── */

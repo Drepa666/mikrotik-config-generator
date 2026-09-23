@@ -723,7 +723,7 @@ AIAgentUI.quickAsk = function(text) {
 /* ── Виконати команду ── */
 AIAgentUI.executeCmd = function(encoded) {
   var cmd = decodeURIComponent(atob(encoded));
-  if (!confirm('Виконати команду на роутері?\n\n' + cmd)) return;
+  /* confirm прибрано — виконуємо без підтвердження */
   AIAgentUI.addMessage('system', '⚡ Виконую: ' + cmd);
   AIAgent.ssh(cmd).then(function(d) {
     var out = d.output || d.error || 'OK';

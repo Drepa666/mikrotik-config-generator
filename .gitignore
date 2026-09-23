@@ -8,3 +8,9 @@ ruijie_*.json
 *_report.txt
 dist/
 .env
+# Temp fix scripts
+fix_*.py
+step*.py
+diag*.py
+debug*.py
+patch*.py

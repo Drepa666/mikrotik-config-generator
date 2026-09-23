@@ -1051,8 +1051,10 @@
 
     if (!rules.length) return html + '<div style="color:#8ea3b0;padding:20px;text-align:center;">Правил немає</div>';
 
-    html += '<div style="overflow-x:auto;"><table class="rm-table rm-table-compact">' +
-      '<tr><th>#</th><th>Chain</th><th>Action</th><th>Protocol</th>' +
+    html += '<div style="overflow-x:auto;"><table class="rm-table rm-table-compact" id="rm-fw-table">' +
+      '<tr>' +
+      '<th style="width:20px;"></th>' +
+      '<th>#</th><th>Chain</th><th>Action</th><th>Protocol</th>' +
       '<th>Src</th><th>Dst</th><th>Port</th><th>In/Out</th>' +
       '<th>State</th><th>Comment</th><th style="text-align:right;">Дії</th></tr>';
 
@@ -1061,7 +1063,14 @@
       var disabled = rule.disabled === 'true';
       var actionColor = rule.action === 'drop' ? '#e05252' : rule.action === 'accept' ? '#5fd0a5' : '#f0a840';
 
-      html += '<tr style="' + (disabled ? 'opacity:.5;' : '') + '">' +
+      html += '<tr ' +
+        'draggable="true" ' +
+        'data-id="' + esc(id) + '" ' +
+        'data-idx="' + idx + '" ' +
+        'data-api="' + esc(apiPath) + '" ' +
+        'style="' + (disabled ? 'opacity:.5;' : '') + 'cursor:grab;" ' +
+        'class="rm-fw-row">' +
+        '<td style="color:#4a6070;font-size:14px;padding:0 4px;cursor:grab;" title="Перетягни для зміни порядку">⠿</td>' +
         '<td style="color:#8ea3b0;font-size:11px;">' + (idx+1) + '</td>' +
         '<td>' + esc(rule.chain||'') + '</td>' +
         '<td><b style="color:' + actionColor + ';">' + esc(rule.action||'') + '</b></td>' +
@@ -1084,6 +1093,20 @@
     html += '</table></div>';
 
     setTimeout(function() {
+
+/* ── Firewall Drag & Drop CSS ── */
+if (!document.getElementById('fw-dnd-css')) {
+  var s = document.createElement('style');
+  s.id = 'fw-dnd-css';
+  s.textContent = [
+    '.rm-fw-row { transition: opacity .15s, border-top .1s; }',
+    '.rm-fw-row:hover td:first-child { color: #5fd0a5 !important; }',
+    '.rm-fw-row.rm-drag-over { border-top: 2px solid #5fd0a5; }',
+    '#rm-fw-table td:first-child { user-select:none; }',
+  ].join('\n');
+  document.head.appendChild(s);
+}
+
       var search = document.getElementById('rm-fw-search');
       if (search) search.addEventListener('input', function() {
         var q = search.value.toLowerCase();
@@ -1092,6 +1115,81 @@
           row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
         });
       });
+
+      /* ── Drag & Drop для зміни порядку ── */
+      (function initDragDrop() {
+        var rows    = document.querySelectorAll('.rm-fw-row');
+        var dragSrc = null;
+        var dragSrcIdx = null;
+
+        rows.forEach(function(row) {
+          row.addEventListener('dragstart', function(e) {
+            dragSrc    = row;
+            dragSrcIdx = parseInt(row.dataset.idx);
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', row.dataset.id);
+            setTimeout(function() { row.style.opacity = '0.4'; }, 0);
+          });
+
+          row.addEventListener('dragend', function() {
+            row.style.opacity = '';
+            document.querySelectorAll('.rm-fw-row').forEach(function(r) {
+              r.classList.remove('rm-drag-over');
+              r.style.borderTop = '';
+            });
+          });
+
+          row.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            document.querySelectorAll('.rm-fw-row').forEach(function(r) {
+              r.style.borderTop = '';
+            });
+            row.style.borderTop = '2px solid #5fd0a5';
+          });
+
+          row.addEventListener('dragleave', function() {
+            row.style.borderTop = '';
+          });
+
+          row.addEventListener('drop', function(e) {
+            e.preventDefault();
+            row.style.borderTop = '';
+            if (!dragSrc || dragSrc === row) return;
+
+            var destIdx = parseInt(row.dataset.idx);
+            var ruleId  = dragSrc.dataset.id;
+            var apiP    = dragSrc.dataset.api;
+
+            if (dragSrcIdx === destIdx) return;
+
+            /* Візуальний feedback */
+            dragSrc.style.opacity = '0.3';
+            row.style.background  = '#1a2a1a';
+
+            /* REST API: переміщення правила */
+            restCall(r, 'POST', apiP + '/move', {
+              '.id':        ruleId,
+              'destination': String(destIdx),
+            }).then(function(res) {
+              S().invalidateRelated('fwFilter');
+              setTimeout(window.rmSectionFirewall, 300);
+            }).catch(function(e) {
+              console.error('[FW Move] error:', e);
+              dragSrc.style.opacity = '';
+              row.style.background  = '';
+              /* Fallback через SSH */
+              var srcNum = dragSrcIdx + 1;
+              var dstNum = destIdx;
+              sshCall(r, '/ip firewall filter move ' + srcNum + ' destination=' + dstNum)
+                .then(function() {
+                  S().invalidateRelated('fwFilter');
+                  setTimeout(window.rmSectionFirewall, 300);
+                });
+            });
+          });
+        });
+      })();
 
       window.__rmFWToggle = function(id, path, disabled) {
         restCall(r, 'PATCH', path + '/' + id, { disabled: disabled ? 'no' : 'yes' }).then(function() {

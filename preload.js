@@ -31,6 +31,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   isElectron: true,
+
+  /* ── Прямий REST до роутера (без proxy.py) ── */
+  routerRest: function(opts) {
+    return ipcRenderer.invoke('router-rest', opts);
+  },
+
+  /* ── Прямий SSH до роутера (без proxy.py) ── */
+  routerSsh: function(opts) {
+    return ipcRenderer.invoke('router-ssh', opts);
+  },
+
+  /* ── SSH keep-alive сесія ── */
+  routerSshStream: function(opts, onData) {
+    ipcRenderer.on('ssh-stream-data', function(e, data) { onData(data); });
+    return ipcRenderer.invoke('router-ssh-stream', opts);
+  },
 });
 
-console.log('[preload] electronAPI ready — proxy автозапуск увімкнено');
+console.log('[preload] electronAPI ready — direct IPC mode');

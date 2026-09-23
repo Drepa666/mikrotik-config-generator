@@ -7,6 +7,9 @@ const https  = require('https');
 const http   = require('http');
 const net    = require('net');
 const { spawn, execSync } = require('child_process');
+let   ssh2Client = null;
+try { ssh2Client = require('ssh2'); } catch(e) { console.warn('[IPC] ssh2 not found:', e.message); }
+
 
 let mainWindow   = null;
 let proxyProcess = null;

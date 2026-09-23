@@ -14,6 +14,10 @@ window.OUILookup = {
     '00:23:EA':'Cisco','58:AC:78':'Cisco','70:DB:98':'Cisco',
     'A4:4C:11':'Cisco','00:0C:29':'Cisco','00:50:56':'Cisco VMware',
     '00:1C:57':'Cisco','00:22:55':'Cisco','FC:FB:FB':'Cisco',
+    /* MediaTek */
+    'F4:4E:B4':'MediaTek','00:0C:E7':'MediaTek','00:0C:43':'MediaTek',
+    '00:90:CC':'MediaTek','20:F4:1B':'MediaTek','4C:BC:98':'MediaTek',
+    'AC:BD:D4':'MediaTek','C4:4B:44':'MediaTek','10:6F:3F':'MediaTek',
     /* Realtek (дуже часто в пристроях) */
     '00:E0:4C':'Realtek','52:54:00':'Realtek/QEMU',
     /* TP-Link */
@@ -113,12 +117,12 @@ window.OUILookup = {
     /* Axis cameras */
     '00:40:8C':'AXIS','AC:CC:8E':'AXIS',
     /* Intel */
-    'F4:4E:B4':'Intel','8C:8D:28':'Intel','18:66:DA':'Intel',
+    'F4:4E:B4':'MediaTek','8C:8D:28':'Intel','18:66:DA':'Intel',
     'AC:ED:5C':'Intel','00:1B:21':'Intel','00:21:6A':'Intel',
     '8C:EC:4B':'Intel','94:65:9C':'Intel','A4:C3:F0':'Intel',
     'D0:57:7B':'Intel','00:1E:67':'Intel','E4:B3:18':'Intel',
     /* Apple */
-    'F4:4E:B4':'Apple','3C:15:C2':'Apple','A8:86:DD':'Apple',
+    'F4:4E:B4':'MediaTek','3C:15:C2':'Apple','A8:86:DD':'Apple',
     '00:17:F2':'Apple','28:CF:DA':'Apple','3C:07:54':'Apple',
     'AC:BC:32':'Apple','F0:18:98':'Apple','DC:A9:04':'Apple',
     '78:4F:43':'Apple','B8:E8:56':'Apple','8C:85:90':'Apple',

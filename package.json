@@ -55,5 +55,8 @@
   "devDependencies": {
     "electron": "^44.0.0",
     "electron-builder": "^26.0.0"
+  },
+  "dependencies": {
+    "ssh2": "^1.17.0"
   }
 }

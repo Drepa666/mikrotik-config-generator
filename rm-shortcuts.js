@@ -161,16 +161,14 @@ window.RMShortcuts = (function() {
       '}',
       /* Trigger button */
       '#sc-trigger {',
-      '  position:fixed; bottom:16px; right:60px; z-index:9990;',
-      '  width:36px; height:36px; border-radius:50%;',
-      '  background:#0d1117; border:1px solid #2a3b48;',
-      '  color:#4a6070; cursor:pointer; font-size:16px;',
-      '  display:flex; align-items:center; justify-content:center;',
-      '  transition:all .2s;',
+      '  background:transparent; border:1px solid #2a3b48;',
+      '  color:#8ea3b0; cursor:pointer; font-size:13px;',
+      '  font-weight:700; border-radius:6px;',
+      '  padding:3px 10px; transition:all .15s;',
+      '  display:inline-flex; align-items:center; gap:4px;',
       '}',
       '#sc-trigger:hover {',
       '  border-color:#5fd0a5; color:#5fd0a5;',
-      '  box-shadow:0 0 12px rgba(95,208,165,.2);',
       '}',
     ].join('\n');
     document.head.appendChild(s);
@@ -247,12 +245,23 @@ window.RMShortcuts = (function() {
       '</div>';
     document.body.appendChild(overlay);
 
-    /* Trigger button */
+    /* Trigger button — вставляємо в lang-switcher */
     var trigger = document.createElement('button');
     trigger.id = 'sc-trigger';
     trigger.title = 'Keyboard Shortcuts (Ctrl+?)';
-    trigger.innerHTML = '?';
-    document.body.appendChild(trigger);
+    trigger.innerHTML = '&#9875; ?';
+    /* Шукаємо lang-switcher */
+    var langSw = document.getElementById('lang-switcher');
+    if (langSw) {
+      /* Роздільник */
+      var sep = document.createElement('span');
+      sep.style.cssText = 'width:1px;background:#2a3b48;margin:4px 4px;';
+      langSw.appendChild(sep);
+      langSw.appendChild(trigger);
+    } else {
+      /* Fallback — fixed position */
+      document.body.appendChild(trigger);
+    }
 
     /* Events */
     trigger.onclick = open;

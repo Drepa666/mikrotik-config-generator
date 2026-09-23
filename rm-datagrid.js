@@ -636,8 +636,11 @@ window.RMDataGrid = (function() {
 
     /* Drag-and-drop */
     enableDragDrop(table, function(srcIdx, dstIdx) {
-      /* Optional: trigger REST move if available */
       console.log('[DataGrid] row moved: ' + srcIdx + ' -> ' + dstIdx);
+      /* Викликаємо onMove якщо є в wrap */
+      if (typeof wrap._onMove === 'function') {
+        wrap._onMove(srcIdx, dstIdx);
+      }
     });
 
     /* Keyboard navigation */

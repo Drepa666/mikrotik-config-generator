@@ -364,6 +364,10 @@
       var wrap = document.getElementById('rm-table-wrap');
       if (wrap) {
         wrap.innerHTML = html;
+    /* Зберігаємо onMove для DataGrid drag-drop */
+    if (typeof opts.onMove === 'function') {
+      wrap._onMove = opts.onMove;
+    }
         wrap._data = data;
         bindActions(wrap, data, load);
       }
@@ -591,6 +595,50 @@
       apiPath: '/ip/firewall/filter',
       cols:    ['chain','action','protocol','src-address','dst-address','dst-port','disabled','comment'],
       canToggle: true,
+      onMove: function(srcIdx, dstIdx) {
+        var r = window.__rmActiveRouter || (window.RMCore && RMCore.activeRouter());
+        if (!r) return;
+        /* MikroTik REST: move rule */
+        var wrap = document.getElementById('rm-table-wrap');
+        var rows = wrap ? wrap.querySelectorAll('tr[data-idx]') : [];
+        var srcRow = wrap ? wrap.querySelector('tr[data-idx="' + srcIdx + '"]') : null;
+        var srcId  = srcRow ? (srcRow.dataset.id || '') : '';
+        if (!srcId) { console.warn('[FW Move] no id for idx', srcIdx); return; }
+        /* Показуємо індикатор */
+        var indicator = document.createElement('div');
+        indicator.style.cssText = 'position:fixed;bottom:80px;right:20px;background:#1a3a2a;' +
+          'border:1px solid #5fd0a5;color:#5fd0a5;padding:8px 14px;border-radius:8px;' +
+          'font-size:12px;z-index:99999;';
+        indicator.textContent = '⠿ Переміщення правила...';
+        document.body.appendChild(indicator);
+        /* REST move */
+        window.restCall(r, 'POST', '/ip/firewall/filter/' + srcId + '/move', {
+          destination: String(dstIdx),
+        }).then(function() {
+          indicator.textContent = '✅ Порядок збережено';
+          indicator.style.borderColor = '#5fd0a5';
+          setTimeout(function() {
+            indicator.remove();
+            if (window.rmCrudFWFilter) window.rmCrudFWFilter();
+          }, 1200);
+        }).catch(function() {
+          /* Fallback SSH */
+          var sshCmd = '/ip firewall filter move ' + srcId + ' destination=' + dstIdx;
+          window.sshCall(r, sshCmd).then(function() {
+            indicator.textContent = '✅ Порядок збережено (SSH)';
+            setTimeout(function() {
+              indicator.remove();
+              if (window.rmCrudFWFilter) window.rmCrudFWFilter();
+            }, 1200);
+          }).catch(function(e) {
+            indicator.style.borderColor = '#e08080';
+            indicator.style.color = '#e08080';
+            indicator.textContent = '❌ Помилка переміщення';
+            setTimeout(function() { indicator.remove(); }, 2000);
+            console.error('[FW Move] SSH fallback failed:', e);
+          });
+        });
+      },
       fields: [
         {
           key: 'chain', label: 'Chain', required: true, type: 'select',

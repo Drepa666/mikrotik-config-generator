@@ -723,14 +723,48 @@ AIAgentUI.quickAsk = function(text) {
 /* ── Виконати команду ── */
 AIAgentUI.executeCmd = function(encoded) {
   var cmd = decodeURIComponent(atob(encoded));
-  /* confirm прибрано — виконуємо без підтвердження */
-  AIAgentUI.addMessage('system', '⚡ Виконую: ' + cmd);
-  AIAgent.ssh(cmd).then(function(d) {
-    var out = d.output || d.error || 'OK';
-    AIAgentUI.addMessage('assistant', '**Результат:**\n```\n' + out + '\n```');
-  }).catch(function(e) {
-    AIAgentUI.addMessage('error', 'SSH помилка: ' + e);
-  });
+
+  /* Розбиваємо на окремі команди, ігноруємо коментарі та порожні рядки */
+  var lines = cmd.split('\n')
+    .map(function(l) { return l.trim(); })
+    .filter(function(l) { return l && !l.startsWith('#'); });
+
+  if (!lines.length) {
+    AIAgentUI.addMessage('error', 'Немає команд для виконання');
+    return;
+  }
+
+  AIAgentUI.addMessage('system', '⚡ Виконую ' + lines.length + ' команд(у)...');
+
+  /* Виконуємо послідовно */
+  var results = [];
+  var idx = 0;
+
+  function runNext() {
+    if (idx >= lines.length) {
+      /* Всі виконано */
+      var report = results.map(function(r) {
+        return (r.ok ? '✅' : '❌') + ' ' + r.cmd + '\n' +
+               (r.out ? r.out.trim() : '');
+      }).join('\n---\n');
+      AIAgentUI.addMessage('assistant', '**Результат:**\n```\n' + report + '\n```');
+      return;
+    }
+    var line = lines[idx++];
+    AIAgent.ssh(line).then(function(d) {
+      results.push({
+        cmd: line,
+        ok:  !d.error || d.output,
+        out: d.output || d.error || 'OK',
+      });
+      runNext();
+    }).catch(function(e) {
+      results.push({ cmd: line, ok: false, out: String(e) });
+      runNext();
+    });
+  }
+
+  runNext();
 };
 
 /* ── Копіювати команду ── */
@@ -765,7 +799,7 @@ AIAgentUI.setLoading = function(val) {
 
 /* ── Очистити чат ── */
 AIAgentUI.clearChat = function() {
-  if (!confirm('Очистити історію чату?')) return;
+  /* confirm прибрано */
   AIAgent.memory.clear();
   var container = document.getElementById('ai-messages');
   if (container) container.innerHTML = '';

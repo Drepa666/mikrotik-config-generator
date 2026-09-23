@@ -117,10 +117,18 @@ window.OUILookup = {
     /* Axis cameras */
     '00:40:8C':'AXIS','AC:CC:8E':'AXIS',
     /* Intel */
-    'F4:4E:B4':'MediaTek','8C:8D:28':'Intel','18:66:DA':'Intel',
-    'AC:ED:5C':'Intel','00:1B:21':'Intel','00:21:6A':'Intel',
-    '8C:EC:4B':'Intel','94:65:9C':'Intel','A4:C3:F0':'Intel',
-    'D0:57:7B':'Intel','00:1E:67':'Intel','E4:B3:18':'Intel',
+    'A8:2B:DD':'Intel','F4:4E:B4':'MediaTek',
+    '8C:8D:28':'Intel','18:66:DA':'Intel',
+    'AC:ED:5C':'Intel','00:1B:21':'Intel',
+    '00:21:6A':'Intel','8C:EC:4B':'Intel',
+    '94:65:9C':'Intel','D0:57:7B':'Intel',
+    '00:1E:67':'Intel','E4:B3:18':'Intel',
+    'A4:C3:F0':'Intel','00:23:14':'Intel',
+    '8C:70:5A':'Intel','A0:36:9F':'Intel',
+    '00:27:10':'Intel','34:13:E8':'Intel',
+    '00:15:17':'Intel','00:1F:3C':'Intel',
+    '28:D2:44':'Intel','68:05:CA':'Intel',
+    'B0:7D:64':'Intel','00:02:B3':'Intel',
     /* Apple */
     'F4:4E:B4':'MediaTek','3C:15:C2':'Apple','A8:86:DD':'Apple',
     '00:17:F2':'Apple','28:CF:DA':'Apple','3C:07:54':'Apple',

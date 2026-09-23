@@ -796,6 +796,34 @@ AIAgentUI.runCmd = function(encoded) {
     AIExecutor.showConfirmModal('Виконати команди (' + cmds.length + ')', cmds, '');
   }
 };
+/* ── Показати підказку від AIContext ── */
+AIAgentUI.showHint = function(section, issues) {
+  if (!issues || !issues.length) return;
+
+  /* Показуємо тільки critical і warning */
+  var important = issues.filter(function(i) {
+    return i.type === 'critical' || i.type === 'warning';
+  });
+  if (!important.length) return;
+
+  /* Формуємо повідомлення */
+  var msg = '🔍 **AI аналіз ' + section + ':**\n' +
+    important.map(function(i) {
+      var icon = i.type === 'critical' ? '🔴' : '🟡';
+      return icon + ' ' + i.msg;
+    }).join('\n');
+
+  /* Показуємо в AI Agent як system повідомлення */
+  AIAgentUI.addMessage('system', msg);
+
+  /* Відкриваємо панель якщо є критичні */
+  var hasCritical = important.some(function(i) { return i.type === 'critical'; });
+  if (hasCritical && !AIAgentUI.state.isOpen) {
+    AIAgentUI.toggle();
+  }
+};
+
+
 console.log('[AIAgentUI] Ready ✅');
 
       /* Слідкуємо за навігацією — кнопка і sidebar завжди видимі */

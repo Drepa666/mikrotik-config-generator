@@ -105,7 +105,7 @@
         logging:         '/system/logging',
         logActions:      '/system/logging/action',
         packages:        '/system/package',
-        health:          '/system/health',
+        /* health: '/system/health', */
         services:        '/ip/service',
         neighbors:       '/ip/neighbor',
         netwatch:        '/tool/netwatch',
@@ -207,8 +207,9 @@
     if (body) opts.body = JSON.stringify(body);
     return fetch(url, opts).then(function(r) {
       if (r.status === 204) return {};
+      if (r.status === 400 || r.status === 404) return [];
       return r.json().catch(function() { return {}; });
-    });
+    }).catch(function() { return []; });
   }
 
   function sshCall(router, command) {

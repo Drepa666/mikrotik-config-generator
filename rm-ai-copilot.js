@@ -164,38 +164,53 @@ window.RMAICopilot = (function() {
     document.head.appendChild(s);
   }
 
-  /* ── Отримуємо API ключ і провайдер ── */
+  /* ── Використовуємо існуючий AI з index.html ── */
   function getAIConfig() {
-    var provider = localStorage.getItem('ai-provider') || 'gemini';
-    var apiKey   = localStorage.getItem('ai-api-key')  || '';
-    var model    = localStorage.getItem('ai-model')    || '';
-    return { provider: provider, apiKey: apiKey, model: model };
+    /* Читаємо з DOM елементів як існуючий AI */
+    var provEl = document.getElementById('ai-prov');
+    var keyEl  = document.getElementById('ai-key');
+    var modEl  = document.getElementById('ai-model');
+    return {
+      provider: provEl ? provEl.value : (localStorage.getItem('ai-provider') || 'gemini'),
+      apiKey:   keyEl  ? keyEl.value.trim()  : (localStorage.getItem('ai-api-key') || ''),
+      model:    modEl  ? modEl.value.trim()  : (localStorage.getItem('ai-model') || ''),
+    };
   }
 
-  /* ── Викликаємо AI ── */
   function callAI(prompt, context) {
     var cfg = getAIConfig();
     if (!cfg.apiKey) {
-      return Promise.reject(new Error('No API key. Set it in AI settings.'));
+      return Promise.reject(new Error(
+        'Потрібен API ключ! Налаштуй його в розділі AI (кнопка вгорі праворуч).'
+      ));
     }
-    var fullPrompt = context
-      ? 'Context:\n' + context + '\n\nQuestion: ' + prompt
-      : prompt;
 
+    var sys = 'You are a MikroTik RouterOS expert. ' +
+              'Analyze firewall rules, find issues, duplicates, security problems. ' +
+              'Be concise. Use RouterOS syntax in examples. ' +
+              'Answer in the same language as the question.';
+
+    var fullPrompt = context
+      ? sys + '\n\nContext:\n' + context + '\n\nQuestion: ' + prompt
+      : sys + '\n\n' + prompt;
+
+    /* Використовуємо window.callAI якщо доступний */
+    if (window.callAI) {
+      return window.callAI(fullPrompt, 2048);
+    }
+
+    /* Fallback: electronAPI.aiRequest з правильним форматом */
     return window.electronAPI.aiRequest({
       provider: cfg.provider,
-      apiKey:   cfg.apiKey,
+      key:      cfg.apiKey,
       model:    cfg.model,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a MikroTik RouterOS expert. Analyze firewall rules, ' +
-                   'find issues, duplicates, security problems. ' +
-                   'Be concise. Use RouterOS syntax in examples. ' +
-                   'Answer in the same language as the question.'
-        },
-        { role: 'user', content: fullPrompt }
-      ],
+      prompt:   fullPrompt,
+      maxTok:   2048,
+    }).then(function(res) {
+      if (!res || res.ok === false) {
+        throw new Error(res ? res.error : 'AI error');
+      }
+      return res.text || res.content || JSON.stringify(res);
     });
   }
 
@@ -397,7 +412,7 @@ window.RMAICopilot = (function() {
         '<div class="ai-cop-tab active" data-tab="analyze">🔍 Аналіз</div>' +
         '<div class="ai-cop-tab" data-tab="chat">💬 Chat</div>' +
         '<div class="ai-cop-tab" data-tab="quick">⚡ Швидко</div>' +
-        '<div class="ai-cop-tab" data-tab="settings">⚙️ Ключ</div>' +
+        '<div class="ai-cop-tab" data-tab="settings">⚙️ Налаштування</div>' +
       '</div>' +
       '<div id="ai-cop-body"></div>' +
       '<div id="ai-cop-input-wrap">' +

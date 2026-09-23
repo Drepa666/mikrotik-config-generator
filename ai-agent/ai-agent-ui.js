@@ -847,6 +847,11 @@ AIAgentUI._formatRulesForAI = function(rules) {
 
 /* Локальний аналіз без AI */
 AIAgentUI.localFirewallAnalysis = function() {
+  var router = AIAgentUI._getActiveRouter();
+  if (!router) {
+    AIAgentUI.addMessage('error', '❌ Роутер не підключений. Підключись в Router Manager.');
+    return;
+  }
   AIAgentUI.addMessage('user', '🔍 Локальний аналіз Firewall...');
   AIAgentUI._getFirewallRules().then(function(rules) {
     var issues = [];
@@ -886,14 +891,19 @@ AIAgentUI.localFirewallAnalysis = function() {
       report += '✅ Типових проблем не знайдено';
     }
 
-    AIAgentUI.addMessage('ai', report);
+    AIAgentUI.addMessage('assistant', report);
   }).catch(function(e) {
-    AIAgentUI.addMessage('ai', '❌ ' + e.message);
+    AIAgentUI.addMessage('error', e.message);
   });
 };
 
 /* AI аналіз Firewall */
 AIAgentUI.aiFirewallAnalysis = function() {
+  var router = AIAgentUI._getActiveRouter();
+  if (!router) {
+    AIAgentUI.addMessage('error', '❌ Роутер не підключений. Підключись в Router Manager.');
+    return;
+  }
   AIAgentUI.addMessage('user', '🤖 AI аналіз Firewall правил...');
   AIAgentUI._getFirewallRules().then(function(rules) {
     var context = AIAgentUI._formatRulesForAI(rules);
@@ -903,12 +913,17 @@ AIAgentUI.aiFirewallAnalysis = function() {
       'Відповідай українською.\n\n' + context;
     AIAgentUI.quickAsk(prompt);
   }).catch(function(e) {
-    AIAgentUI.addMessage('ai', '❌ ' + e.message);
+    AIAgentUI.addMessage('error', e.message);
   });
 };
 
 /* Security Audit */
 AIAgentUI.securityAudit = function() {
+  var router = AIAgentUI._getActiveRouter();
+  if (!router) {
+    AIAgentUI.addMessage('error', '❌ Роутер не підключений. Підключись в Router Manager.');
+    return;
+  }
   AIAgentUI.addMessage('user', '🔐 Security Audit конфігурації...');
   AIAgentUI._getFirewallRules().then(function(rules) {
     var context = AIAgentUI._formatRulesForAI(rules);
@@ -919,7 +934,7 @@ AIAgentUI.securityAudit = function() {
       'Відповідай українською.\n\n' + context;
     AIAgentUI.quickAsk(prompt);
   }).catch(function(e) {
-    AIAgentUI.addMessage('ai', '❌ ' + e.message);
+    AIAgentUI.addMessage('error', e.message);
   });
 };
 

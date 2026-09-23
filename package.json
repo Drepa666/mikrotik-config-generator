@@ -5,43 +5,55 @@
   "author": "MikroTik Generator Team",
   "main": "main.js",
   "scripts": {
-    "start":   "electron .",
-    "dev":     "node dev.js",
-    "build":   "electron-builder build --win"
+    "start": "electron .",
+    "dev": "node dev.js",
+    "build": "electron-builder build --win"
   },
   "build": {
-    "appId":       "com.mikrotik.config-generator",
-    "productName": "MikroTikConfigGenerator",
-    "asar":        false,
+    "appId": "com.mikrotik.config-generator",
+    "productName": "MikroTik Manager",
+    "asar": false,
     "directories": {
       "output": "dist"
     },
     "win": {
       "target": "nsis",
-      "icon":   "icon-512.png"
+      "icon": "icon-512.png"
     },
     "nsis": {
-      "oneClick":                           false,
+      "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut":              true,
-      "createStartMenuShortcut":            true,
-      "shortcutName":                       "MikroTik Config Generator",
-      "language":                           "1058",
-      "menuCategory":                       "MikroTik",
-      "license":                            "LICENSE.txt"
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MikroTik Manager",
+      "language": "1058",
+      "menuCategory": "MikroTik",
+      "license": "LICENSE.txt"
     },
     "files": [
       "**/*",
       "!backups/**",
       "!dist/**",
-      "!*.py",
+      "!fix_*.py",
+      "!step*.py",
+      "!diag*.py",
+      "!build_exe.py",
+      "!cleanup.py",
       "!*.md",
       "!.github/**",
-      "!node_modules/.cache/**"
-    ]
+      "!node_modules/.cache/**",
+      "!node_modules/electron/dist/**"
+    ],
+    "extraResources": [
+      {
+        "from": "proxy.py",
+        "to": "proxy.py"
+      }
+    ],
+    "copyright": "Copyright 2025 MikroTik Manager"
   },
   "devDependencies": {
-    "electron":         "^44.0.0",
+    "electron": "^44.0.0",
     "electron-builder": "^26.0.0"
   }
 }

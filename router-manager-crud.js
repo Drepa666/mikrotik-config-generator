@@ -473,6 +473,17 @@
 
   /* ── Interfaces ── */
   window.rmCrudInterfaces = function() {
+    if (window.AIContext) {
+      var r = window.__rmGetActiveRouter ? window.__rmGetActiveRouter() : null;
+      if (r) {
+        window.restCall(r, 'GET', '/interface')
+          .then(function(ifaces) {
+            window.AIContext.enter('interfaces', { interfaces: ifaces });
+          }).catch(function() {
+            window.AIContext.enter('interfaces', {});
+          });
+      }
+    }
     window.renderTableCRUD({
       title:   'Interfaces',
       icon:    '🌐',
@@ -585,6 +596,20 @@
 
   /* ── Firewall Filter ── */
   window.rmCrudFWFilter = function() {
+    /* AIContext — повідомляємо AI де ми */
+    if (window.AIContext) {
+      var r = window.__rmGetActiveRouter ? window.__rmGetActiveRouter() : null;
+      if (r) {
+        window.restCall(r, 'GET', '/ip/firewall/filter')
+          .then(function(rules) {
+            window.AIContext.enter('firewall', { filter: rules }, 'filter');
+          }).catch(function() {
+            window.AIContext.enter('firewall', {}, 'filter');
+          });
+      } else {
+        window.AIContext.enter('firewall', {}, 'filter');
+      }
+    }
     window.renderTableCRUD({
       title:   'Firewall Filter',
       icon:    '🔥',

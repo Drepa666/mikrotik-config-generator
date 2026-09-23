@@ -371,42 +371,71 @@ window.RMSearch = (function() {
   }
 
   /* ── Navigate to section in Router Manager ── */
-  function navigateToSection(sectionId) {
-    /* Мапи section id → пункт меню */
-    var MAP = {
-      'fw-filter':    function() { clickMenuItem('Filter Rules'); },
-      'fw-nat':       function() { clickMenuItem('NAT'); },
-      'fw-mangle':    function() { clickMenuItem('Mangle'); },
-      'fw-addr-list': function() { clickMenuItem('Firewall'); },
-      'interfaces':   function() { clickMenuItem('Interfaces'); },
-      'ip-addr':      function() { clickMenuItem('IP'); },
-      'ip-route':     function() { clickMenuItem('IP'); },
-      'ip-arp':       function() { clickMenuItem('IP'); },
-      'dhcp-server':  function() { clickMenuItem('IP'); },
-      'dhcp-lease':   function() { clickMenuItem('IP'); },
-      'queue-simple': function() { clickMenuItem('Queues'); },
-      'queue-tree':   function() { clickMenuItem('Queues'); },
-      'ppp-secret':   function() { clickMenuItem('PPP'); },
-      'wireless':     function() { clickMenuItem('Wireless'); },
-      'users':        function() { clickMenuItem('System'); },
-      'scripts':      function() { clickMenuItem('System'); },
-      'scheduler':    function() { clickMenuItem('System'); },
-    };
-    var fn = MAP[sectionId];
-    if (fn) fn();
-  }
+  /* Мапа: search section id -> sidebar data-id */
+  var SECTION_MAP = {
+    'fw-filter':    { parent: 'firewall', child: 'fw-filter'    },
+    'fw-nat':       { parent: 'firewall', child: 'fw-nat'        },
+    'fw-mangle':    { parent: 'firewall', child: 'fw-mangle'     },
+    'fw-raw':       { parent: 'firewall', child: 'fw-filter'     },
+    'fw-addr-list': { parent: null,       child: 'addr-list'     },
+    'interfaces':   { parent: null,       child: 'interfaces'    },
+    'ip-addr':      { parent: 'ip',       child: 'ip-addresses'  },
+    'ip-route':     { parent: 'ip',       child: 'ip-routes'     },
+    'ip-arp':       { parent: 'ip',       child: 'ip-arp'        },
+    'ip-pool':      { parent: null,       child: 'ip-pool'       },
+    'dhcp-server':  { parent: null,       child: 'dhcp-srv'      },
+    'dhcp-lease':   { parent: 'ip',       child: 'ip-dhcp'       },
+    'dns-static':   { parent: null,       child: 'dns-static'    },
+    'queue-simple': { parent: 'queues',   child: 'queues-simple' },
+    'queue-tree':   { parent: 'queues',   child: 'queues-tree'   },
+    'ppp-secret':   { parent: 'ppp',      child: 'ppp-secrets'   },
+    'wireless':     { parent: 'wireless', child: 'wl-interfaces' },
+    'bridge':       { parent: 'vlans',    child: 'bridge-ports'  },
+    'vlan':         { parent: 'vlans',    child: 'vlan-list'     },
+    'users':        { parent: 'system',   child: 'sys-users'     },
+    'scripts':      { parent: 'system',   child: 'sys-scripts'   },
+    'scheduler':    { parent: 'system',   child: 'sys-scheduler' },
+    'certificates': { parent: null,       child: 'certificates'  },
+    'neighbors':    { parent: null,       child: 'neighbors'     },
+    'hotspot-users':{ parent: null,       child: 'net-scanner'   },
+    'tunnel-vpn':   { parent: null,       child: 'wireguard'     },
+  };
 
-  function clickMenuItem(label) {
-    /* Шукаємо в sidebar */
-    var items = document.querySelectorAll(
-      '.rm-nav-item, .rm-menu-item, [data-section], .rm-sidebar a, .rm-sidebar li'
-    );
-    for (var i = 0; i < items.length; i++) {
-      if (items[i].textContent.trim().includes(label)) {
-        items[i].click();
-        return;
+  function navigateToSection(sectionId) {
+    var map = SECTION_MAP[sectionId];
+    if (!map) return;
+
+    var sb = document.getElementById('rm-sidebar');
+    if (!sb) return;
+
+    /* Якщо є батьківське меню — спочатку розкриваємо його */
+    if (map.parent) {
+      var parentEl = sb.querySelector('.rm-menu-item[data-id="' + map.parent + '"]');
+      if (parentEl) {
+        /* Розкриваємо submenu */
+        var sub = sb.querySelector('[data-parent="' + map.parent + '"]');
+        if (sub && !sub.classList.contains('open')) {
+          parentEl.click(); /* toggle expand */
+        }
       }
     }
+
+    /* Клікаємо на потрібний пункт */
+    setTimeout(function() {
+      var target = sb.querySelector(
+        '.rm-submenu-item[data-id="' + map.child + '"],' +
+        '.rm-menu-item[data-id="' + map.child + '"]'
+      );
+      if (target) {
+        target.click();
+        /* Підсвічуємо */
+        target.style.transition = 'background .3s';
+        target.style.background = '#1a4a2a';
+        setTimeout(function() {
+          target.style.background = '';
+        }, 1200);
+      }
+    }, 150);
   }
 
   /* ── UI helpers ── */

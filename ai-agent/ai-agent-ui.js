@@ -720,14 +720,60 @@ AIAgentUI.quickAsk = function(text) {
 /* ── Виконати команду ── */
 AIAgentUI.executeCmd = function(encoded) {
   var cmd = decodeURIComponent(atob(encoded));
-  if (!confirm('Виконати команду на роутері?\n\n' + cmd)) return;
-  AIAgentUI.addMessage('system', '⚡ Виконую: ' + cmd);
-  AIAgent.ssh(cmd).then(function(d) {
-    var out = d.output || d.error || 'OK';
-    AIAgentUI.addMessage('assistant', '**Результат:**\n```\n' + out + '\n```');
-  }).catch(function(e) {
-    AIAgentUI.addMessage('error', 'SSH помилка: ' + e);
-  });
+
+  /* Sanitize — прибираємо markdown, виправляємо лапки */
+  cmd = cmd
+    .replace(/```[\w]*/g, '').replace(/```/g, '')
+    .replace(/\*\*/g, '')
+    .replace(/^#+\s.*/gm, '');
+
+  /* Розбиваємо на рядки, ігноруємо коментарі */
+  var lines = cmd.split('\n')
+    .map(function(l) { return l.trim(); })
+    .filter(function(l) { return l && !l.startsWith('#'); })
+    .map(function(l) {
+      /* Одинарні лапки → подвійні в параметрах */
+      return l
+        .replace(/comment='([^']*)'/g, 'comment="$1"')
+        .replace(/name='([^']*)'/g, 'name="$1"')
+        .replace(/password='([^']*)'/g, 'password="$1"')
+        /* Типографічні лапки */
+        .replace(/[\u2018\u2019]/g, '')
+        .replace(/[\u201c\u201d]/g, '"')
+        .replace(/\s+/g, ' ').trim();
+    })
+    .filter(function(l) { return l.length > 2; });
+
+  if (!lines.length) {
+    AIAgentUI.addMessage('error', 'Немає команд для виконання');
+    return;
+  }
+
+  AIAgentUI.addMessage('system', '⚡ Виконую ' + lines.length + ' команд...');
+
+  var results = [];
+  var idx = 0;
+
+  function runNext() {
+    if (idx >= lines.length) {
+      var report = results.map(function(r) {
+        return (r.ok ? '✅' : '❌') + ' `' + r.cmd + '`' +
+               (r.out && r.out !== 'OK' ? '\n   ' + r.out.trim().slice(0,100) : '');
+      }).join('\n');
+      AIAgentUI.addMessage('assistant', '**Результат:**\n' + report);
+      return;
+    }
+    var line = lines[idx++];
+    AIAgent.ssh(line).then(function(d) {
+      results.push({ cmd: line, ok: true,  out: d.output || d.error || 'OK' });
+      runNext();
+    }).catch(function(e) {
+      results.push({ cmd: line, ok: false, out: String(e) });
+      runNext();
+    });
+  }
+
+  runNext();
 };
 
 /* ── Копіювати команду ── */

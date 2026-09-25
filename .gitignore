@@ -14,3 +14,17 @@ step*.py
 diag*.py
 debug*.py
 patch*.py
+
+# Зайві файли
+dify/
+dify-project-context.md
+file-agent-server.py
+project-context*.txt
+connect_sections.py
+connect_all_sections.py
+fix_*.py
+find_*.py
+read_*.py
+add_*.py
+write_*.py
+check_*.py

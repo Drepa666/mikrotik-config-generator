@@ -504,6 +504,8 @@
 
   /* ── IP Addresses ── */
   window.rmCrudIPAddresses = function() {
+    /* AIContext — повідомляємо AI де ми */
+    if (window.AIContext) window.AIContext.enter('ip-addresses', {});
     window.renderTableCRUD({
       title:   'IP Addresses',
       icon:    '📋',
@@ -522,6 +524,8 @@
 
   /* ── IP Routes ── */
   window.rmCrudRoutes = function() {
+    /* AIContext — повідомляємо AI де ми */
+    if (window.AIContext) window.AIContext.enter('routes', {});
     window.renderTableCRUD({
       title:   'Routes',
       icon:    '🛣️',
@@ -541,6 +545,8 @@
 
   /* ── DHCP Leases ── */
   window.rmCrudDHCP = function() {
+    /* AIContext — повідомляємо AI де ми */
+    if (window.AIContext) window.AIContext.enter('dhcp', {});
     window.renderTableCRUD({
       title:   'DHCP Leases',
       icon:    '📡',
@@ -645,6 +651,8 @@
 
   /* ── Firewall NAT ── */
   window.rmCrudFWNAT = function() {
+    /* AIContext — повідомляємо AI де ми */
+    if (window.AIContext) window.AIContext.enter('nat', {});
     window.renderTableCRUD({
       title:   'NAT Rules',
       icon:    '🔥',
@@ -680,6 +688,8 @@
 
   /* ── Firewall Mangle ── */
   window.rmCrudFWMangle = function() {
+    /* AIContext — повідомляємо AI де ми */
+    if (window.AIContext) window.AIContext.enter('mangle', {});
     window.renderTableCRUD({
       title:   'Mangle Rules',
       icon:    '🔥',
@@ -719,6 +729,8 @@
 
   /* ── Wireless Interfaces ── */
   window.rmCrudWireless = function() {
+    /* AIContext — повідомляємо AI де ми */
+    if (window.AIContext) window.AIContext.enter('wireless', {});
     window.renderTableCRUD({
       title:   'Wireless Interfaces',
       icon:    '📡',
@@ -806,6 +818,8 @@
 
   /* ── Queues Simple ── */
   window.rmCrudQueues = function() {
+    /* AIContext — повідомляємо AI де ми */
+    if (window.AIContext) window.AIContext.enter('queues', {});
     window.renderTableCRUD({
       title:   'Simple Queues',
       icon:    '📊',
@@ -855,6 +869,8 @@
 
   /* ── Users ── */
   window.rmCrudUsers = function() {
+    /* AIContext — повідомляємо AI де ми */
+    if (window.AIContext) window.AIContext.enter('users', {});
     window.renderTableCRUD({
       title:   'Users',
       icon:    '👤',
@@ -900,6 +916,8 @@
 
   /* ── VLAN Interfaces ── */
   window.rmCrudVLAN = function() {
+    /* AIContext — повідомляємо AI де ми */
+    if (window.AIContext) window.AIContext.enter('vlan', {});
     window.renderTableCRUD({
       title:   'VLAN Interfaces',
       icon:    '🔀',
@@ -921,6 +939,8 @@
 
   /* ── Bridge ── */
   window.rmCrudBridge = function() {
+    /* AIContext — повідомляємо AI де ми */
+    if (window.AIContext) window.AIContext.enter('bridge', {});
     window.renderTableCRUD({
       title:   'Bridge Ports',
       icon:    '🌉',

@@ -268,7 +268,11 @@ AIAgentUI.createSidebar = function() {
     '<div style="padding:10px 12px 4px;border-bottom:1px solid #1a2a38;flex-shrink:0;">',
       '<div style="font-size:10px;color:#4a6070;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Швидкі дії</div>',
       '<div class="ai-quick-btns" style="padding:0;">',
-        '<button class="ai-quick-btn" onclick="window.AISecurityAudit.run()">🔒 Аудит</button>',,
+        '<button class="ai-quick-btn" onclick="window.AISecurityAudit.run()">🔒 Аудит</button>',
+        '<button class="ai-quick-btn" onclick="window.AIAgentUI.localFirewallAnalysis()">🔍 Firewall</button>',
+        '<button class="ai-quick-btn" onclick="window.AIAgentUI.autoFixFirewall()">🔧 Auto-Fix</button>',
+        '<button class="ai-quick-btn" onclick="window.AIAgentUI.aiFirewallAnalysis()">🤖 AI Firewall</button>',
+        '<button class="ai-quick-btn" onclick="window.AIAgentUI.securityAudit()">🔐 Security</button>',
         '<button class="ai-quick-btn" onclick="window.AIAgentUI.quickAsk(\'Проаналізуй поточний стан мережі\')">📊 Аналіз</button>',
         '<button class="ai-quick-btn" onclick="window.AIAgentUI.quickAsk(\'Знайди проблеми в конфігурації\')">🔍 Діагностика</button>',
         '<button class="ai-quick-btn" onclick="window.AIAgentUI.quickAsk(\'Покажи топ пристроїв за трафіком\')">📈 Трафік</button>',
@@ -828,6 +832,280 @@ AIAgentUI.showHint = function(section, issues) {
   }
 };
 
+
+/* ════ ДОПОМІЖНІ ФУНКЦІЇ ════ */
+
+/* Отримати активний роутер */
+AIAgentUI._getActiveRouter = function() {
+  if (window.__rmGetActiveRouter) return window.__rmGetActiveRouter();
+  return null;
+};
+
+/* Отримати правила Firewall Filter */
+AIAgentUI._getFirewallRules = function() {
+  var router = AIAgentUI._getActiveRouter();
+  if (!router) return Promise.reject(new Error('Роутер не підключений'));
+  return window.restCall(router, 'GET', '/ip/firewall/filter')
+    .then(function(data) {
+      return Array.isArray(data) ? data : [];
+    });
+};
+
+/* Локальний аналіз Firewall */
+AIAgentUI.localFirewallAnalysis = function() {
+  var router = AIAgentUI._getActiveRouter();
+  if (!router) { AIAgentUI.addMessage('error', 'Роутер не підключений'); return; }
+  AIAgentUI.addMessage('user', '🔍 Локальний аналіз Firewall...');
+  AIAgentUI.setLoading(true);
+  AIAgentUI._getFirewallRules().then(function(rules) {
+    if (!rules.length) {
+      AIAgentUI.addMessage('assistant', '✅ Правил немає');
+      AIAgentUI.setLoading(false); return;
+    }
+    var active = rules.filter(function(r){return r.disabled!=='true';}).length;
+    var issues = [];
+    /* Bare drop */
+    rules.forEach(function(r,i) {
+      if (r.disabled==='true'||r.action!=='drop') return;
+      var has = r['src-address']||r['dst-address']||r.protocol||
+        r['in-interface']||r['in-interface-list']||r['connection-state']||
+        r['src-address-list']||r['dst-port']||r['src-port'];
+      if (!has) issues.push('🔴 Правило #'+(i+1)+': DROP без умов — небезпечно!');
+    });
+    /* DROP перед ACCEPT того ж порту на тому ж інтерфейсі */
+    rules.forEach(function(r,i) {
+      if (r.disabled==='true'||r.action!=='drop'||!r['dst-port']) return;
+      var dropIf = r['in-interface-list']||r['in-interface']||'';
+      var found = rules.slice(i+1).some(function(r2) {
+        if (r2.disabled==='true'||r2.action!=='accept') return false;
+        if (r2['dst-port']!==r['dst-port']) return false;
+        var accIf = r2['in-interface-list']||r2['in-interface']||'';
+        if (dropIf&&accIf&&dropIf!==accIf) return false;
+        return true;
+      });
+      if (found) issues.push('🟡 Правило #'+(i+1)+': DROP порту '+r['dst-port']+' стоїть перед ACCEPT того ж порту');
+    });
+    /* Дублікати */
+    var seen = {};
+    rules.forEach(function(r,i) {
+      if (r.disabled==='true') return;
+      var has = r['src-address']||r['dst-address']||r.protocol||r['dst-port']||
+        r['in-interface']||r['in-interface-list']||r['connection-state'];
+      if (!has) return;
+      var key=[r.chain,r.action,r['src-address']||'',r['dst-address']||'',
+        r.protocol||'',r['dst-port']||'',r['in-interface-list']||'',
+        r['connection-state']||''].join('|');
+      if (seen[key]!==undefined) {
+        issues.push('🟡 Правило #'+(i+1)+': дублікат правила #'+(seen[key]+1));
+      } else { seen[key]=i; }
+    });
+    var lines = ['🔍 **Аналіз '+rules.length+' правил (активних: '+active+'):**',''];
+    if (issues.length) {
+      issues.forEach(function(iss){lines.push(iss);});
+      lines.push('');
+      lines.push('Натисни 🔧 Auto-Fix для виправлення');
+    } else { lines.push('✅ Проблем не знайдено!'); }
+    AIAgentUI.addMessage('assistant', lines.join('\n'));
+    AIAgentUI.setLoading(false);
+  }).catch(function(e){
+    AIAgentUI.addMessage('error','❌ '+String(e));
+    AIAgentUI.setLoading(false);
+  });
+};
+
+/* AI аналіз Firewall через LLM */
+AIAgentUI.aiFirewallAnalysis = function() {
+  var router = AIAgentUI._getActiveRouter();
+  if (!router) { AIAgentUI.addMessage('error','❌ Роутер не підключений'); return; }
+  AIAgentUI.addMessage('user','🤖 AI аналіз Firewall правил...');
+  AIAgentUI.setLoading(true);
+  AIAgentUI._getFirewallRules().then(function(rules) {
+    var lines = [];
+    rules.forEach(function(r,i) {
+      var p=['#'+(i+1),'chain='+(r.chain||'?'),'action='+(r.action||'?')];
+      if(r.protocol)         p.push('proto='+r.protocol);
+      if(r['dst-port'])      p.push('dport='+r['dst-port']);
+      if(r['src-address'])   p.push('src='+r['src-address']);
+      if(r['in-interface-list']) p.push('in-list='+r['in-interface-list']);
+      if(r['connection-state'])  p.push('state='+r['connection-state']);
+      if(r['src-address-list'])  p.push('src-list='+r['src-address-list']);
+      if(r.disabled==='true') p.push('[OFF]');
+      p.push('.id='+r['.id']);
+      lines.push(p.join(' '));
+    });
+    var prompt =
+      'Проаналізуй '+rules.length+' Firewall Filter правил MikroTik RouterOS.\n\n'+
+      'Правила:\n'+lines.join('\n')+'\n\n'+
+      'Знайди: 1.DROP без умов 2.мертві правила 3.DROP перед ACCEPT того ж порту'+
+      ' 4.дублікати 5.відсутній brute-force захист.\n'+
+      'Для кожної проблеми: команду виправлення.\n'+
+      'ТІЛЬКИ: set .id або remove .id (НЕ add! НЕ position=!)';
+    AIAgent.send(prompt)
+      .then(function(resp){
+        AIAgentUI.addMessage('assistant',resp);
+        AIAgentUI.setLoading(false);
+      }).catch(function(e){
+        AIAgentUI.addMessage('error','❌ '+String(e));
+        AIAgentUI.setLoading(false);
+      });
+  }).catch(function(e){
+    AIAgentUI.addMessage('error','❌ '+String(e));
+    AIAgentUI.setLoading(false);
+  });
+};
+
+/* Auto-Fix Firewall */
+AIAgentUI.autoFixFirewall = function() {
+  var router = AIAgentUI._getActiveRouter();
+  if (!router) { AIAgentUI.addMessage('error','❌ Роутер не підключений'); return; }
+  AIAgentUI.addMessage('user','🔧 Auto-Fix Firewall...');
+  AIAgentUI.setLoading(true);
+  AIAgentUI._getFirewallRules().then(function(rules) {
+    var fixes=[];
+    /* Bare drop */
+    rules.forEach(function(r,i) {
+      if(r.disabled==='true'||r.action!=='drop'||r.chain!=='input') return;
+      var has=r['src-address']||r['dst-address']||r.protocol||
+        r['in-interface']||r['in-interface-list']||r['connection-state']||
+        r['src-address-list']||r['dst-port'];
+      if(!has) fixes.push({
+        severity:'critical',
+        desc:'🔴 #'+(i+1)+': DROP без умов → in-interface-list=WAN',
+        cmd:'/ip firewall filter set '+r['.id']+' in-interface-list=WAN',
+        type:'set'
+      });
+    });
+    /* DROP перед ACCEPT */
+    rules.forEach(function(r,i) {
+      if(r.disabled==='true'||r.action!=='drop'||!r['dst-port']) return;
+      var dropIf=r['in-interface-list']||r['in-interface']||'';
+      rules.slice(i+1).forEach(function(r2,j) {
+        if(r2.disabled==='true'||r2.action!=='accept') return;
+        if(r2['dst-port']!==r['dst-port']) return;
+        var accIf=r2['in-interface-list']||r2['in-interface']||'';
+        if(dropIf&&accIf&&dropIf!==accIf) return;
+        fixes.push({
+          severity:'critical',
+          desc:'🔴 #'+(i+j+2)+': ACCEPT порту '+r['dst-port']+' стоїть після DROP → переміщуємо',
+          cmd:'/ip firewall filter move '+r2['.id']+' destination='+i,
+          type:'move'
+        });
+      });
+    });
+    /* Дублікати */
+    var seen={};
+    rules.forEach(function(r,i) {
+      if(r.disabled==='true') return;
+      var has=r['src-address']||r['dst-address']||r.protocol||r['dst-port']||
+        r['in-interface']||r['in-interface-list']||r['connection-state'];
+      if(!has) return;
+      var key=[r.chain,r.action,r['src-address']||'',r['dst-address']||'',
+        r.protocol||'',r['dst-port']||'',r['in-interface-list']||'',
+        r['connection-state']||''].join('|');
+      if(seen[key]!==undefined) {
+        fixes.push({
+          severity:'warning',
+          desc:'🟡 #'+(i+1)+': дублікат #'+(seen[key]+1)+' → видаляємо',
+          cmd:'/ip firewall filter remove '+r['.id'],
+          type:'remove'
+        });
+      } else { seen[key]=i; }
+    });
+    if(!fixes.length) {
+      AIAgentUI.addMessage('assistant','✅ Firewall в порядку! Перевірено '+rules.length+' правил.');
+      AIAgentUI.setLoading(false); return;
+    }
+    var plan='🔧 **Auto-Fix: '+fixes.length+' виправлень:**\n\n';
+    fixes.forEach(function(f){plan+=f.desc+'\n';});
+    plan+='\n⚡ Виконую...';
+    AIAgentUI.addMessage('system',plan);
+    /* move → set → remove (зворотній) */
+    var ordered=[];
+    fixes.filter(function(f){return f.type==='move';}).forEach(function(f){ordered.push(f);});
+    fixes.filter(function(f){return f.type==='set';}).forEach(function(f){ordered.push(f);});
+    fixes.filter(function(f){return f.type==='remove';})
+      .sort(function(a,b){
+        var ai=parseInt((a.cmd.match(/\*(\d+)/)||[0,0])[1]);
+        var bi=parseInt((b.cmd.match(/\*(\d+)/)||[0,0])[1]);
+        return bi-ai;
+      }).forEach(function(f){ordered.push(f);});
+    var results=[],idx=0;
+    function runNext(){
+      if(idx>=ordered.length){
+        var ok=results.filter(function(r){return r.ok;}).length;
+        var rep='✅ **Auto-Fix: '+ok+'/'+ordered.length+' виправлено**\n\n';
+        results.forEach(function(r){
+          rep+=(r.ok?'✅ ':'❌ ')+r.desc+'\n';
+          if(!r.ok&&r.err) rep+='⚠️ '+r.err+'\n';
+        });
+        AIAgentUI.addMessage('assistant',rep);
+        AIAgentUI.setLoading(false);
+        setTimeout(function(){if(window.rmCrudFWFilter)window.rmCrudFWFilter();},1500);
+        return;
+      }
+      var fix=ordered[idx++];
+      AIAgent.ssh(fix.cmd).then(function(d){
+        var isErr=d.error&&d.error.trim().length>0&&!d.output;
+        results.push({desc:fix.desc,ok:!isErr,err:isErr?d.error.trim().slice(0,80):''});
+        runNext();
+      }).catch(function(e){
+        results.push({desc:fix.desc,ok:false,err:String(e).slice(0,80)});
+        runNext();
+      });
+    }
+    runNext();
+  }).catch(function(e){
+    AIAgentUI.addMessage('error','❌ '+String(e));
+    AIAgentUI.setLoading(false);
+  });
+};
+
+/* Security Audit */
+AIAgentUI.securityAudit = function() {
+  var router = AIAgentUI._getActiveRouter();
+  if (!router) { AIAgentUI.addMessage('error','❌ Роутер не підключений'); return; }
+  AIAgentUI.addMessage('user','🔐 Security Audit...');
+  AIAgentUI.setLoading(true);
+  Promise.all([
+    window.restCall(router,'GET','/ip/firewall/filter').catch(function(){return [];}),
+    window.restCall(router,'GET','/ip/service').catch(function(){return [];}),
+    window.restCall(router,'GET','/user').catch(function(){return [];}),
+  ]).then(function(res) {
+    var filter=Array.isArray(res[0])?res[0]:[];
+    var services=Array.isArray(res[1])?res[1]:[];
+    var users=Array.isArray(res[2])?res[2]:[];
+    var issues=[];
+    /* Небезпечні сервіси */
+    ['telnet','ftp','api'].forEach(function(svc){
+      var found=services.find(function(s){return s.name===svc&&s.disabled!=='true';});
+      if(found) issues.push('🔴 Сервіс '+svc+' увімкнений — рекомендується вимкнути');
+    });
+    /* Стандартний admin */
+    var admin=users.find(function(u){return u.name==='admin';});
+    if(admin) issues.push('🟡 Стандартний логін "admin" — рекомендується змінити');
+    /* DROP input з WAN */
+    var hasDropWAN=filter.some(function(r){
+      return r.action==='drop'&&r.chain==='input'&&
+        (r['in-interface-list']==='WAN'||r['in-interface']==='ether1');
+    });
+    if(!hasDropWAN) issues.push('🔴 Немає DROP input з WAN!');
+    /* Brute-force */
+    var hasBrute=filter.some(function(r){
+      return r['src-address-list']==='ssh-bruteforce'||
+        (r.comment&&r.comment.toLowerCase().indexOf('brute')>-1);
+    });
+    if(!hasBrute) issues.push('🟡 Немає захисту від brute-force');
+    var lines=['🔐 **Security Audit:**',''];
+    if(issues.length){
+      issues.forEach(function(iss){lines.push(iss);});
+    } else { lines.push('✅ Критичних проблем не знайдено!'); }
+    AIAgentUI.addMessage('assistant',lines.join('\n'));
+    AIAgentUI.setLoading(false);
+  }).catch(function(e){
+    AIAgentUI.addMessage('error','❌ '+String(e));
+    AIAgentUI.setLoading(false);
+  });
+};
 
 console.log('[AIAgentUI] Ready ✅');
 

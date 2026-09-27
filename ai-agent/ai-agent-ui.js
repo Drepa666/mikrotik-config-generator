@@ -624,10 +624,15 @@ AIAgentUI.addMessage = function(type, content, meta) {
     }
   } else if (type === 'system') {
     div.className = 'ai-msg-system';
-    div.innerHTML = content;
+    div.innerHTML = content
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
+      .replace(/`([^`]+)`/g,'<code>$1</code>')
+      .replace(/\n/g,'<br>');
   } else if (type === 'error') {
     div.className = 'ai-msg-error';
-    div.innerHTML = '❌ ' + content;
+    div.innerHTML = ('❌ ' + content)
+      .replace(/\n/g,'<br>');
   }
 
   if (meta && meta.time) {

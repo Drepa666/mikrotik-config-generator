@@ -101,7 +101,7 @@ AIAgent.memory = {
 /* ── Збір контексту роутера ── */
 AIAgent.getRouterContext = function() {
   if (AIAgent.memory.routerCache &&
-      Date.now() - AIAgent.memory.cacheTime < 120000) {
+      Date.now() - AIAgent.memory.cacheTime < 30000) {
     return Promise.resolve(AIAgent.memory.routerCache);
   }
   var router = window.getActiveRouter ? window.getActiveRouter() : null;
@@ -157,10 +157,21 @@ AIAgent.getRouterContext = function() {
 
     var fw = ctx["/ip/firewall/filter"] || [];
     lines.push("\n=== FIREWALL (" + fw.length + ") ===");
-    fw.slice(0, 15).forEach(function(r, i) {
-      lines.push(i + ": chain=" + (r.chain||"?") +
-        " action=" + (r.action||"?") +
-        " comment=" + (r.comment||""));
+    fw.slice(0, 20).forEach(function(r, i) {
+      var parts = [];
+      parts.push('.id=' + (r['.id'] || '?'));
+      parts.push('chain=' + (r.chain || '?'));
+      parts.push('action=' + (r.action || '?'));
+      if (r.protocol)             parts.push('proto=' + r.protocol);
+      if (r['dst-port'])          parts.push('dport=' + r['dst-port']);
+      if (r['in-interface'])      parts.push('in=' + r['in-interface']);
+      if (r['in-interface-list']) parts.push('in-list=' + r['in-interface-list']);
+      if (r['connection-state'])  parts.push('state=' + r['connection-state']);
+      if (r['src-address-list'])  parts.push('src-list=' + r['src-address-list']);
+      if (r['src-address'])       parts.push('src=' + r['src-address']);
+      if (r.disabled === 'true')  parts.push('[OFF]');
+      if (r.comment)             parts.push('comment="' + r.comment + '"');
+      lines.push(parts.join(' '));
     });
 
     var leases = ctx["/ip/dhcp-server/lease"] || [];

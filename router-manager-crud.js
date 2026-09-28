@@ -708,6 +708,10 @@
       ],
       addTitle:  '➕ Додати правило',
       editTitle: '✏️ Filter Rule',
+      canMove: true,
+      moveCmd: function(srcId, dstIdx) {
+        return '/ip firewall filter move ' + srcId + ' destination=' + dstIdx;
+      },
     });
   };
 
@@ -743,6 +747,8 @@
       ],
       addTitle:  '➕ Додати NAT правило',
       editTitle: '✏️ NAT Rule',
+      canMove: true,
+      moveCmd: function(srcId, dstIdx) { return '/ip firewall nat move ' + srcId + ' destination=' + dstIdx; },
     });
   };
 

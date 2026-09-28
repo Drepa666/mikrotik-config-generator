@@ -330,7 +330,9 @@
         var disabled = row.disabled === 'true' || row.disabled === true;
         var rowStyle = disabled ? 'opacity:.55;' : '';
 
-        html += '<tr style="' + rowStyle + '" data-idx="' + idx + '">';
+        var dragAttr = opts.canMove ? ' draggable="true" data-id="' + esc(rowId) + '"' : '';
+        html += '<tr style="cursor:' + (opts.canMove?'grab':'default') + ';' + rowStyle + '"'
+          + ' data-idx="' + idx + '"' + dragAttr + '>';
         opts.cols.forEach(function(c) {
           var val = String(row[c] !== undefined ? row[c] : '');
           var display = val;
@@ -366,7 +368,98 @@
         wrap.innerHTML = html;
         wrap._data = data;
         bindActions(wrap, data, load);
+        if (opts.canMove) bindDragDrop(wrap, data, load);
       }
+    }
+
+    function bindDragDrop(wrap, data, reload) {
+      var rows = wrap.querySelectorAll('tr[draggable]');
+      var dragSrcIdx = null;
+      var dragSrcId  = null;
+
+      [].forEach.call(rows, function(row) {
+        row.addEventListener('dragstart', function(e) {
+          dragSrcIdx = parseInt(row.dataset.idx);
+          dragSrcId  = row.dataset.id;
+          row.style.opacity = '0.4';
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        row.addEventListener('dragend', function() {
+          row.style.opacity = '1';
+          [].forEach.call(wrap.querySelectorAll('tr'), function(r) {
+            r.style.borderTop = '';
+          });
+        });
+        row.addEventListener('dragover', function(e) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          [].forEach.call(wrap.querySelectorAll('tr'), function(r) {
+            r.style.borderTop = '';
+          });
+          row.style.borderTop = '2px solid #5fd0a5';
+        });
+        row.addEventListener('drop', function(e) {
+          e.preventDefault();
+          var dstIdx = parseInt(row.dataset.idx);
+          var dstId  = row.dataset.id;
+          if (dragSrcId === dstId || !dragSrcId || !dstId) return;
+
+          /* Показуємо індикатор */
+          var indicator = document.createElement('div');
+          indicator.style.cssText =
+            'position:fixed;bottom:80px;right:20px;background:#1a3a2a;'
+            + 'border:1px solid #5fd0a5;color:#5fd0a5;padding:8px 16px;'
+            + 'border-radius:8px;font-size:12px;z-index:99999;';
+          indicator.textContent = '⠿ Переміщення...';
+          document.body.appendChild(indicator);
+
+          /* Виконуємо move через REST або SSH */
+          var moveUrl = opts.apiPath + '/' + dragSrcId + '/move';
+          restCall(router, 'POST', moveUrl, { destination: dstIdx })
+            .then(function(res) {
+              if (res && res.error) throw new Error(res.error);
+              indicator.textContent = '✅ Переміщено';
+              indicator.style.borderColor = '#5fd0a5';
+              setTimeout(function() {
+                indicator.remove();
+                reload();
+                /* Оновлюємо AI контекст */
+                setTimeout(function() {
+                  if (window.AIAgentUI && window.AIAgentUI._getFirewallRules) {
+                    window.AIAgentUI._getFirewallRules().then(function(rules) {
+                      if (window.AIContext) window.AIContext.enter('firewall', { filter: rules }, 'filter');
+                    }).catch(function(){});
+                  }
+                }, 800);
+              }, 1000);
+            })
+            .catch(function() {
+              /* Fallback SSH */
+              var cmd = opts.moveCmd
+                ? opts.moveCmd(dragSrcId, dstIdx)
+                : '/ip firewall filter move ' + dragSrcId + ' destination=' + dstIdx;
+              sshCall(router, cmd).then(function(d) {
+                indicator.textContent = '✅ Переміщено (SSH)';
+                setTimeout(function() {
+                  indicator.remove();
+                  reload();
+                  setTimeout(function() {
+                    if (window.AIAgentUI && window.AIAgentUI._getFirewallRules) {
+                      window.AIAgentUI._getFirewallRules().then(function(rules) {
+                        if (window.AIContext) window.AIContext.enter('firewall', { filter: rules }, 'filter');
+                      }).catch(function(){});
+                    }
+                  }, 800);
+                }, 1000);
+              }).catch(function(err) {
+                indicator.style.borderColor = '#e05252';
+                indicator.style.color = '#e05252';
+                indicator.textContent = '❌ Помилка: ' + String(err).slice(0,40);
+                setTimeout(function() { indicator.remove(); }, 3000);
+              });
+            });
+        });
+      });
     }
 
     function bindActions(wrap, data, reload) {
@@ -646,6 +739,10 @@
       ],
       addTitle:  '➕ Додати правило',
       editTitle: '✏️ Filter Rule',
+      canMove: true,
+      moveCmd: function(srcId, dstIdx) {
+        return '/ip firewall filter move ' + srcId + ' destination=' + dstIdx;
+      },
     });
   };
 
@@ -683,6 +780,8 @@
       ],
       addTitle:  '➕ Додати NAT правило',
       editTitle: '✏️ NAT Rule',
+      canMove: true,
+      moveCmd: function(srcId, dstIdx) { return '/ip firewall nat move ' + srcId + ' destination=' + dstIdx; },
     });
   };
 

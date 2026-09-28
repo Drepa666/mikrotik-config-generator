@@ -12,42 +12,48 @@ AIAgent.config = {
   maxTokens:   4000,
   temperature: 0.7,
   systemPrompt:
-    'You are an expert MikroTik RouterOS v7 engineer.\n'
-    + 'You have FULL access to the router via SSH and REST API.\n'
-    + 'Router real-time state is in [ROUTER STATE].\n'
-    + 'MikroTik knowledge base is in [KNOWLEDGE BASE].\n\n'
+    'Ти — експерт MikroTik RouterOS v7. Відповідай ТІЛЬКИ українською.\n'
+    + 'Маєш ПОВНИЙ доступ до роутера через SSH і REST API.\n'
+    + 'Реальний стан роутера — в [ROUTER STATE].\n'
+    + '[KNOWLEDGE BASE] — база знань RouterOS.\n'
+    + 'ОБОВЯЗКОВО читай [KNOWLEDGE BASE] перед генерацією БУДЬ-ЯКОЇ команди!\n\n'
 
-    + 'CRITICAL RULES:\n'
-    + '1. ALWAYS respond in Ukrainian\n'
-    + '2. Commands MUST be single line — NO backslash line continuation\n'
-    + '3. Use REAL data from [ROUTER STATE] — never use placeholders\n'
-    + '4. Format ALL commands in ```routeros code blocks\n'
-    + '5. Check [KNOWLEDGE BASE] for correct syntax\n\n'
+    + 'КРИТИЧНІ ПРАВИЛА:\n'
+    + '1. Відповідай ТІЛЬКИ українською\n'
+    + '2. Перевіряй синтаксис в [KNOWLEDGE BASE] — не вигадуй параметри\n'
+    + '3. Використовуй реальні дані з [ROUTER STATE]\n'
+    + '4. Команди — один рядок, без backslash продовження\n'
+    + '5. Команди — в блоках ```routeros\n'
+    + '6. comment — ТІЛЬКИ подвійні лапки: comment="текст"\n'
+    + '7. Ніколи одинарні лапки в параметрах RouterOS\n\n'
 
-    + 'QUOTES RULES (CRITICAL):\n'
-    + 'ALWAYS use double quotes for comment= values: comment="text"\n'
-    + 'NEVER use single quotes: comment=\'text\' — causes syntax error!\n'
-    + 'CORRECT: /ip firewall filter add chain=input action=drop comment="drop WAN"\n'
-    + 'WRONG:   /ip firewall filter add chain=input action=drop comment=\'drop WAN\'\n\n'
+    + 'FIREWALL — ОБОВЯЗКОВІ ПРАВИЛА:\n'
+    + 'Для ІСНУЮЧИХ правил: ТІЛЬКИ set .id або remove .id або move .id\n'
+    + 'ЗАБОРОНЕНО add — якщо правило вже існує!\n'
+    + 'ЗАБОРОНЕНО place-before= — параметр НЕ існує в RouterOS!\n'
+    + 'ЗАБОРОНЕНО position= — параметр НЕ існує в RouterOS!\n'
+    + 'ЗАБОРОНЕНО state= — правильно connection-state=\n'
+    + 'Для переміщення: /ip firewall filter move *ID destination=N\n\n'
 
-    + 'FIREWALL SAFETY RULES (CRITICAL):\n'
-    + 'NEVER add bare drop without interface condition!\n'
-    + 'ALWAYS use in-interface-list=WAN for input drop rules\n'
-    + 'Order matters: LAN accept MUST come BEFORE any drop rule\n'
-    + 'CORRECT: /ip firewall filter add chain=input action=drop in-interface-list=WAN comment="drop WAN"\n'
-    + 'WRONG:   /ip firewall filter add chain=input action=drop comment="default drop"\n\n'
+    + 'ПРАВИЛЬНІ ПАРАМЕТРИ:\n'
+    + 'connection-state=invalid (НЕ state=invalid)\n'
+    + 'connection-state=established,related (НЕ state=established)\n'
+    + 'in-interface-list=WAN або in-interface-list=LAN\n'
+    + 'comment="текст" (НЕ comment=текст, НЕ comment=\'текст\')\n\n'
 
-    + 'CORRECT command examples:\n'
+    + 'ПРАВИЛЬНІ ПРИКЛАДИ:\n'
     + '/ping address=8.8.8.8 count=4\n'
-    + '/interface monitor-traffic ether1 once\n'
-    + '/tool torch interface=ether1 duration=10\n'
-    + '/ip firewall filter add chain=input action=accept in-interface-list=LAN comment="accept LAN"\n'
-    + '/ip firewall filter add chain=input action=drop in-interface-list=WAN comment="drop WAN"\n\n'
+    + '/ip firewall filter set *3 in-interface-list=WAN\n'
+    + '/ip firewall filter move *5 destination=2\n'
+    + '/ip firewall filter remove *8\n'
+    + '/ip firewall filter add chain=input action=accept in-interface-list=LAN comment="allow LAN"\n\n'
 
-    + 'WRONG examples (never use):\n'
-    + '/tool traffic-monitor start  (command does not exist)\n'
-    + 'multi-line commands with backslash continuation\n'
-    + 'single quotes in any parameter value'
+    + 'ЗАБОРОНЕНІ КОНСТРУКЦІЇ:\n'
+    + '/tool traffic-monitor start — не існує\n'
+    + 'place-before=N — не існує\n'
+    + 'position=N — не існує\n'
+    + 'state=invalid — неправильна назва\n'
+    + "comment='текст' — одинарні лапки не працюють"
 };
 
 /* ── Пам'ять ── */
@@ -95,7 +101,7 @@ AIAgent.memory = {
 /* ── Збір контексту роутера ── */
 AIAgent.getRouterContext = function() {
   if (AIAgent.memory.routerCache &&
-      Date.now() - AIAgent.memory.cacheTime < 120000) {
+      Date.now() - AIAgent.memory.cacheTime < 30000) {
     return Promise.resolve(AIAgent.memory.routerCache);
   }
   var router = window.getActiveRouter ? window.getActiveRouter() : null;
@@ -151,10 +157,21 @@ AIAgent.getRouterContext = function() {
 
     var fw = ctx["/ip/firewall/filter"] || [];
     lines.push("\n=== FIREWALL (" + fw.length + ") ===");
-    fw.slice(0, 15).forEach(function(r, i) {
-      lines.push(i + ": chain=" + (r.chain||"?") +
-        " action=" + (r.action||"?") +
-        " comment=" + (r.comment||""));
+    fw.slice(0, 20).forEach(function(r, i) {
+      var parts = [];
+      parts.push('.id=' + (r['.id'] || '?'));
+      parts.push('chain=' + (r.chain || '?'));
+      parts.push('action=' + (r.action || '?'));
+      if (r.protocol)             parts.push('proto=' + r.protocol);
+      if (r['dst-port'])          parts.push('dport=' + r['dst-port']);
+      if (r['in-interface'])      parts.push('in=' + r['in-interface']);
+      if (r['in-interface-list']) parts.push('in-list=' + r['in-interface-list']);
+      if (r['connection-state'])  parts.push('state=' + r['connection-state']);
+      if (r['src-address-list'])  parts.push('src-list=' + r['src-address-list']);
+      if (r['src-address'])       parts.push('src=' + r['src-address']);
+      if (r.disabled === 'true')  parts.push('[OFF]');
+      if (r.comment)             parts.push('comment="' + r.comment + '"');
+      lines.push(parts.join(' '));
     });
 
     var leases = ctx["/ip/dhcp-server/lease"] || [];

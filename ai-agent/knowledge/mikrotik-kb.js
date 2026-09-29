@@ -48,7 +48,10 @@ window.MikroTikKB = {
     if (!MikroTikKB._loaded || !MikroTikKB._text) return '';
     var q = (query || '').toLowerCase();
     var keywords = q.split(/\s+/).filter(function(w) { return w.length > 2; });
-    if (keywords.length === 0) return MikroTikKB._text.substring(0, maxChars);
+    /* Якщо ліміт великий — повертаємо весь текст */
+    if (keywords.length === 0 || maxChars >= 50000) {
+      return '[БАЗА ЗНАНЬ MIKROTIK]\n' + MikroTikKB._text.substring(0, maxChars);
+    }
     var lines  = MikroTikKB._text.split('\n');
     var blocks = [];
     var i = 0;
@@ -60,7 +63,7 @@ window.MikroTikKB = {
       });
       if (score > 0) {
         var s   = Math.max(0, i - 2);
-        var e   = Math.min(lines.length, i + 40);
+        var e   = Math.min(lines.length, i + 80);
         var txt = lines.slice(s, e).join('\n');
         blocks.push({ score: score, text: txt });
         i = e;

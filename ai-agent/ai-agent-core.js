@@ -9,7 +9,7 @@ window.AIAgent = window.AIAgent || {};
 /* ── Конфігурація ── */
 AIAgent.config = {
   model:       '', /* Модель вказана в main.js — не чіпати! */
-  maxTokens:   8000,
+  maxTokens:   2000,
   temperature: 0.7,
   systemPrompt:
     'Ти — експерт MikroTik RouterOS v7 і є частиною конфігуратора роутера.\n'
@@ -336,7 +336,7 @@ AIAgent.send = function(userMessage, options) {
 
       /* Додаємо KB перед кожною відповіддю */
       if (window.MikroTikKB) {
-        var kbContext = MikroTikKB.getContext(userMessage, 100000);
+        var kbContext = MikroTikKB.getContext(userMessage, 6000);
         if (kbContext) {
           systemContent += '\n\n[KNOWLEDGE BASE]\n' + kbContext;
         }

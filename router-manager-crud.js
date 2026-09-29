@@ -414,8 +414,13 @@
           document.body.appendChild(indicator);
 
           /* Виконуємо move через REST або SSH */
-          var moveUrl = opts.apiPath + '/' + dragSrcId + '/move';
-          restCall(router, 'POST', moveUrl, { destination: dstIdx })
+          /* RouterOS REST: POST /ip/firewall/filter/move */
+          /* body: {numbers: '.id', destination: N} */
+          var moveUrl = opts.apiPath + '/move';
+          restCall(router, 'POST', moveUrl, {
+            numbers: dragSrcId,
+            destination: dstIdx
+          })
             .then(function(res) {
               if (res && res.error) throw new Error(res.error);
               indicator.textContent = '✅ Переміщено';

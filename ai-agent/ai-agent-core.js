@@ -39,6 +39,7 @@ AIAgent.config = {
     + 'connection-state=invalid (НЕ state=invalid)\n'
     + 'connection-state=established,related (НЕ state=established)\n'
     + 'in-interface-list=WAN або in-interface-list=LAN\n'
+    + 'ЗАБОРОНЕНО in-list= — повна назва ТІЛЬКИ in-interface-list=!\n'
     + 'comment="текст" (НЕ comment=текст, НЕ comment=\'текст\')\n\n'
 
     + 'ПРАВИЛЬНІ ПРИКЛАДИ:\n'
@@ -52,7 +53,9 @@ AIAgent.config = {
     + '/tool traffic-monitor start — не існує\n'
     + 'place-before=N — не існує\n'
     + 'position=N — не існує\n'
-    + 'state=invalid — неправильна назва\n'
+    + 'state=invalid — неправильна назва (треба connection-state=invalid)\n'
+    + 'in-list=WAN — не існує (треба in-interface-list=WAN)\n'
+    + 'out-list=LAN — не існує (треба out-interface-list=LAN)\n'
     + "comment='текст' — одинарні лапки не працюють"
 };
 

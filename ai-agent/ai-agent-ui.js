@@ -1153,6 +1153,82 @@ AIAgentUI.securityAudit = function() {
   });
 };
 
+/* ════════════════════════════════════════════════
+   AITools — інструменти AI для керування UI
+   AI може відкривати секції, запускати функції
+   ════════════════════════════════════════════════ */
+window.AITools = {
+
+  /* Відкрити секцію в UI */
+  openSection: function(menu) {
+    var menuMap = {
+      "firewall":   "fw-filter",
+      "filter":     "fw-filter",
+      "nat":        "fw-nat",
+      "mangle":     "fw-mangle",
+      "interfaces": "interfaces",
+      "routes":     "ip-routes",
+      "dhcp":       "ip-dhcp",
+      "dns":        "ip-dns",
+      "users":      "sys-users",
+      "services":   "sys-services",
+      "scheduler":  "sys-scheduler",
+      "wireless":   "wl-interfaces",
+    };
+    var menuId = menuMap[menu.toLowerCase()] || menu;
+    /* Знаходимо пункт меню і клікаємо */
+    var menuItem = document.querySelector('.rm-menu-item[data-menu="' + menuId + '"]');
+    if (menuItem) {
+      menuItem.click();
+      console.log("[AITools] opened:", menuId);
+      return true;
+    }
+    console.warn("[AITools] menu not found:", menuId);
+    return false;
+  },
+
+  /* Запустити Auto-Fix */
+  runAutoFix: function() {
+    if (window.AIAgentUI && window.AIAgentUI.autoFixFirewall) {
+      window.AIAgentUI.autoFixFirewall();
+      return true;
+    }
+    return false;
+  },
+
+  /* Показати повідомлення */
+  showAlert: function(msg, type) {
+    if (window.AIAgentUI) {
+      window.AIAgentUI.addMessage(type || "system", msg);
+    }
+  },
+
+  /* Виконати SSH команду */
+  ssh: function(cmd) {
+    if (window.AIAgent) return window.AIAgent.ssh(cmd);
+    return Promise.reject("AIAgent недоступний");
+  },
+
+  /* Оновити таблицю поточного розділу */
+  refreshTable: function() {
+    if (window.__rmRefreshTable) { window.__rmRefreshTable(); return true; }
+    if (window.rmCrudFWFilter)   { window.rmCrudFWFilter();   return true; }
+    return false;
+  },
+
+  /* Зробити backup перед змінами */
+  backup: function(name) {
+    var bname = name || ("auto-backup-" + new Date().toISOString().slice(0,10));
+    return window.AIAgent.ssh("/system backup save name=\"" + bname + "\"");
+  },
+};
+
+/* Реєструємо AITools в AI Agent для виклику з відповідей */
+if (window.AIAgent) {
+  AIAgent.tools = window.AITools;
+  console.log("[AITools] registered ✅");
+}
+
 console.log('[AIAgentUI] Ready ✅');
 
       /* Слідкуємо за навігацією — кнопка і sidebar завжди видимі */

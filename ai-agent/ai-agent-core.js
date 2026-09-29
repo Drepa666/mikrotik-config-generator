@@ -114,8 +114,12 @@ AIAgent.getRouterContext = function() {
     "/interface",
     "/ip/firewall/filter",
     "/ip/firewall/nat",
+    "/ip/firewall/mangle",
+    "/ip/route",
     "/ip/service",
     "/ip/dhcp-server/lease",
+    "/ip/dns",
+    "/user",
   ];
 
   return Promise.allSettled(
@@ -192,7 +196,57 @@ AIAgent.getRouterContext = function() {
     var nat = ctx["/ip/firewall/nat"] || [];
     lines.push("\n=== NAT (" + nat.length + ") ===");
     nat.slice(0, 10).forEach(function(r) {
-      lines.push("chain=" + (r.chain||"?") + " action=" + (r.action||"?"));
+      var p = [".id=" + (r[".id"]||"?")];
+      p.push("chain=" + (r.chain||"?"));
+      p.push("action=" + (r.action||"?"));
+      if (r.protocol)          p.push("proto=" + r.protocol);
+      if (r["dst-port"])       p.push("dport=" + r["dst-port"]);
+      if (r["to-addresses"])   p.push("to=" + r["to-addresses"]);
+      if (r["to-ports"])       p.push("to-port=" + r["to-ports"]);
+      if (r["in-interface"])   p.push("in=" + r["in-interface"]);
+      if (r["out-interface"])  p.push("out=" + r["out-interface"]);
+      if (r["in-interface-list"])  p.push("in-list=" + r["in-interface-list"]);
+      if (r["out-interface-list"]) p.push("out-list=" + r["out-interface-list"]);
+      if (r.disabled === "true") p.push("[OFF]");
+      if (r.comment) p.push("comment=\"" + r.comment + "\"");
+      lines.push(p.join(" "));
+    });
+
+    /* Mangle */
+    var mangle = ctx["/ip/firewall/mangle"] || [];
+    if (mangle.length) {
+      lines.push("\n=== MANGLE (" + mangle.length + ") ===");
+      mangle.slice(0, 10).forEach(function(r) {
+        lines.push(".id=" + (r[".id"]||"?") + " chain=" + (r.chain||"?") +
+          " action=" + (r.action||"?") +
+          (r.comment ? " comment=\"" + r.comment + "\"" : ""));
+      });
+    }
+
+    /* Routes */
+    var routes = ctx["/ip/route"] || [];
+    var activeRoutes = routes.filter(function(r) { return r.active === "true"; });
+    lines.push("\n=== ROUTES (active: " + activeRoutes.length + "/" + routes.length + ") ===");
+    activeRoutes.slice(0, 10).forEach(function(r) {
+      lines.push(".id=" + (r[".id"]||"?") +
+        " dst=" + (r["dst-address"]||"?") +
+        " gateway=" + (r.gateway||"?") +
+        " distance=" + (r.distance||"?"));
+    });
+
+    /* DNS */
+    var dns = (ctx["/ip/dns"] || [])[0] || {};
+    if (dns.servers) {
+      lines.push("\n=== DNS ===");
+      lines.push("servers=" + dns.servers +
+        " cache-size=" + (dns["cache-size"]||"?"));
+    }
+
+    /* Users */
+    var users = ctx["/user"] || [];
+    lines.push("\n=== USERS (" + users.length + ") ===");
+    users.forEach(function(u) {
+      lines.push("name=" + (u.name||"?") + " group=" + (u.group||"?"));
     });
 
     var str = lines.join("\n");

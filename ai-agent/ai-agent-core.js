@@ -100,7 +100,7 @@ AIAgent.config = {
 /* ── Пам'ять ── */
 AIAgent.memory = {
   messages:    [],    // Поточна розмова
-  maxMessages: 20,    // Максимум повідомлень в контексті
+  maxMessages: 30,    // Максимум повідомлень в контексті
   routerCache: null,  // Кеш даних роутера
   cacheTime:   0,     // Час кешування
 
@@ -336,7 +336,7 @@ AIAgent.send = function(userMessage, options) {
 
       /* Додаємо KB перед кожною відповіддю */
       if (window.MikroTikKB) {
-        var kbContext = MikroTikKB.getContext(userMessage, 3000);
+        var kbContext = MikroTikKB.getContext(userMessage, 12000);
         if (kbContext) {
           systemContent += '\n\n[KNOWLEDGE BASE]\n' + kbContext;
         }

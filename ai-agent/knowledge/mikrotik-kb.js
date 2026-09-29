@@ -44,7 +44,7 @@ window.MikroTikKB = {
 
   /* Релевантний контекст по ключових словах */
   getContext: function(query, maxChars) {
-    maxChars = maxChars || 3000;
+    maxChars = maxChars || 15000;
     if (!MikroTikKB._loaded || !MikroTikKB._text) return '';
     var q = (query || '').toLowerCase();
     var keywords = q.split(/\s+/).filter(function(w) { return w.length > 2; });
@@ -60,7 +60,7 @@ window.MikroTikKB = {
       });
       if (score > 0) {
         var s   = Math.max(0, i - 2);
-        var e   = Math.min(lines.length, i + 20);
+        var e   = Math.min(lines.length, i + 40);
         var txt = lines.slice(s, e).join('\n');
         blocks.push({ score: score, text: txt });
         i = e;

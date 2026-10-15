@@ -1829,3 +1829,88 @@ set allowed-interface-list=LAN
 set allowed-interface-list=LAN
 /tool romon
 set enabled=yes
+
+
+════════════════════════════════════════════════════
+КРИТИЧНІ ПРАВИЛА ДЛЯ ГЕНЕРАЦІЇ СКРИПТІВ
+════════════════════════════════════════════════════
+
+1. КОМЕНТАРІ — тільки # (решітка):
+   ПРАВИЛЬНО: # це коментар
+   НЕПРАВИЛЬНО: /* це коментар */ — синтаксична помилка в RouterOS CLI!
+
+2. КОРИСТУВАЧІ — правильна послідовність:
+   /user set [find name=admin] name=admin-old
+   /user add name=admin group=full password=ПАРОЛЬ comment="new admin"
+   /user remove [find name=admin-old]
+   НІКОЛИ не робити: /user add name=admin якщо admin вже існує!
+   НІКОЛИ не робити: /user remove [find name!="admin"] — видалить сервісних користувачів!
+
+3. BRUTE-FORCE — два правила обов'язково (спочатку DROP, потім ADD):
+   /ip firewall filter add chain=input in-interface-list=WAN protocol=tcp dst-port=22 src-address-list=ssh-bruteforce action=drop comment="block SSH bruteforce"
+   /ip firewall filter add chain=input in-interface-list=WAN protocol=tcp dst-port=22 connection-state=new action=add-src-to-address-list address-list=ssh-bruteforce address-list-timeout=1h comment="track SSH bruteforce"
+
+4. /system reboot — НЕБЕЗПЕЧНО в скриптах:
+   Якщо виконується віддалено — розриває з'єднання одразу.
+   НЕ додавати reboot якщо не попереджено користувача.
+   Альтернатива: :log info "Config complete. Reboot manually if needed."
+
+5. connection-state=established,related,untracked — правильно для v7
+   Але untracked можна опустити для простоти.
+
+6. NAT chain — ТІЛЬКИ:
+   chain=srcnat (не src-nat!)
+   chain=dstnat (не dst-nat!)
+
+7. DHCP — обов'язково активувати:
+   /ip dhcp-server add ... disabled=no
+   АБО після add: /ip dhcp-server enable dhcp1
+
+8. DNS allow-remote-requests:
+   allow-remote-requests=no — завжди! (інакше відкритий DNS резолвер)
+
+9. Порядок bridge — СПОЧАТКУ bridge, ПОТІМ порти:
+   /interface bridge add name=bridge-lan
+   /interface bridge port add bridge=bridge-lan interface=ether2
+   /interface list member add list=LAN interface=bridge-lan
+
+10. NTP в RouterOS v7 — ТІЛЬКИ так:
+    /system ntp client set enabled=yes
+    /system ntp client servers add address=time.cloudflare.com
+    НЕПРАВИЛЬНО: /system ntp client set servers=time.cloudflare.com
+════════════════════════════════════════════════════
+
+════════════════════════════════════════════════
+ДОДАТКОВІ КРИТИЧНІ ПРАВИЛА (виявлені помилки AI)
+════════════════════════════════════════════════
+
+11. /# ... # — НЕ ІСНУЄ в RouterOS CLI!
+    НЕПРАВИЛЬНО: /# Brute-force protection #
+    ПРАВИЛЬНО:   # Brute-force protection
+
+12. [find where name!=X] — "where" НЕ існує!
+    НЕПРАВИЛЬНО: /user remove [find where name!="admin"]
+    ПРАВИЛЬНО:   /user remove [find name!=admin]
+
+13. Користувач admin — завжди існує за замовчуванням!
+    ОБОВ'ЯЗКОВА послідовність:
+    /user set [find name=admin] name=admin-old
+    /user add name=admin group=full password=ПАРОЛЬ
+    /user remove [find name=admin-old]
+
+14. Brute-force — ОБОВ'ЯЗКОВО два правила:
+    Правило 1 (DROP вже заблокованих):
+    /ip firewall filter add chain=input in-interface-list=WAN protocol=tcp dst-port=22 src-address-list=ssh-bruteforce action=drop comment="block SSH bruteforce"
+    Правило 2 (ADD нових порушників):
+    /ip firewall filter add chain=input in-interface-list=WAN protocol=tcp dst-port=22 connection-state=new action=add-src-to-address-list address-list=ssh-bruteforce address-list-timeout=1h comment="track SSH bruteforce"
+    БЕЗ placeholder address-list! НЕ додавати 0.0.0.0/0 в address-list!
+
+15. DHCP сервер — ЗАВЖДИ включати в скрипт з нуля:
+    /ip pool add name=dhcp_pool ranges=192.168.88.10-192.168.88.250
+    /ip dhcp-server add name=dhcp1 interface=bridge-lan address-pool=dhcp_pool lease-time=1d disabled=no
+    /ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=8.8.8.8,1.1.1.1
+
+16. protocol=tcp,udp — НЕ існує в одному правилі!
+    НЕПРАВИЛЬНО: protocol=tcp,udp
+    ПРАВИЛЬНО: два окремих правила — одне для tcp, одне для udp
+════════════════════════════════════════════════

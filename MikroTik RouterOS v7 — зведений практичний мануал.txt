@@ -1914,3 +1914,27 @@ set enabled=yes
     НЕПРАВИЛЬНО: protocol=tcp,udp
     ПРАВИЛЬНО: два окремих правила — одне для tcp, одне для udp
 ════════════════════════════════════════════════
+
+════════════════════════════════════════════════
+КРИТИЧНО: ЗАБОРОНЕНІ КОНСТРУКЦІЇ В СКРИПТАХ
+════════════════════════════════════════════════
+
+17. Backslash \ — продовження рядка НЕ існує в RouterOS!
+    НЕПРАВИЛЬНО:
+    /ip firewall nat add chain=srcnat out-interface-list=WAN action=masquerade \
+        comment="NAT masquerade"
+    ПРАВИЛЬНО (один рядок!):
+    /ip firewall nat add chain=srcnat out-interface-list=WAN action=masquerade comment="NAT masquerade"
+
+18. comment= в /ip dns set — параметр НЕ існує!
+    НЕПРАВИЛЬНО: /ip dns set servers=8.8.8.8 allow-remote-requests=no comment="DNS"
+    ПРАВИЛЬНО:   /ip dns set servers=8.8.8.8 allow-remote-requests=no
+
+19. chain=forward in-interface-list=LAN action=accept — занадто широко!
+    ПРАВИЛЬНО: chain=forward in-interface-list=LAN out-interface-list=WAN action=accept
+    + окремо: chain=forward action=drop comment="drop everything else"
+
+20. Пробіл перед командою — може викликати помилку:
+    НЕПРАВИЛЬНО:  /ip firewall filter add ...  (пробіл на початку)
+    ПРАВИЛЬНО:   /ip firewall filter add ...   (без пробілу)
+════════════════════════════════════════════════
